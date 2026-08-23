@@ -73,7 +73,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (credentials: any) => {
-    const res = await apiClient.post('/auth/login', credentials);
+    let endpoint = '/auth/login';
+    if (credentials.requiredRole === 'ROLE_CANDIDATE') {
+      endpoint = '/auth/candidate/login';
+    } else if (credentials.requiredRole === 'ROLE_HR') {
+      endpoint = '/auth/hr/login';
+    } else if (credentials.requiredRole === 'ROLE_SUPER_ADMIN') {
+      endpoint = '/auth/admin/login';
+    }
+
+    const res = await apiClient.post(endpoint, credentials);
     const authData = res.data.data;
     if (authData.accessToken) {
       localStorage.setItem('accessToken', authData.accessToken);

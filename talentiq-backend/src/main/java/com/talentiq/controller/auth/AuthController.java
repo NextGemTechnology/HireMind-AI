@@ -65,8 +65,8 @@ public class AuthController {
     @PostMapping("/login")
     @SecurityRequirements
     @Operation(
-            summary = "Login",
-            description = "Authenticate with email and password. Returns access token (15 min) and refresh token (7 days)."
+            summary = "Universal Login",
+            description = "Authenticate with email and password. Optional requiredRole parameter enforces RBAC."
     )
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
@@ -74,6 +74,48 @@ public class AuthController {
 
         AuthResponse response = authService.login(request, httpRequest);
         return ResponseEntity.ok(ApiResponse.success("Login successful", response));
+    }
+
+    @PostMapping("/candidate/login")
+    @SecurityRequirements
+    @Operation(
+            summary = "Candidate Login",
+            description = "Authenticate candidate accounts strictly. Rejects HR or Admin accounts attempting candidate login."
+    )
+    public ResponseEntity<ApiResponse<AuthResponse>> loginCandidate(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+
+        AuthResponse response = authService.loginCandidate(request, httpRequest);
+        return ResponseEntity.ok(ApiResponse.success("Candidate login successful", response));
+    }
+
+    @PostMapping("/hr/login")
+    @SecurityRequirements
+    @Operation(
+            summary = "HR Recruiter Login",
+            description = "Authenticate HR recruiter accounts strictly. Rejects Candidate accounts attempting HR login."
+    )
+    public ResponseEntity<ApiResponse<AuthResponse>> loginHr(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+
+        AuthResponse response = authService.loginHr(request, httpRequest);
+        return ResponseEntity.ok(ApiResponse.success("HR Recruiter login successful", response));
+    }
+
+    @PostMapping("/admin/login")
+    @SecurityRequirements
+    @Operation(
+            summary = "Super Admin Login",
+            description = "Authenticate Super Admin accounts strictly."
+    )
+    public ResponseEntity<ApiResponse<AuthResponse>> loginAdmin(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+
+        AuthResponse response = authService.loginAdmin(request, httpRequest);
+        return ResponseEntity.ok(ApiResponse.success("Super Admin login successful", response));
     }
 
     // ── Google OAuth Login ───────────────────────────────────────────────────

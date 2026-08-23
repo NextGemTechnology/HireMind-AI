@@ -42,9 +42,16 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
       });
       setShowPrompt(false);
       const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const roles = savedUser.roles || [];
-      if (roles.includes('ROLE_HR') || roles.includes('HR')) {
+      const roles: string[] = savedUser.roles || [];
+      const isHr = roles.includes('ROLE_HR') || roles.includes('HR');
+      const isAdmin = roles.includes('ROLE_SUPER_ADMIN') || roles.includes('SUPER_ADMIN');
+
+      if (role === 'ROLE_HR' && (isHr || isAdmin)) {
         navigate('/hr-analytics');
+      } else if (role === 'ROLE_CANDIDATE' && !isHr) {
+        navigate('/jobs');
+      } else if (isAdmin) {
+        navigate('/admin');
       } else {
         navigate('/jobs');
       }

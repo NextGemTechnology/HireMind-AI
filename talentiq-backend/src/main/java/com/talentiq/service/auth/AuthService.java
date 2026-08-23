@@ -20,6 +20,12 @@ public interface AuthService {
      */
     AuthResponse login(LoginRequest request, HttpServletRequest httpRequest);
 
+    AuthResponse loginCandidate(LoginRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse loginHr(LoginRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest);
+
     /**
      * Rotate the refresh token. Invalidates old token, issues new pair.
      */

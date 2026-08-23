@@ -158,6 +158,24 @@ public class AuthServiceImpl implements AuthService {
     // ── Login ─────────────────────────────────────────────────────────────────
 
     @Override
+    public AuthResponse loginCandidate(LoginRequest request, HttpServletRequest httpRequest) {
+        request.setRequiredRole(Role.ROLE_CANDIDATE);
+        return login(request, httpRequest);
+    }
+
+    @Override
+    public AuthResponse loginHr(LoginRequest request, HttpServletRequest httpRequest) {
+        request.setRequiredRole(Role.ROLE_HR);
+        return login(request, httpRequest);
+    }
+
+    @Override
+    public AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest) {
+        request.setRequiredRole(Role.ROLE_SUPER_ADMIN);
+        return login(request, httpRequest);
+    }
+
+    @Override
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
         validateGmailDomain(email);
@@ -180,6 +198,50 @@ public class AuthServiceImpl implements AuthService {
             UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
             User authenticatedUser = principal.getUser();
 
+            // RBAC Portal Enforcement: Verify user possesses the required role for the portal
+            if (request.getRequiredRole() != null) {
+                boolean hasRole = authenticatedUser.getRoles().contains(request.getRequiredRole());
+                if (!hasRole) {
+                    boolean isAdmin = authenticatedUser.getRoles().contains(Role.ROLE_SUPER_ADMIN) || authenticatedUser.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
+                    if (!isAdmin) {
+                        Role primaryRole = authenticatedUser.getRoles().stream().findFirst().orElse(Role.ROLE_CANDIDATE);
+                        String roleLabel = primaryRole == Role.ROLE_HR ? "HR Recruiter" : (primaryRole == Role.ROLE_CANDIDATE ? "Candidate" : "Super Admin");
+                        String targetLabel = request.getRequiredRole() == Role.ROLE_HR ? "HR Recruiter" : (request.getRequiredRole() == Role.ROLE_CANDIDATE ? "Candidate" : "Super Admin");
+                        throw new com.talentiq.common.exception.ForbiddenException(
+                                "Access Denied: Your account (" + email + ") is registered as a " + roleLabel +
+                                ". You cannot log in through the " + targetLabel + " portal. Please switch to the " + roleLabel + " Login tab."
+                        );
+                    }
+                }
+            }
+
+            // Ensure profile entity exists in candidate or hr_profiles table
+            if (authenticatedUser.getRoles().contains(Role.ROLE_CANDIDATE)) {
+                if (!candidateRepository.existsByUserId(authenticatedUser.getId())) {
+                    candidateRepository.save(Candidate.builder()
+                            .user(authenticatedUser)
+                            .openToWork(true)
+                            .build());
+                }
+            }
+            if (authenticatedUser.getRoles().contains(Role.ROLE_HR)) {
+                if (!hrProfileRepository.existsByUserId(authenticatedUser.getId())) {
+                    Company defaultComp = companyRepository.findByName("TalentIQ Enterprise")
+                            .orElseGet(() -> companyRepository.save(Company.builder()
+                                    .name("TalentIQ Enterprise")
+                                    .slug("talentiq-enterprise-" + System.currentTimeMillis())
+                                    .verified(true)
+                                    .active(true)
+                                    .build()));
+                    hrProfileRepository.save(HrProfile.builder()
+                            .user(authenticatedUser)
+                            .company(defaultComp)
+                            .designation("Talent Partner")
+                            .companyAdmin(true)
+                            .build());
+                }
+            }
+
             // Reset failed attempts on success
             userRepository.recordSuccessfulLogin(authenticatedUser.getId(), Instant.now());
 
@@ -187,7 +249,7 @@ public class AuthServiceImpl implements AuthService {
             String accessToken = jwtService.generateAccessToken(principal, authenticatedUser.getId());
             RefreshToken refreshToken = createRefreshToken(authenticatedUser, httpRequest);
 
-            log.info("User logged in: {}", email);
+            log.info("User logged in successfully: {} [{}]", email, authenticatedUser.getRoles());
 
             return buildAuthResponse(authenticatedUser, accessToken, refreshToken.getToken());
 
@@ -207,6 +269,25 @@ public class AuthServiceImpl implements AuthService {
         validateGmailDomain(email);
 
         User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user != null) {
+            // Existing user: Enforce RBAC portal check
+            if (request.getRole() != null) {
+                boolean hasRole = user.getRoles().contains(request.getRole());
+                if (!hasRole) {
+                    boolean isAdmin = user.getRoles().contains(Role.ROLE_SUPER_ADMIN) || user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
+                    if (!isAdmin) {
+                        Role primaryRole = user.getRoles().stream().findFirst().orElse(Role.ROLE_CANDIDATE);
+                        String roleLabel = primaryRole == Role.ROLE_HR ? "HR Recruiter" : "Candidate";
+                        String targetLabel = request.getRole() == Role.ROLE_HR ? "HR Recruiter" : "Candidate";
+                        throw new com.talentiq.common.exception.ForbiddenException(
+                                "Access Denied: Google account (" + email + ") is registered as a " + roleLabel +
+                                ". You cannot log in through the " + targetLabel + " portal. Please switch to the " + roleLabel + " Login tab."
+                        );
+                    }
+                }
+            }
+        }
 
         if (user == null) {
             // Auto-register new Google user

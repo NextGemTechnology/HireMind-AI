@@ -10,7 +10,7 @@ type LoginRoleMode = 'CANDIDATE' | 'HR' | 'ADMIN';
 type AuthCardMode = 'LOGIN' | 'REGISTER';
 
 export const Login: React.FC = () => {
-  const { login, register } = useAuth();
+  const { login, register, logout } = useAuth();
   const navigate = useNavigate();
 
   const [authCardMode, setAuthCardMode] = useState<AuthCardMode>('LOGIN');
@@ -72,21 +72,43 @@ export const Login: React.FC = () => {
     }
     setLoading(true);
     try {
-      await login({ email: email.trim(), password });
-      const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const roles = savedUser.roles || [];
-      const userIsHr = roles.includes('ROLE_HR') || roles.includes('HR') || selectedRole === 'HR';
-      const userIsAdmin = roles.includes('ROLE_SUPER_ADMIN') || roles.includes('SUPER_ADMIN') || selectedRole === 'ADMIN';
+      const targetRole = selectedRole === 'HR'
+        ? 'ROLE_HR'
+        : (selectedRole === 'ADMIN' ? 'ROLE_SUPER_ADMIN' : 'ROLE_CANDIDATE');
 
-      if (userIsAdmin) {
-        navigate('/admin');
-      } else if (userIsHr) {
+      await login({ email: email.trim(), password, requiredRole: targetRole });
+
+      const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const roles: string[] = savedUser.roles || [];
+
+      const userIsHr = roles.includes('ROLE_HR') || roles.includes('HR');
+      const userIsAdmin = roles.includes('ROLE_SUPER_ADMIN') || roles.includes('SUPER_ADMIN') || roles.includes('ROLE_PLATFORM_ADMIN');
+      const userIsCandidate = roles.includes('ROLE_CANDIDATE') || roles.includes('CANDIDATE');
+
+      if (selectedRole === 'HR') {
+        if (!userIsHr && !userIsAdmin) {
+          logout();
+          setError('Access Denied: This account is not registered as an HR Recruiter.');
+          return;
+        }
         navigate('/hr-analytics');
+      } else if (selectedRole === 'ADMIN') {
+        if (!userIsAdmin) {
+          logout();
+          setError('Access Denied: This account does not possess Super Admin privileges.');
+          return;
+        }
+        navigate('/admin');
       } else {
+        if (!userIsCandidate && !userIsAdmin) {
+          logout();
+          setError('Access Denied: This account is not registered as a Candidate.');
+          return;
+        }
         navigate('/jobs');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please verify your credentials.');
+      setError(err.response?.data?.message || 'Invalid email or password for selected portal.');
     } finally {
       setLoading(false);
     }
