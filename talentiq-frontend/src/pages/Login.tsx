@@ -129,27 +129,27 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       if (selectedRole === 'HR') {
         if (!userIsHr && !userIsAdmin) {
           logout();
-          setError('Access Denied: This account is not registered as an HR Recruiter.');
+          setError('Invalid email or password');
           return;
         }
         navigate('/hr-analytics');
       } else if (selectedRole === 'ADMIN') {
         if (!userIsAdmin) {
           logout();
-          setError('Access Denied: This account does not possess Super Admin privileges.');
+          setError('Invalid email or password');
           return;
         }
         navigate('/admin');
       } else {
         if (!userIsCandidate && !userIsAdmin) {
           logout();
-          setError('Access Denied: This account is not registered as a Candidate.');
+          setError('Invalid email or password');
           return;
         }
         navigate('/jobs');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password for selected portal.');
+      setError(err.response?.data?.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }

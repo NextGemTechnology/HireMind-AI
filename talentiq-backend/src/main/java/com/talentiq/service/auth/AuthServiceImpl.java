@@ -204,13 +204,7 @@ public class AuthServiceImpl implements AuthService {
                 if (!hasRole) {
                     boolean isAdmin = authenticatedUser.getRoles().contains(Role.ROLE_SUPER_ADMIN) || authenticatedUser.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
                     if (!isAdmin) {
-                        Role primaryRole = authenticatedUser.getRoles().stream().findFirst().orElse(Role.ROLE_CANDIDATE);
-                        String roleLabel = primaryRole == Role.ROLE_HR ? "HR Recruiter" : (primaryRole == Role.ROLE_CANDIDATE ? "Candidate" : "Super Admin");
-                        String targetLabel = request.getRequiredRole() == Role.ROLE_HR ? "HR Recruiter" : (request.getRequiredRole() == Role.ROLE_CANDIDATE ? "Candidate" : "Super Admin");
-                        throw new com.talentiq.common.exception.ForbiddenException(
-                                "Access Denied: Your account (" + email + ") is registered as a " + roleLabel +
-                                ". You cannot log in through the " + targetLabel + " portal. Please switch to the " + roleLabel + " Login tab."
-                        );
+                        throw new BadCredentialsException("Invalid email or password");
                     }
                 }
             }
@@ -277,13 +271,7 @@ public class AuthServiceImpl implements AuthService {
                 if (!hasRole) {
                     boolean isAdmin = user.getRoles().contains(Role.ROLE_SUPER_ADMIN) || user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
                     if (!isAdmin) {
-                        Role primaryRole = user.getRoles().stream().findFirst().orElse(Role.ROLE_CANDIDATE);
-                        String roleLabel = primaryRole == Role.ROLE_HR ? "HR Recruiter" : "Candidate";
-                        String targetLabel = request.getRole() == Role.ROLE_HR ? "HR Recruiter" : "Candidate";
-                        throw new com.talentiq.common.exception.ForbiddenException(
-                                "Access Denied: Google account (" + email + ") is registered as a " + roleLabel +
-                                ". You cannot log in through the " + targetLabel + " portal. Please switch to the " + roleLabel + " Login tab."
-                        );
+                        throw new UnauthorizedException("Invalid credentials for this portal");
                     }
                 }
             }

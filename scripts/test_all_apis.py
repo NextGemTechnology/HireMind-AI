@@ -127,19 +127,19 @@ def run_suite():
     hr_token = res.get("data", {}).get("accessToken")
     hr_id = res.get("data", {}).get("userId")
 
-    # RBAC: Candidate login via HR endpoint (MUST FAIL 403)
+    # RBAC: Candidate login via HR endpoint (MUST REJECT WITH 401 INVALID CREDENTIALS)
     code, res = request("/v1/auth/hr/login", "POST", {
         "email": cand_email,
         "password": "Password123!"
     })
-    log_test("Auth", "/v1/auth/hr/login (Candidate rejected)", "POST", code, 403)
+    log_test("Auth", "/v1/auth/hr/login (Candidate rejected - 401 Invalid Credentials)", "POST", code, 401)
 
-    # RBAC: HR login via Candidate endpoint (MUST FAIL 403)
+    # RBAC: HR login via Candidate endpoint (MUST REJECT WITH 401 INVALID CREDENTIALS)
     code, res = request("/v1/auth/candidate/login", "POST", {
         "email": hr_email,
         "password": "Password123!"
     })
-    log_test("Auth", "/v1/auth/candidate/login (HR rejected)", "POST", code, 403)
+    log_test("Auth", "/v1/auth/candidate/login (HR rejected - 401 Invalid Credentials)", "POST", code, 401)
 
     # Candidate Login
     code, res = request("/v1/auth/candidate/login", "POST", {
