@@ -185,19 +185,9 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     setError('');
 
     const trimmedEmail = email.trim().toLowerCase();
-    const isGmail = trimmedEmail.endsWith('@gmail.com');
-    const isTalentIqDomain = trimmedEmail.endsWith('@talentiq.ai');
-
-    if (selectedRole === 'ADMIN') {
-      if (!isGmail && !isTalentIqDomain) {
-        setError('Admin email must end with @gmail.com or @talentiq.ai.');
-        return;
-      }
-    } else {
-      if (!isGmail) {
-        setError('Only @gmail.com email addresses are allowed for login.');
-        return;
-      }
+    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
+      setError('Please enter a valid email address.');
+      return;
     }
 
     setLoading(true);
@@ -248,8 +238,13 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
-    if (!regEmail.trim().endsWith('@gmail.com')) {
-      setRegError('Registration requires an email ending with @gmail.com.');
+    const trimmedEmail = regEmail.trim().toLowerCase();
+    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
+      setRegError('Please enter a valid email address.');
+      return;
+    }
+    if (!regPassword || regPassword.length < 8) {
+      setRegError('Password must be at least 8 characters.');
       return;
     }
     setRegLoading(true);
@@ -258,10 +253,10 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         await register({
           firstName: regFirstName,
           lastName: regLastName,
-          email: regEmail.trim(),
+          email: trimmedEmail,
           password: regPassword,
           role: 'ROLE_HR',
-          companyName: regCompany || 'My Enterprise Corp',
+          companyName: regCompany || 'Enterprise Talent Corp',
           jobTitle: 'Recruitment Lead',
         });
         navigate('/hr-analytics');
@@ -269,7 +264,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         await register({
           firstName: regFirstName,
           lastName: regLastName,
-          email: regEmail.trim(),
+          email: trimmedEmail,
           password: regPassword,
           role: 'ROLE_CANDIDATE',
           desiredRole: regDesiredRole || 'Software Engineer',

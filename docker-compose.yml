@@ -77,7 +77,7 @@ services:
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-HireMeAI}
       DB_USER: ${DB_USER:-talentiq_user}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-}}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-minimum-256-bits}
@@ -90,8 +90,10 @@ services:
       AI_PROVIDER: ${AI_PROVIDER:-openai}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_USERNAME: ${MAIL_USERNAME:-hiremindai.ai@gmail.com}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-hiremindai.ai@gmail.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-HireMind AI Platform}
     ports:
       - "8081:8080"
     volumes:

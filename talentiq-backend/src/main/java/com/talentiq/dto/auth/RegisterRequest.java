@@ -23,7 +23,6 @@ public class RegisterRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
-    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@gmail\\.com$", message = "Email must end with @gmail.com")
     @Size(max = 255, message = "Email must not exceed 255 characters")
     private String email;
 

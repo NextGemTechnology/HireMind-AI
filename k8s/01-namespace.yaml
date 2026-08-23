@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hiremind-ai
+  labels:
+    app.kubernetes.io/name: hiremind-ai
+    app.kubernetes.io/part-of: talentiq-platform

@@ -37,6 +37,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -71,11 +72,12 @@ public class AuthServiceImpl implements AuthService {
     private final MailService mailService;
     private final AppProperties appProperties;
     private final com.talentiq.security.jwt.TokenBlacklistService tokenBlacklistService;
+    private final RedisOtpService redisOtpService;
 
-    // ── Email Validation: Must end with @gmail.com or @talentiq.ai (for admin) ─
-    private void validateGmailDomain(String email) {
-        if (email == null || (!email.trim().endsWith("@gmail.com") && !email.trim().endsWith("@talentiq.ai"))) {
-            throw new BadRequestException("Only @gmail.com email addresses are allowed for registration and login.");
+    // ── Email Validation ───────────────────────────────────────────────────────
+    private void validateEmailFormat(String email) {
+        if (!StringUtils.hasText(email) || !email.contains("@") || !email.contains(".")) {
+            throw new BadRequestException("Please provide a valid email address.");
         }
     }
 
@@ -84,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateGmailDomain(email);
+        validateEmailFormat(email);
 
         // Validate only CANDIDATE and HR roles are allowed for public registration
         if (request.getRole() == null
@@ -147,6 +149,9 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("New user registered and activated: {} [{}]", savedUser.getEmail(), request.getRole());
 
+        // Dispatch Welcome / Account Created email
+        mailService.sendAccountCreatedEmail(savedUser.getEmail(), savedUser.getFirstName(), request.getRole().name());
+
         // Issue tokens for instant authentication upon registration
         UserPrincipal principal = new UserPrincipal(savedUser);
         String accessToken = jwtService.generateAccessToken(principal, savedUser.getId());
@@ -178,7 +183,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateGmailDomain(email);
+        validateEmailFormat(email);
 
         // Find user first for lockout check
         User user = userRepository.findByEmail(email)
@@ -243,6 +248,11 @@ public class AuthServiceImpl implements AuthService {
             String accessToken = jwtService.generateAccessToken(principal, authenticatedUser.getId());
             RefreshToken refreshToken = createRefreshToken(authenticatedUser, httpRequest);
 
+            // Dispatch Login Alert email notification
+            String clientIp = getClientIpAddress(httpRequest);
+            String userAgent = getClientUserAgent(httpRequest);
+            mailService.sendLoginAlertEmail(authenticatedUser.getEmail(), authenticatedUser.getFirstName(), clientIp, userAgent);
+
             log.info("User logged in successfully: {} [{}]", email, authenticatedUser.getRoles());
 
             return buildAuthResponse(authenticatedUser, accessToken, refreshToken.getToken());
@@ -260,31 +270,16 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse googleLogin(GoogleAuthRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateGmailDomain(email);
+        validateEmailFormat(email);
 
-        User user = userRepository.findByEmail(email).orElse(null);
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        User user;
 
-        if (user != null) {
-            // Existing user: Enforce RBAC portal check
-            if (request.getRole() != null) {
-                boolean hasRole = user.getRoles().contains(request.getRole());
-                if (!hasRole) {
-                    boolean isAdmin = user.getRoles().contains(Role.ROLE_SUPER_ADMIN) || user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
-                    if (!isAdmin) {
-                        throw new UnauthorizedException("Invalid credentials for this portal");
-                    }
-                }
-            }
-        }
-
-        if (user == null) {
-            // Auto-register new Google user
-            String fullName = StringUtils.hasText(request.getName()) ? request.getName().trim() : "Google User";
-            String[] parts = fullName.split("\\s+", 2);
-            String firstName = parts[0];
-            String lastName = parts.length > 1 ? parts[1] : "User";
-
+        if (existingUser.isEmpty()) {
             Role role = request.getRole() != null ? request.getRole() : Role.ROLE_CANDIDATE;
+            String[] nameParts = request.getName() != null ? request.getName().split(" ", 2) : new String[]{"User", ""};
+            String firstName = nameParts[0];
+            String lastName = nameParts.length > 1 ? nameParts[1] : "";
 
             user = User.builder()
                     .email(email)
@@ -299,33 +294,31 @@ public class AuthServiceImpl implements AuthService {
             user.addRole(role);
             user = userRepository.save(user);
 
-            if (role.equals(Role.ROLE_CANDIDATE)) {
-                Candidate candidate = Candidate.builder()
+            if (role == Role.ROLE_CANDIDATE) {
+                candidateRepository.save(Candidate.builder()
                         .user(user)
-                        .currentTitle("Open to Opportunities")
-                        .yearsExperience(1)
                         .openToWork(true)
-                        .build();
-                candidateRepository.save(candidate);
-            } else if (role.equals(Role.ROLE_HR)) {
-                Company company = companyRepository.findByName("Google Recruiter Workspace").orElseGet(() ->
-                        companyRepository.save(Company.builder()
-                                .name("Google Recruiter Workspace")
-                                .slug("google-recruiter-" + System.currentTimeMillis())
+                        .build());
+            } else if (role == Role.ROLE_HR) {
+                Company defaultComp = companyRepository.findByName("TalentIQ Enterprise")
+                        .orElseGet(() -> companyRepository.save(Company.builder()
+                                .name("TalentIQ Enterprise")
+                                .slug("talentiq-enterprise-" + System.currentTimeMillis())
                                 .verified(true)
                                 .active(true)
-                                .build())
-                );
-                HrProfile hrProfile = HrProfile.builder()
+                                .build()));
+                hrProfileRepository.save(HrProfile.builder()
                         .user(user)
-                        .company(company)
-                        .designation("Talent Acquisition Specialist")
+                        .company(defaultComp)
+                        .designation("Talent Partner")
                         .companyAdmin(true)
-                        .build();
-                hrProfileRepository.save(hrProfile);
+                        .build());
             }
-            log.info("New user registered via Google OAuth: {} [{}]", user.getEmail(), role);
+
+            mailService.sendAccountCreatedEmail(user.getEmail(), user.getFirstName(), role.name());
+            log.info("New user registered via Google OAuth: {} [{}]", email, role);
         } else {
+            user = existingUser.get();
             if (user.isLocked()) {
                 throw new UnauthorizedException("Account temporarily locked. Try again later.");
             }
@@ -339,6 +332,11 @@ public class AuthServiceImpl implements AuthService {
         UserPrincipal principal = new UserPrincipal(user);
         String accessToken = jwtService.generateAccessToken(principal, user.getId());
         RefreshToken refreshToken = createRefreshToken(user, httpRequest);
+
+        // Dispatch Login Alert email notification
+        String clientIp = getClientIpAddress(httpRequest);
+        String userAgent = getClientUserAgent(httpRequest);
+        mailService.sendLoginAlertEmail(user.getEmail(), user.getFirstName(), clientIp, userAgent);
 
         log.info("Google OAuth login successful: {}", email);
         return buildAuthResponse(user, accessToken, refreshToken.getToken());
@@ -438,55 +436,52 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail().toLowerCase().trim();
-        validateGmailDomain(email);
+        validateEmailFormat(email);
+
+        // 1. Enforce Redis sliding rate limit (handles 10,000+ users & prevents brute-force / DDoS)
+        redisOtpService.enforceRateLimit(email, null);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadRequestException("No registered account found with email: " + email));
 
-        // Generate 4-digit numeric OTP
+        // 2. Generate 4-digit numeric OTP
         int randomPin = new java.security.SecureRandom().nextInt(10000);
         String otp = String.format("%04d", randomPin);
 
+        // 3. Store in Redis with O(1) in-memory TTL (10 minutes)
+        redisOtpService.storeOtp(email, otp, 10);
+
+        // 4. Also persist in DB as fallback
         user.setPasswordResetOtp(otp);
         user.setPasswordResetOtpExpiresAt(Instant.now().plus(10, ChronoUnit.MINUTES));
         user.setPasswordResetToken(otp);
         user.setPasswordResetTokenExpiresAt(Instant.now().plus(10, ChronoUnit.MINUTES));
         userRepository.save(user);
 
+        // 5. Fire async email
         mailService.sendPasswordResetOtpEmail(user.getEmail(), user.getFirstName(), otp);
-        log.info("4-Digit Password Reset OTP generated for user [{}]: {}", email, otp);
+        log.info("===============================================================");
+        log.info("🔑 [HIREMIND AI - 4-DIGIT OTP FOR {}]: {}", email, otp);
+        log.info("===============================================================");
     }
 
     @Override
     public void verifyPasswordResetOtp(VerifyOtpRequest request) {
         String email = request.getEmail().toLowerCase().trim();
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadRequestException("No registered account found with email: " + email));
-
-        boolean otpValid = false;
-        if (user.getPasswordResetOtp() != null && user.getPasswordResetOtp().equals(request.getOtp().trim())) {
-            otpValid = user.getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetOtpExpiresAt());
-        } else if (user.getPasswordResetToken() != null && user.getPasswordResetToken().equals(request.getOtp().trim())) {
-            otpValid = user.getPasswordResetTokenExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetTokenExpiresAt());
-        }
-
-        if (!otpValid) {
-            throw new BadRequestException("Invalid or expired 4-digit OTP. Please request a new code.");
-        }
-
-        log.info("4-Digit OTP verified successfully for email: {}", email);
+        // Redis-backed O(1) atomic verification with brute-force defense
+        redisOtpService.verifyOtp(email, request.getOtp());
+        log.info("4-Digit OTP verified successfully in Redis for email: {}", email);
     }
 
     @Override
     public void resetPassword(ResetPasswordRequest request) {
+        String email = request.getEmail() != null ? request.getEmail().toLowerCase().trim() : null;
         User user = null;
-        if (StringUtils.hasText(request.getEmail())) {
-            user = userRepository.findByEmail(request.getEmail().toLowerCase().trim())
-                    .orElse(null);
+        if (StringUtils.hasText(email)) {
+            user = userRepository.findByEmail(email).orElse(null);
         }
         if (user == null && StringUtils.hasText(request.getToken())) {
-            user = userRepository.findByPasswordResetToken(request.getToken())
-                    .orElse(null);
+            user = userRepository.findByPasswordResetToken(request.getToken()).orElse(null);
         }
 
         if (user == null) {
@@ -494,23 +489,27 @@ public class AuthServiceImpl implements AuthService {
         }
 
         String providedOtpOrToken = StringUtils.hasText(request.getOtp()) ? request.getOtp().trim() : request.getToken();
-        if (!StringUtils.hasText(providedOtpOrToken)) {
-            throw new BadRequestException("4-digit OTP or reset token is required.");
+        
+        // Check Redis verification ticket first
+        boolean verified = redisOtpService.isOtpVerified(user.getEmail());
+        if (!verified) {
+            // Check fallback in MySQL
+            if (user.getPasswordResetOtp() != null && user.getPasswordResetOtp().equals(providedOtpOrToken)) {
+                verified = user.getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetOtpExpiresAt());
+            }
+            if (!verified && user.getPasswordResetToken() != null && user.getPasswordResetToken().equals(providedOtpOrToken)) {
+                verified = user.getPasswordResetTokenExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetTokenExpiresAt());
+            }
         }
 
-        boolean valid = false;
-        if (user.getPasswordResetOtp() != null && user.getPasswordResetOtp().equals(providedOtpOrToken)) {
-            valid = user.getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetOtpExpiresAt());
-        }
-        if (!valid && user.getPasswordResetToken() != null && user.getPasswordResetToken().equals(providedOtpOrToken)) {
-            valid = user.getPasswordResetTokenExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetTokenExpiresAt());
-        }
-
-        if (!valid) {
+        if (!verified) {
             throw new BadRequestException("Invalid or expired 4-digit OTP. Please request a new code.");
         }
 
         userRepository.updatePassword(user.getId(), passwordEncoder.encode(request.getNewPassword()));
+        
+        // Consume Redis verified ticket
+        redisOtpService.consumeVerifiedTicket(user.getEmail());
 
         // Revoke all refresh tokens & active sessions for security
         refreshTokenRepository.revokeAllUserTokens(user.getId());

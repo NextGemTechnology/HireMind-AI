@@ -59,8 +59,8 @@ export const Register: React.FC = () => {
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
       setError('All fields are required'); return;
     }
-    if (!form.email.trim().endsWith('@gmail.com')) {
-      setError('Registration requires a valid email ending with @gmail.com.'); return;
+    if (!form.email || !form.email.includes('@') || !form.email.includes('.')) {
+      setError('Registration requires a valid email address.'); return;
     }
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match'); return;

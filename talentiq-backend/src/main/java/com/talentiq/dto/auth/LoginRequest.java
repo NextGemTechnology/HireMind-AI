@@ -11,7 +11,6 @@ public class LoginRequest {
 
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid email format")
-    @Pattern(regexp = "^[a-zA-Z0-9._%+-]+@(gmail\\.com|talentiq\\.ai)$", message = "Email must end with @gmail.com or @talentiq.ai")
     private String email;
 
     @NotBlank(message = "Password is required")

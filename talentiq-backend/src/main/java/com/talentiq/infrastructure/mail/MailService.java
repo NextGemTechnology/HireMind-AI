@@ -36,7 +36,7 @@ public class MailService {
         String verificationUrl = appProperties.getFrontend().getBaseUrl()
                 + "/verify-email?token=" + verificationToken;
 
-        String subject = "Verify your TalentIQ email address";
+        String subject = "Verify your HireMind AI email address";
         String body = buildEmailVerificationHtml(firstName, verificationUrl,
                 appProperties.getMail().getVerificationExpiryMinutes());
 
@@ -52,7 +52,7 @@ public class MailService {
         String resetUrl = appProperties.getFrontend().getBaseUrl()
                 + "/reset-password?token=" + resetToken;
 
-        String subject = "Reset your TalentIQ password";
+        String subject = "Reset your HireMind AI password";
         String body = buildPasswordResetHtml(firstName, resetUrl,
                 appProperties.getMail().getResetPasswordExpiryMinutes());
 
@@ -65,7 +65,7 @@ public class MailService {
      */
     @Async("mailExecutor")
     public void sendPasswordResetOtpEmail(String toEmail, String firstName, String otp) {
-        String subject = "🔑 Your TalentIQ Password Reset OTP: " + otp;
+        String subject = "🔑 Your HireMind AI Password Reset OTP: " + otp;
         String body = buildPasswordResetOtpHtml(firstName, otp, 10);
 
         sendHtmlEmail(toEmail, subject, body);
@@ -73,11 +73,38 @@ public class MailService {
     }
 
     /**
+     * Sends an account created confirmation email upon successful registration.
+     */
+    @Async("mailExecutor")
+    public void sendAccountCreatedEmail(String toEmail, String firstName, String role) {
+        String roleDisplay = role != null && role.contains("HR") ? "HR Recruiter" : "Candidate";
+        String subject = "🎉 Welcome to HireMind AI — Your Account has been Created!";
+        String body = buildAccountCreatedHtml(firstName, roleDisplay, appProperties.getFrontend().getBaseUrl());
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Account created confirmation email dispatched to: {} [{}]", toEmail, roleDisplay);
+    }
+
+    /**
+     * Sends a security alert notification when a new login occurs.
+     */
+    @Async("mailExecutor")
+    public void sendLoginAlertEmail(String toEmail, String firstName, String ipAddress, String userAgent) {
+        String formattedTime = DateTimeFormatter
+                .ofPattern("EEEE, MMMM d, yyyy 'at' h:mm a z", Locale.ENGLISH)
+                .withZone(ZoneId.of("UTC"))
+                .format(Instant.now());
+        String subject = "🛡️ HireMind AI — New Sign-In to Your Account";
+        String body = buildLoginAlertHtml(firstName, formattedTime, ipAddress, userAgent);
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Login alert email dispatched to: {} [IP: {}]", toEmail, ipAddress);
+    }
+
+    /**
      * Sends a welcome email after successful email verification.
      */
     @Async("mailExecutor")
     public void sendWelcomeEmail(String toEmail, String firstName) {
-        String subject = "Welcome to TalentIQ — Your AI Career Platform";
+        String subject = "Welcome to HireMind AI — Your AI Career Platform";
         String body = buildWelcomeHtml(firstName, appProperties.getFrontend().getBaseUrl());
         sendHtmlEmail(toEmail, subject, body);
         log.info("Welcome email dispatched to: {}", toEmail);
@@ -88,7 +115,7 @@ public class MailService {
      */
     @Async("mailExecutor")
     public void sendSystemAlert(String toEmail, String alertTitle, String alertMessage) {
-        String subject = "TalentIQ Notification: " + alertTitle;
+        String subject = "HireMind AI Notification: " + alertTitle;
         String body = buildAlertHtml(alertTitle, alertMessage);
         sendHtmlEmail(toEmail, subject, body);
         log.info("System alert email dispatched to: {}", toEmail);
@@ -100,7 +127,7 @@ public class MailService {
     @Async("mailExecutor")
     public void sendSelectionEmail(String toEmail, String candidateName, String jobTitle,
                                    String hrName, String customMessage) {
-        String subject = "🎉 You've been selected — " + jobTitle + " at TalentIQ";
+        String subject = "🎉 You've been selected — " + jobTitle + " at HireMind AI";
         String body = buildSelectionHtml(candidateName, jobTitle, hrName, customMessage);
         sendHtmlEmail(toEmail, subject, body);
         log.info("Selection email dispatched to: {} for job: {}", toEmail, jobTitle);
@@ -136,10 +163,14 @@ public class MailService {
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-        } catch (MessagingException e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage());
-        } catch (Exception e) {
-            log.error("Unexpected error sending email to {}: {}", to, e.getMessage(), e);
+            log.info("✅ Email successfully delivered to [{}] | Subject: {}", to, subject);
+        } catch (Throwable e) {
+            String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+            if (errorMsg.contains("Authentication") || errorMsg.contains("535") || errorMsg.contains("BadCredentials")) {
+                log.warn("⚠️ Gmail SMTP Authentication Notice for [{}]: Google requires a 16-character App Password (generated at https://myaccount.google.com/apppasswords). Error: {}", to, errorMsg);
+            } else {
+                log.warn("⚠️ Email dispatch skipped or failed for [{}]: {}", to, errorMsg);
+            }
         }
     }
 
@@ -384,10 +415,90 @@ public class MailService {
                   </p>
                 </td></tr>
                 <tr><td style="padding:24px 40px;border-top:1px solid #334155;text-align:center;">
-                  <p style="color:#475569;font-size:12px;margin:0;">© 2025 TalentIQ · AI Talent Intelligence Platform</p>
+                  <p style="color:#475569;font-size:12px;margin:0;">© 2026 HireMind AI · AI Talent Intelligence Platform</p>
                 </td></tr>
                 </table></td></tr></table>
                 </body></html>
                 """.formatted(candidateName, jobTitle, formattedDate, meetingSection);
+    }
+
+    private String buildAccountCreatedHtml(String firstName, String roleDisplay, String portalUrl) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Welcome to HireMind AI</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(129,140,248,0.25);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6,#06b6d4);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:36px;margin-bottom:8px;">🪐</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:28px;font-weight:800;letter-spacing:-0.02em;">Welcome to HireMind AI!</h1>
+                  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:15px;">Official Account Confirmation</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 14px;font-size:22px;font-weight:700;">Hi %s! 👋</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 20px;font-size:15px;">
+                    Your account has been successfully created as a <strong style="color:#38bdf8;">%s</strong> on the HireMind AI platform.
+                  </p>
+                  
+                  <div style="background:rgba(30,41,59,0.7);border-left:4px solid #38bdf8;padding:16px 20px;border-radius:8px;margin:20px 0;">
+                    <p style="color:#cbd5e1;margin:0;font-size:14px;line-height:1.5;">
+                      ✨ <strong>What's Next?</strong> Access real-time AI job recommendations, full-duplex recruiter chat messaging, smart resume analysis, and cosmic portal tools.
+                    </p>
+                  </div>
+
+                  <div style="text-align:center;margin:30px 0 10px;">
+                    <a href="%s/login" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#38bdf8);color:#fff;text-decoration:none;padding:14px 36px;border-radius:10px;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(99,102,241,0.4);">
+                      Sign In to Your Account →
+                    </a>
+                  </div>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · hiremindai.ai@gmail.com</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(firstName, roleDisplay, portalUrl);
+    }
+
+    private String buildLoginAlertHtml(String firstName, String loginTime, String ipAddress, String userAgent) {
+        String safeIp = ipAddress != null ? ipAddress : "Unknown IP";
+        String safeAgent = userAgent != null ? userAgent : "Web Browser";
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>New Login Detected</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(56,189,248,0.25);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#0284c7,#38bdf8);padding:32px 40px 26px;text-align:center;">
+                  <div style="font-size:32px;margin-bottom:6px;">🛡️</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.02em;">New Sign-In Detected</h1>
+                  <p style="color:rgba(255,255,255,0.9);margin:4px 0 0;font-size:14px;">HireMind AI Security Notification</p>
+                </td></tr>
+                <tr><td style="padding:32px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 12px;font-size:18px;font-weight:700;">Hi %s 👋</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 20px;font-size:14px;">
+                    We noticed a new sign-in to your HireMind AI account with the following details:
+                  </p>
+                  
+                  <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:16px 20px;margin:16px 0;">
+                    <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong>🕒 Time:</strong> <span style="color:#e2e8f0;">%s</span></p>
+                    <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong>🌐 IP Address:</strong> <span style="color:#38bdf8;font-family:monospace;">%s</span></p>
+                    <p style="color:#94a3b8;font-size:13px;margin:0;"><strong>💻 Device/Client:</strong> <span style="color:#cbd5e1;">%s</span></p>
+                  </div>
+
+                  <p style="color:#64748b;font-size:12px;margin:18px 0 0;line-height:1.5;">
+                    🔒 If this was you, no action is needed. If you did not log in, please reset your password immediately via the HireMind AI forgot password portal.
+                  </p>
+                </td></tr>
+                <tr><td style="padding:18px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · hiremindai.ai@gmail.com</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(firstName, loginTime, safeIp, safeAgent);
     }
 }

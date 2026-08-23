@@ -233,10 +233,7 @@ public class AuthController {
 
     @PostMapping("/reset-password")
     @SecurityRequirements
-    @Operation(
-            summary = "Reset password",
-            description = "Sets a new password using verified 4-digit OTP or reset token."
-    )
+    @Operation(summary = "Reset password", description = "Sets a new password using verified 4-digit OTP or reset token.")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
 
