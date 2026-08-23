@@ -75,7 +75,7 @@ public class JobApplicationServiceImpl implements JobApplicationService {
             throw new BadRequestException("You have already applied for this job");
         }
 
-        // Resolve resume: either explicit or candidate's active version
+        // Resolve resume: either explicit or candidate's active version (optional)
         Resume resume = null;
         if (request.getResumeId() != null) {
             resume = resumeRepository.findById(request.getResumeId())
@@ -84,8 +84,7 @@ public class JobApplicationServiceImpl implements JobApplicationService {
                 throw new ForbiddenException("You do not own this resume version");
             }
         } else {
-            resume = resumeRepository.findByCandidateIdAndActiveTrue(candidate.getId())
-                    .orElseThrow(() -> new BadRequestException("Please upload and set an active resume before applying"));
+            resume = resumeRepository.findByCandidateIdAndActiveTrue(candidate.getId()).orElse(null);
         }
 
         // Pull AI match score from recommendations cache if exists, otherwise compute it now

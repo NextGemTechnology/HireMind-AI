@@ -72,9 +72,9 @@ public class AuthServiceImpl implements AuthService {
     private final AppProperties appProperties;
     private final com.talentiq.security.jwt.TokenBlacklistService tokenBlacklistService;
 
-    // ── Email Validation: Must end with @gmail.com ───────────────────────────
+    // ── Email Validation: Must end with @gmail.com or @talentiq.ai (for admin) ─
     private void validateGmailDomain(String email) {
-        if (email == null || !email.trim().endsWith("@gmail.com")) {
+        if (email == null || (!email.trim().endsWith("@gmail.com") && !email.trim().endsWith("@talentiq.ai"))) {
             throw new BadRequestException("Only @gmail.com email addresses are allowed for registration and login.");
         }
     }

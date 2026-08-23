@@ -23,7 +23,6 @@ public class JobDto {
         @Size(max = 200)
         private String title;
 
-        @NotBlank(message = "Job slug is required")
         @Size(max = 250)
         private String slug;
 

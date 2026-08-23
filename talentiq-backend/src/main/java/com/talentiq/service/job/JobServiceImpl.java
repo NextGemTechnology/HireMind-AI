@@ -28,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -53,15 +54,19 @@ public class JobServiceImpl implements JobService {
 
         Company company = hrProfile.getCompany();
 
-        if (jobRepository.existsBySlug(request.getSlug().toLowerCase().trim())) {
-            throw new BadRequestException("Job slug is already taken");
+        String slug = StringUtils.hasText(request.getSlug())
+                ? request.getSlug().toLowerCase().trim()
+                : request.getTitle().toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "") + "-" + System.currentTimeMillis();
+
+        if (jobRepository.existsBySlug(slug)) {
+            slug = slug + "-" + (int)(Math.random() * 10000);
         }
 
         Job job = Job.builder()
                 .company(company)
                 .postedBy(hrProfile.getUser())
                 .title(request.getTitle().trim())
-                .slug(request.getSlug().toLowerCase().trim())
+                .slug(slug)
                 .description(request.getDescription())
                 .responsibilities(request.getResponsibilities())
                 .requirements(request.getRequirements())
