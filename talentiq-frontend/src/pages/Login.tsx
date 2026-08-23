@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sparkles, User, Building2, ShieldCheck, LogIn, ArrowRight, RefreshCw, UserPlus } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
@@ -9,13 +9,32 @@ import '../css/login.css';
 type LoginRoleMode = 'CANDIDATE' | 'HR' | 'ADMIN';
 type AuthCardMode = 'LOGIN' | 'REGISTER';
 
-export const Login: React.FC = () => {
+interface LoginProps {
+  initialRole?: LoginRoleMode;
+}
+
+export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const { login, register, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const getRoleFromPath = (): LoginRoleMode => {
+    if (location.pathname === '/hr-login') return 'HR';
+    if (location.pathname === '/admin-login') return 'ADMIN';
+    if (initialRole) return initialRole;
+    return 'CANDIDATE';
+  };
 
   const [authCardMode, setAuthCardMode] = useState<AuthCardMode>('LOGIN');
-  const [selectedRole, setSelectedRole] = useState<LoginRoleMode>('CANDIDATE');
+  const [selectedRole, setSelectedRole] = useState<LoginRoleMode>(getRoleFromPath);
   const [flippingClass, setFlippingClass] = useState<string>('');
+
+  useEffect(() => {
+    const roleFromUrl = getRoleFromPath();
+    if (roleFromUrl !== selectedRole) {
+      setSelectedRole(roleFromUrl);
+    }
+  }, [location.pathname, initialRole]);
 
   // Login Form State
   const [email, setEmail] = useState('');
@@ -33,7 +52,7 @@ export const Login: React.FC = () => {
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
 
-  // ── Trigger 3D Super Motion Flip when switching Role Tabs ──
+  // ── Trigger 3D Super Motion Flip when switching Role Tabs & Sync URL ──
   const handleRoleSelect = (role: LoginRoleMode) => {
     if (role === selectedRole) return;
 
@@ -48,6 +67,15 @@ export const Login: React.FC = () => {
     setFlippingClass(animClass);
     setSelectedRole(role);
     setError('');
+
+    // Sync URL with dedicated portal route
+    if (role === 'HR' && location.pathname !== '/hr-login') {
+      navigate('/hr-login');
+    } else if (role === 'ADMIN' && location.pathname !== '/admin-login') {
+      navigate('/admin-login');
+    } else if (role === 'CANDIDATE' && location.pathname !== '/login') {
+      navigate('/login');
+    }
 
     // Reset animation class after flip finishes
     setTimeout(() => {
@@ -66,17 +94,30 @@ export const Login: React.FC = () => {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!email.trim().endsWith('@gmail.com')) {
-      setError('Only @gmail.com email addresses are allowed for login.');
-      return;
+
+    const trimmedEmail = email.trim().toLowerCase();
+    const isGmail = trimmedEmail.endsWith('@gmail.com');
+    const isTalentIqDomain = trimmedEmail.endsWith('@talentiq.ai');
+
+    if (selectedRole === 'ADMIN') {
+      if (!isGmail && !isTalentIqDomain) {
+        setError('Admin email must end with @gmail.com or @talentiq.ai.');
+        return;
+      }
+    } else {
+      if (!isGmail) {
+        setError('Only @gmail.com email addresses are allowed for login.');
+        return;
+      }
     }
+
     setLoading(true);
     try {
       const targetRole = selectedRole === 'HR'
         ? 'ROLE_HR'
         : (selectedRole === 'ADMIN' ? 'ROLE_SUPER_ADMIN' : 'ROLE_CANDIDATE');
 
-      await login({ email: email.trim(), password, requiredRole: targetRole });
+      await login({ email: trimmedEmail, password, requiredRole: targetRole });
 
       const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
       const roles: string[] = savedUser.roles || [];
@@ -298,6 +339,28 @@ export const Login: React.FC = () => {
                 onError={setError}
               />
             </form>
+
+            {/* Quick Portal Direct Links */}
+            <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.65)', border: '1px solid rgba(255, 255, 255, 0.08)', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ color: '#94A3B8', fontSize: '11px' }}>Switch Portal:</span>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {selectedRole !== 'CANDIDATE' && (
+                  <Link to="/login" onClick={() => handleRoleSelect('CANDIDATE')} style={{ color: '#38BDF8', textDecoration: 'none', fontWeight: 600 }}>
+                    👤 Candidate (/login)
+                  </Link>
+                )}
+                {selectedRole !== 'HR' && (
+                  <Link to="/hr-login" onClick={() => handleRoleSelect('HR')} style={{ color: '#818CF8', textDecoration: 'none', fontWeight: 600 }}>
+                    🏢 HR Recruiter (/hr-login)
+                  </Link>
+                )}
+                {selectedRole !== 'ADMIN' && (
+                  <Link to="/admin-login" onClick={() => handleRoleSelect('ADMIN')} style={{ color: '#FB7185', textDecoration: 'none', fontWeight: 600 }}>
+                    🛡️ Admin (/admin-login)
+                  </Link>
+                )}
+              </div>
+            </div>
 
             {/* 3D Flip Action Switcher Footer */}
             <div className="login-flip-footer">

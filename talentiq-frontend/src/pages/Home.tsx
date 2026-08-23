@@ -449,7 +449,7 @@ export const Home: React.FC = () => {
 
         <div style={{ display: 'flex', gap: '32px', alignItems: 'center' }}>
           {['Home', 'Find Jobs', 'For Employers', 'AI Recruiter', 'Pricing'].map((item, i) => (
-            <button key={item} onClick={() => { if (item === 'Find Jobs') navigate('/jobs'); else if (item === 'For Employers') navigate('/hr-analytics'); }}
+            <button key={item} onClick={() => { if (item === 'Find Jobs') navigate('/jobs'); else if (item === 'For Employers') navigate('/hr-login'); }}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: '14px', fontWeight: i === 0 ? 600 : 400,
@@ -473,14 +473,23 @@ export const Home: React.FC = () => {
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
 
+          <button onClick={() => navigate('/hr-login')} style={{
+            padding: '9px 16px', borderRadius: '10px', border: `1px solid rgba(129, 140, 248, 0.4)`,
+            background: 'rgba(99, 102, 241, 0.12)', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+            color: '#818CF8', transition: 'all 0.2s',
+          }}
+            onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.borderColor = '#818CF8'}
+            onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(129, 140, 248, 0.4)'}
+          >HR Login</button>
+
           <button onClick={() => navigate('/login')} style={{
-            padding: '9px 20px', borderRadius: '10px', border: `1px solid ${T.border}`,
+            padding: '9px 18px', borderRadius: '10px', border: `1px solid ${T.border}`,
             background: 'transparent', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
             color: T.text, transition: 'all 0.2s',
           }}
             onMouseEnter={e => (e.currentTarget as HTMLButtonElement).style.borderColor = '#7C3AED'}
             onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.borderColor = T.border}
-          >Login</button>
+          >Candidate Login</button>
 
           <button onClick={() => navigate('/register')} style={{
             padding: '9px 20px', borderRadius: '10px', border: 'none',

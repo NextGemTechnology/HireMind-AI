@@ -51,7 +51,7 @@ apiClient.interceptors.response.use(
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
-          const publicRoutes = ['/', '/jobs', '/login', '/register'];
+          const publicRoutes = ['/', '/jobs', '/login', '/hr-login', '/admin-login', '/register'];
           if (!publicRoutes.includes(window.location.pathname)) {
             window.location.href = '/login';
           }
@@ -60,7 +60,8 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        const publicRoutes = ['/', '/jobs', '/login', '/register'];
+        sessionStorage.clear();
+        const publicRoutes = ['/', '/jobs', '/login', '/hr-login', '/admin-login', '/register'];
         if (!publicRoutes.includes(window.location.pathname)) {
           window.location.href = '/login';
         }
