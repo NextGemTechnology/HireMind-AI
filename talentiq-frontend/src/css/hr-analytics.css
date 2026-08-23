@@ -157,18 +157,24 @@
 }
 
 .analytics-page-wrapper.theme-universe .an-sidebar {
-  background: #0F172A !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(180deg, rgba(17, 24, 48, 0.96) 0%, rgba(10, 15, 32, 0.98) 100%) !important;
+  border-right: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(20px) !important;
 }
 
 .analytics-page-wrapper.theme-universe .an-right-rail {
-  background: rgba(15, 23, 42, 0.85) !important;
-  border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(180deg, rgba(17, 24, 48, 0.96) 0%, rgba(10, 15, 32, 0.98) 100%) !important;
+  border-left: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(20px) !important;
 }
 
 .analytics-page-wrapper.theme-universe .an-header-bar {
-  background: rgba(15, 23, 42, 0.85) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: linear-gradient(90deg, rgba(17, 24, 48, 0.95) 0%, rgba(13, 19, 40, 0.97) 100%) !important;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(20px) !important;
 }
 
 .analytics-page-wrapper.theme-universe .an-card,
@@ -177,18 +183,34 @@
 .theme-universe .an-chart-card,
 .theme-universe .an-list-card,
 .theme-universe .an-rail-card {
-  background: rgba(15, 23, 42, 0.75) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37) !important;
-  backdrop-filter: blur(16px);
+  background: linear-gradient(135deg, rgba(20, 29, 56, 0.95) 0%, rgba(13, 19, 40, 0.97) 100%) !important;
+  border: 1px solid rgba(167, 139, 250, 0.42) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 
+              inset 0 1px 0 rgba(255, 255, 255, 0.2), 
+              0 0 20px rgba(124, 58, 237, 0.12) !important;
+  backdrop-filter: blur(24px) !important;
   color: #F8FAFC !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.theme-universe .an-card:hover,
+.theme-universe .an-kpi-card:hover,
+.theme-universe .an-chart-card:hover,
+.theme-universe .an-list-card:hover {
+  border-color: rgba(192, 132, 252, 0.75) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.75), 
+              inset 0 1px 0 rgba(255, 255, 255, 0.3), 
+              0 0 28px rgba(139, 92, 246, 0.25) !important;
+  transform: translateY(-2px);
 }
 
 .analytics-page-wrapper.theme-universe .an-input-field,
 .theme-universe .an-header-search-input {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  color: #F8FAFC !important;
+  background: rgba(10, 15, 32, 0.95) !important;
+  border: 1px solid rgba(167, 139, 250, 0.4) !important;
+  color: #FFFFFF !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
 
 .analytics-page-wrapper.theme-universe .an-input-field::placeholder,
@@ -197,26 +219,33 @@
 }
 
 .analytics-page-wrapper.theme-universe .an-user-badge {
-  background: rgba(99, 102, 241, 0.1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(124, 58, 237, 0.25) !important;
+  border: 1px solid rgba(167, 139, 250, 0.45) !important;
+  color: #FEF3C7 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
 .analytics-page-wrapper.theme-universe .an-theme-btn {
-  background: rgba(99, 102, 241, 0.2) !important;
-  color: #A78BFA !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: rgba(26, 36, 66, 0.9) !important;
+  color: #FDBA74 !important;
+  border: 1px solid rgba(167, 139, 250, 0.4) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12) !important;
 }
 
 .analytics-page-wrapper.theme-universe .an-theme-btn:hover {
-  background: rgba(99, 102, 241, 0.35) !important;
+  background: rgba(124, 58, 237, 0.4) !important;
+  border-color: #C084FC !important;
+  color: #FFFFFF !important;
 }
 
 .analytics-page-wrapper.theme-universe .an-avatar-brand {
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.5);
 }
 
 .analytics-page-wrapper.theme-universe .an-kpi-label {
-  color: #94A3B8 !important;
+  color: #CBD5E1 !important;
+  font-weight: 600;
 }
 
 .analytics-page-wrapper.theme-universe .an-kpi-value {

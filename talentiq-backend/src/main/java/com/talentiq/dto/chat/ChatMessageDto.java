@@ -49,6 +49,8 @@ public class ChatMessageDto {
         private String name;
         private String email;
         private String avatarUrl;
+        private String companyName;
+        private String jobTitle;
         private long unreadCount;
         private String lastMessage;
         private Instant lastMessageAt;
@@ -66,5 +68,7 @@ public class ChatMessageDto {
         private String type;
         private boolean read;
         private Instant sentAt;
+        private String fileUrl;
+        private String fileName;
     }
 }

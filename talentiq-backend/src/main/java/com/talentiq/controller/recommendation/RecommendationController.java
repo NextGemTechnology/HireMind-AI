@@ -2,11 +2,15 @@ package com.talentiq.controller.recommendation;
 
 import com.talentiq.common.response.ApiResponse;
 import com.talentiq.common.response.PagedResponse;
+import com.talentiq.dto.recommendation.CareerAgentDto;
 import com.talentiq.dto.recommendation.RecommendationDto;
+import com.talentiq.dto.recommendation.RecommendationStatusDto;
+import com.talentiq.service.recommendation.CareerAgentService;
 import com.talentiq.service.recommendation.RecommendationService;
 import com.talentiq.security.userdetails.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -22,17 +26,53 @@ import org.springframework.web.bind.annotation.*;
 public class RecommendationController {
 
     private final RecommendationService recommendationService;
+    private final CareerAgentService careerAgentService;
 
     @GetMapping("/jobs")
     @PreAuthorize("hasRole('CANDIDATE')")
     @Operation(summary = "Get personalized job recommendations (Candidate only)")
     public ResponseEntity<PagedResponse<RecommendationDto>> getJobRecommendations(
             @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) Double minScore,
+            @RequestParam(defaultValue = "false") boolean refresh,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        PagedResponse<RecommendationDto> response = recommendationService.getJobRecommendationsForCandidate(principal.getId(), pageable);
+        PagedResponse<RecommendationDto> response = recommendationService.getJobRecommendationsForCandidate(
+                principal.getId(),
+                minScore,
+                refresh,
+                pageable
+        );
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/chat")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    @Operation(summary = "Chat with AI Career Advisor Agent (Candidate only)")
+    public ResponseEntity<ApiResponse<CareerAgentDto.ChatResponse>> chatWithCareerAgent(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody CareerAgentDto.ChatRequest request) {
+        CareerAgentDto.ChatResponse response = careerAgentService.handleCandidateChatMessage(principal.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/status")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    @Operation(summary = "Get candidate recommendation status, resume state, and match statistics")
+    public ResponseEntity<ApiResponse<RecommendationStatusDto>> getRecommendationStatus(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        RecommendationStatusDto status = recommendationService.getRecommendationStatusForCandidate(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(status));
+    }
+
+    @PostMapping("/recalculate")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    @Operation(summary = "Trigger full AI match recalculation for candidate")
+    public ResponseEntity<ApiResponse<Void>> recalculateRecommendations(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        recommendationService.recalculateAllRecommendationsForCandidate(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success("AI job matches recalculated successfully"));
     }
 
     @GetMapping("/candidates/{jobId}")

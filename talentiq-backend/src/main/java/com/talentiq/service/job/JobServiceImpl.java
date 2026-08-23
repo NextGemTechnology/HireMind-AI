@@ -289,7 +289,7 @@ public class JobServiceImpl implements JobService {
         return JobDto.Response.builder()
                 .id(job.getId())
                 .company(CompanyServiceImpl.mapToResponse(job.getCompany()))
-                .postedById(job.getPostedBy().getId())
+                .postedById(job.getPostedBy() != null ? job.getPostedBy().getId() : null)
                 .title(job.getTitle())
                 .slug(job.getSlug())
                 .description(job.getDescription())

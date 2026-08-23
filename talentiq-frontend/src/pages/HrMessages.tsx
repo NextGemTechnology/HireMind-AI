@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import { Client as StompClient } from '@stomp/stompjs';
@@ -8,11 +8,16 @@ import {
   Send, Phone, PhoneOff, Mic, MicOff, Search,
   LayoutDashboard, Calendar,
   MessageSquare, Users, Briefcase, Settings, LogOut,
-  Circle, Sun, Sparkles
+  Circle, Sun, Moon, Trash2, Copy, Paperclip, Image as ImageIcon,
+  Check, CheckCheck, Clock, ChevronDown, CheckCircle2, Sparkles, X,
+  ExternalLink, UserCheck, ShieldCheck, User as UserIcon
 } from 'lucide-react';
+import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import '../css/hr-messages.css';
 
 /* ─── Types ─── */
+type ChatTheme = 'galaxy' | 'moon' | 'light' | 'obsidian';
+
 interface Contact {
   userId: number;
   name: string;
@@ -21,6 +26,8 @@ interface Contact {
   unreadCount: number;
   lastMessage?: string;
   lastMessageAt?: string;
+  companyName?: string;
+  jobTitle?: string;
 }
 
 interface Message {
@@ -32,35 +39,37 @@ interface Message {
   type: string;
   read: boolean;
   sentAt: string;
+  fileUrl?: string;
+  fileName?: string;
+  status?: 'SENDING' | 'SENT' | 'DELIVERED' | 'READ';
 }
 
-/* ─── Sidebar NavItem ─── */
-const NavItem: React.FC<{ icon: React.ReactNode; label: string; active?: boolean; isUniverse?: boolean; onClick?: () => void }> =
-  ({ icon, label, active, onClick }) => (
-    <button
-      onClick={onClick}
-      className={`msg-nav-item ${active ? 'active' : ''}`}
-    >
-      {icon}{label}
-    </button>
-  );
-
-const HrMessages: React.FC = () => {
+export const HrMessages: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Theme State
-  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
-    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'light';
+  // ── 4-Theme Engine ──
+  const [theme, setTheme] = useState<ChatTheme>(() => {
+    const saved = localStorage.getItem('hr_chat_theme') as ChatTheme;
+    if (saved && ['galaxy', 'moon', 'light', 'obsidian'].includes(saved)) {
+      return saved;
+    }
+    return 'galaxy';
   });
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'universe' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('hr_theme', nextTheme);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+
+  const handleSelectTheme = (newTheme: ChatTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('hr_chat_theme', newTheme);
+    setShowThemeMenu(false);
   };
 
-  const isUniverse = theme === 'universe';
+  const toggleLightDark = () => {
+    const nextTheme: ChatTheme = theme === 'light' ? 'galaxy' : 'light';
+    handleSelectTheme(nextTheme);
+  };
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -72,6 +81,20 @@ const HrMessages: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [contactsLoading, setContactsLoading] = useState(true);
 
+  // Context menu state for message deletion
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    message: Message | null;
+  }>({ visible: false, x: 0, y: 0, message: null });
+
+  const [showClearModal, setShowClearModal] = useState(false);
+
+  // 2-Second Notification Popup state
+  const [activePopup, setActivePopup] = useState<any | null>(null);
+  const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // WebRTC state
   const [callState, setCallState] = useState<'idle' | 'calling' | 'in-call'>('idle');
   const [isMuted, setIsMuted] = useState(false);
@@ -80,76 +103,325 @@ const HrMessages: React.FC = () => {
   const stompRef = useRef<StompClient | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   // WebRTC refs
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
 
-  const currentUserId = user?.id ? parseInt(String(user.id)) : 0;
+  // Robust User ID Extraction (Works with state or JWT token directly)
+  const getEffectiveUserId = useCallback((): number => {
+    if (user?.id) return Number(user.id);
+    if ((user as any)?.userId) return Number((user as any).userId);
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          if (payload.userId) return Number(payload.userId);
+        }
+      } catch (e) {}
+    }
+    return 0;
+  }, [user]);
+
+  const currentUserId = getEffectiveUserId();
+  const directContactId = searchParams.get('contactId');
+
+  // Calculate total unread count
+  const totalUnreadCount = contacts.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
 
   /* ─── Fetch contacts ─── */
-  useEffect(() => {
-    const fetchContacts = async () => {
-      try {
-        setContactsLoading(true);
-        const res = await apiClient.get('/chat/contacts');
-        setContacts(res.data?.data || []);
-      } catch {
-        setContacts([]);
-      } finally {
-        setContactsLoading(false);
+  const fetchContacts = useCallback(async () => {
+    try {
+      setContactsLoading(true);
+      const res = await apiClient.get('/chat/contacts');
+      const list: Contact[] = res.data?.data || [];
+      setContacts(list);
+
+      const savedContactId = sessionStorage.getItem('active_hr_chat_contact_id');
+
+      // If URL has direct contact ID (e.g. from notification click), select that contact
+      if (directContactId) {
+        const found = list.find(c => c.userId === parseInt(directContactId));
+        if (found) {
+          setSelectedContact(found);
+          sessionStorage.setItem('active_hr_chat_contact_id', String(found.userId));
+        }
+      } else if (savedContactId) {
+        const targetId = parseInt(savedContactId);
+        const found = list.find(c => c.userId === targetId);
+        if (found) {
+          setSelectedContact(found);
+        } else if (list.length > 0) {
+          setSelectedContact(list[0]);
+          sessionStorage.setItem('active_hr_chat_contact_id', String(list[0].userId));
+        }
+      } else if (list.length > 0) {
+        setSelectedContact(list[0]);
+        sessionStorage.setItem('active_hr_chat_contact_id', String(list[0].userId));
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch HR contacts', err);
+      setContacts([]);
+    } finally {
+      setContactsLoading(false);
+    }
+  }, [directContactId]);
+
+  useEffect(() => {
     fetchContacts();
+  }, [fetchContacts]);
+
+  // Close context menu on global click
+  useEffect(() => {
+    const handleGlobalClick = () => setContextMenu(prev => ({ ...prev, visible: false }));
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  /* ─── Connect WebSocket / STOMP ─── */
+  /* ─── WebRTC Signaling Handler ─── */
+  const handleIncomingSignal = async (signal: any) => {
+    const { signalType, payload } = signal;
+    if (signalType === 'call-start') {
+      setCallWith(selectedContact?.name || 'Candidate');
+      setCallState('calling');
+    } else if (signalType === 'offer') {
+      try {
+        const pc = createPeerConnection();
+        await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(payload)));
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        localStreamRef.current = stream;
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendSignal('answer', JSON.stringify(answer));
+        setCallState('in-call');
+      } catch (err) {
+        console.error('Error handling WebRTC offer', err);
+      }
+    } else if (signalType === 'answer') {
+      if (pcRef.current) {
+        await pcRef.current.setRemoteDescription(new RTCSessionDescription(JSON.parse(payload)));
+        setCallState('in-call');
+      }
+    } else if (signalType === 'ice-candidate') {
+      if (pcRef.current && payload) {
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(JSON.parse(payload)));
+        } catch (err) {
+          console.error('Error adding ICE candidate', err);
+        }
+      }
+    } else if (signalType === 'call-end') {
+      endCallCleanup();
+    }
+  };
+
+  const createPeerConnection = (): RTCPeerConnection => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+    pcRef.current = pc;
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal('ice-candidate', JSON.stringify(event.candidate));
+      }
+    };
+    pc.ontrack = (event) => {
+      if (remoteAudioRef.current && event.streams[0]) {
+        remoteAudioRef.current.srcObject = event.streams[0];
+      }
+    };
+    return pc;
+  };
+
+  const sendSignal = (signalType: string, payload: string) => {
+    if (!selectedContact) return;
+    const signalData = {
+      receiverId: selectedContact.userId,
+      signalType,
+      payload
+    };
+    if (stompRef.current?.connected) {
+      stompRef.current.publish({
+        destination: '/app/chat.signal',
+        body: JSON.stringify(signalData)
+      });
+    }
+  };
+
+  const endCallCleanup = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    setCallState('idle');
+    setIsMuted(false);
+  };
+
+  const startCall = async () => {
+    if (!selectedContact) return;
+    try {
+      setCallWith(selectedContact.name);
+      setCallState('calling');
+      sendSignal('call-start', '');
+      const pc = createPeerConnection();
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      localStreamRef.current = stream;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      sendSignal('offer', JSON.stringify(offer));
+    } catch (err) {
+      console.error('Failed to start audio call', err);
+      endCallCleanup();
+    }
+  };
+
+  const hangUp = () => {
+    sendSignal('call-end', '');
+    endCallCleanup();
+  };
+
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted(!isMuted);
+    }
+  };
+
+  /* ─── Connect WebSocket / STOMP with Deduplication ─── */
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     if (!token) return;
 
+    const wsUrl = `${window.location.origin}/api/ws`;
+    const socket = new SockJS(wsUrl);
+
     const client = new StompClient({
-      webSocketFactory: () => new SockJS('http://localhost:8080/api/ws'),
+      webSocketFactory: () => socket as any,
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
-
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
       onConnect: () => {
+        // Chat messages queue
         client.subscribe('/user/queue/chat', (frame) => {
-          const msg: Message = JSON.parse(frame.body);
-          setMessages(prev => {
-            if (prev.some(m => m.id === msg.id)) return prev;
-            return [...prev, msg];
-          });
-          apiClient.get('/chat/contacts').then(res => setContacts(res.data?.data || []));
-        });
+          try {
+            const incoming: Message = JSON.parse(frame.body);
+            const myId = getEffectiveUserId();
 
-        client.subscribe('/user/queue/typing', (frame) => {
-          const payload = JSON.parse(frame.body);
-          if (payload.senderId === selectedContact?.userId) {
-            setOtherTyping(payload.typing);
+            setMessages(prev => {
+              // 1. Direct ID duplicate check
+              if (incoming.id && prev.some(m => m.id === incoming.id)) {
+                return prev;
+              }
+
+              // 2. If this message is sent by me, replace any matching optimistic/pending bubble
+              if (Number(incoming.senderId) === myId) {
+                const optimisticIdx = prev.findIndex(m =>
+                  Number(m.senderId) === myId &&
+                  m.content === incoming.content &&
+                  (m.id === undefined || String(m.id).length > 10 || m.status === 'SENDING' || m.status === 'SENT' || Math.abs(new Date(m.sentAt).getTime() - new Date(incoming.sentAt).getTime()) < 15000)
+                );
+
+                if (optimisticIdx !== -1) {
+                  const updated = [...prev];
+                  updated[optimisticIdx] = incoming;
+                  return updated;
+                }
+              }
+
+              // 3. Otherwise append if genuinely new incoming message
+              return [...prev, incoming];
+            });
+
+            // Trigger 2-Second Notification Popup for HR
+            if (Number(incoming.senderId) !== myId) {
+              setActivePopup({
+                title: incoming.senderName || 'Candidate',
+                message: incoming.content,
+                senderId: incoming.senderId
+              });
+
+              if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+              popupTimerRef.current = setTimeout(() => {
+                setActivePopup(null);
+              }, 2000);
+            }
+
+            fetchContacts();
+          } catch (err) {
+            console.error('Error parsing incoming chat', err);
           }
         });
 
+        // Deletions queue
+        client.subscribe('/user/queue/chat.delete', (frame) => {
+          try {
+            const event = JSON.parse(frame.body);
+            if (event.action === 'DELETE_MESSAGE' && event.messageId) {
+              setMessages(prev => prev.filter(m => m.id !== event.messageId));
+            } else if (event.action === 'CLEAR_CONVERSATION') {
+              setMessages([]);
+            }
+          } catch (err) {
+            console.error('Error handling delete event', err);
+          }
+        });
+
+        // Typing indicator
+        client.subscribe('/user/queue/typing', (frame) => {
+          try {
+            const payload = JSON.parse(frame.body);
+            if (payload.senderId === selectedContact?.userId) {
+              setOtherTyping(payload.typing);
+            }
+          } catch (err) {
+            console.error('Typing error', err);
+          }
+        });
+
+        // WebRTC Signaling
         client.subscribe('/user/queue/signal', (frame) => {
-          const signal = JSON.parse(frame.body);
-          handleIncomingSignal(signal);
+          try {
+            const signal = JSON.parse(frame.body);
+            handleIncomingSignal(signal);
+          } catch (err) {
+            console.error('Signal error', err);
+          }
         });
       },
     });
+
     client.activate();
     stompRef.current = client;
 
-    return () => { client.deactivate(); };
-  }, [selectedContact?.userId]);
+    return () => {
+      client.deactivate();
+      if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+    };
+  }, [selectedContact?.userId, getEffectiveUserId, fetchContacts]);
 
-  /* ─── Load conversation history ─── */
+  /* ─── Load Real Database Conversation History (Zero Fake Messages) ─── */
   const loadConversation = useCallback(async (contact: Contact) => {
+    if (!contact?.userId) return;
     try {
       setLoading(true);
       const res = await apiClient.get(`/chat/conversations/${contact.userId}`);
       setMessages(res.data?.data || []);
-    } catch {
+    } catch (err) {
+      console.error('Failed to load HR conversation history', err);
       setMessages([]);
     } finally {
       setLoading(false);
@@ -159,6 +431,10 @@ const HrMessages: React.FC = () => {
   useEffect(() => {
     if (selectedContact) {
       loadConversation(selectedContact);
+      // Mark as read in backend
+      apiClient.put(`/chat/conversations/${selectedContact.userId}/read`).catch(() => {});
+      // Clear unread count locally
+      setContacts(prev => prev.map(c => c.userId === selectedContact.userId ? { ...c, unreadCount: 0 } : c));
     }
   }, [selectedContact, loadConversation]);
 
@@ -167,34 +443,121 @@ const HrMessages: React.FC = () => {
   }, [messages, otherTyping]);
 
   /* ─── Send message ─── */
-  const sendMessage = () => {
-    if (!inputText.trim() || !selectedContact || !stompRef.current?.connected) return;
+  const sendMessage = async (presetText?: string) => {
+    const textToSend = presetText || inputText;
+    if (!textToSend.trim() || !selectedContact) return;
 
+    const myId = getEffectiveUserId();
+    const token = localStorage.getItem('accessToken');
+    const text = textToSend.trim();
     const payload = {
       receiverId: selectedContact.userId,
-      content: inputText.trim(),
+      content: text,
       type: 'TEXT',
     };
 
+    const tempId = Date.now();
     const optimistic: Message = {
-      senderId: currentUserId,
-      senderName: user ? `${user.firstName} ${user.lastName}` : 'Me',
+      id: tempId,
+      senderId: myId,
+      senderName: user ? `${user.firstName} ${user.lastName}` : 'HR Team',
       receiverId: selectedContact.userId,
-      content: inputText.trim(),
+      content: text,
       type: 'TEXT',
       read: false,
+      status: 'SENDING',
       sentAt: new Date().toISOString(),
     };
     setMessages(prev => [...prev, optimistic]);
-    setInputText('');
+    if (!presetText) setInputText('');
 
-    stompRef.current.publish({
-      destination: '/app/chat.send',
-      body: JSON.stringify(payload),
-    });
+    if (stompRef.current?.connected) {
+      stompRef.current.publish({
+        destination: '/app/chat.send',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: JSON.stringify(payload),
+      });
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'SENT' } : m));
+    } else {
+      try {
+        const res = await apiClient.post('/chat/messages', payload);
+        if (res.data?.data?.id) {
+          setMessages(prev => prev.map(m => m.id === tempId ? { ...res.data.data, status: 'SENT' } : m));
+        }
+      } catch (err) {
+        console.error('Failed to send message via REST', err);
+      }
+    }
   };
 
-  /* ─── Typing indicator ─── */
+  /* ─── File & Photo Upload (WhatsApp Style) ─── */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isImageOnly: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedContact) return;
+
+    const myId = getEffectiveUserId();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('receiverId', String(selectedContact.userId));
+
+    const isImage = file.type.startsWith('image/') || isImageOnly;
+    const tempId = Date.now();
+    const optimistic: Message = {
+      id: tempId,
+      senderId: myId,
+      senderName: user ? `${user.firstName} ${user.lastName}` : 'HR Team',
+      receiverId: selectedContact.userId,
+      content: isImage ? `🖼️ ${file.name}` : `📎 ${file.name}`,
+      type: isImage ? 'IMAGE' : 'FILE',
+      read: false,
+      status: 'SENDING',
+      sentAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimistic]);
+
+    try {
+      const res = await apiClient.post('/chat/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data?.data?.id) {
+        setMessages(prev => prev.map(m => m.id === tempId ? { ...res.data.data, status: 'SENT' } : m));
+      }
+    } catch (err) {
+      console.error('File upload failed', err);
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
+
+  /* ─── Delete Message ─── */
+  const handleDeleteMessage = async (msg: Message) => {
+    if (!msg.id) return;
+    try {
+      await apiClient.delete(`/chat/messages/${msg.id}`);
+      setMessages(prev => prev.filter(m => m.id !== msg.id));
+    } catch (err) {
+      console.error('Failed to delete message', err);
+      setMessages(prev => prev.filter(m => m.id !== msg.id));
+    }
+  };
+
+  /* ─── Clear Conversation ─── */
+  const handleClearConversation = async () => {
+    if (!selectedContact) return;
+    try {
+      await apiClient.delete(`/chat/conversations/${selectedContact.userId}`);
+      setMessages([]);
+      setShowClearModal(false);
+      fetchContacts();
+    } catch (err) {
+      console.error('Failed to clear conversation', err);
+      setMessages([]);
+      setShowClearModal(false);
+    }
+  };
+
+  /* ─── Typing Trigger ─── */
   const handleTyping = () => {
     if (!selectedContact || !stompRef.current?.connected) return;
     if (!isTyping) {
@@ -214,318 +577,640 @@ const HrMessages: React.FC = () => {
     }, 2000);
   };
 
-  /* ─── WebRTC Audio Call ─── */
-  const startCall = async () => {
-    if (!selectedContact) return;
-    try {
-      setCallState('calling');
-      setCallWith(selectedContact.name);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      localStreamRef.current = stream;
-
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-      pcRef.current = pc;
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-      pc.ontrack = (event) => {
-        if (remoteAudioRef.current) remoteAudioRef.current.srcObject = event.streams[0];
-        setCallState('in-call');
-      };
-      pc.onicecandidate = (event) => {
-        if (event.candidate && stompRef.current?.connected) {
-          stompRef.current.publish({
-            destination: '/app/chat.signal',
-            body: JSON.stringify({
-              receiverId: selectedContact.userId,
-              signalType: 'ice-candidate',
-              payload: JSON.stringify(event.candidate),
-            }),
-          });
-        }
-      };
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      stompRef.current?.publish({
-        destination: '/app/chat.signal',
-        body: JSON.stringify({
-          receiverId: selectedContact.userId,
-          signalType: 'offer',
-          payload: JSON.stringify(offer),
-        }),
-      });
-    } catch (err) {
-      alert('Microphone access denied or unavailable.');
-      hangUp();
+  /* ─── Render Tick Status Indicator ─── */
+  const renderMessageAcknowledgement = (msg: Message) => {
+    if (msg.read) {
+      return (
+        <span className="msg-tick read" title="Seen by Candidate (Double Cyan Ticks)">
+          <CheckCheck size={14} color="#38BDF8" />
+        </span>
+      );
     }
-  };
-
-  const hangUp = () => {
-    pcRef.current?.close();
-    pcRef.current = null;
-    localStreamRef.current?.getTracks().forEach(t => t.stop());
-    localStreamRef.current = null;
-    setCallState('idle');
-    setCallWith('');
-    if (selectedContact) {
-      stompRef.current?.publish({
-        destination: '/app/chat.signal',
-        body: JSON.stringify({ receiverId: selectedContact.userId, signalType: 'call-end', payload: '{}' }),
-      });
+    if (msg.status === 'DELIVERED') {
+      return (
+        <span className="msg-tick delivered" title="Delivered to Candidate (Double Gray Ticks)">
+          <CheckCheck size={14} color="#94A3B8" />
+        </span>
+      );
     }
-  };
-
-  const toggleMute = () => {
-    if (localStreamRef.current) {
-      const enabled = !isMuted;
-      localStreamRef.current.getAudioTracks().forEach(t => { t.enabled = enabled; });
-      setIsMuted(!enabled);
+    if (msg.status === 'SENDING') {
+      return (
+        <span className="msg-tick sending" title="Sending...">
+          <Clock size={12} color="#94A3B8" />
+        </span>
+      );
     }
-  };
-
-  const handleIncomingSignal = async (signal: any) => {
-    if (signal.signalType === 'call-end') { hangUp(); return; }
-    if (signal.signalType === 'offer') {
-      setCallState('calling');
-      setCallWith(signal.senderName || 'Caller');
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
-      if (!stream) return;
-      localStreamRef.current = stream;
-
-      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-      pcRef.current = pc;
-      stream.getTracks().forEach(t => pc.addTrack(t, stream));
-      pc.ontrack = e => { if (remoteAudioRef.current) remoteAudioRef.current.srcObject = e.streams[0]; setCallState('in-call'); };
-      pc.onicecandidate = e => {
-        if (e.candidate) stompRef.current?.publish({
-          destination: '/app/chat.signal',
-          body: JSON.stringify({ receiverId: signal.senderId, signalType: 'ice-candidate', payload: JSON.stringify(e.candidate) }),
-        });
-      };
-
-      await pc.setRemoteDescription(JSON.parse(signal.payload));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      stompRef.current?.publish({
-        destination: '/app/chat.signal',
-        body: JSON.stringify({ receiverId: signal.senderId, signalType: 'answer', payload: JSON.stringify(answer) }),
-      });
-    } else if (signal.signalType === 'answer' && pcRef.current) {
-      await pcRef.current.setRemoteDescription(JSON.parse(signal.payload));
-    } else if (signal.signalType === 'ice-candidate' && pcRef.current) {
-      await pcRef.current.addIceCandidate(JSON.parse(signal.payload));
-    }
+    return (
+      <span className="msg-tick sent" title="Sent to Server (Single Tick)">
+        <Check size={13} color="#94A3B8" />
+      </span>
+    );
   };
 
   const filteredContacts = contacts.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchQuery.toLowerCase())
+    c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.jobTitle?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatMsgTime = (iso: string) => {
-    try { return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }); }
-    catch { return ''; }
+  const formatMsgTime = (sentAt: string) => {
+    try {
+      const d = new Date(sentAt);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch {
+      return '';
+    }
   };
 
   return (
-    <div className={`messages-page-wrapper ${isUniverse ? 'theme-universe' : 'theme-light'}`}>
+    <div className={`messages-page-wrapper theme-${theme}`}>
+      {/* ── Retain Background Theme (Untouched Interactive Canvas Background) ── */}
+      {theme === 'galaxy' && <InteractiveGalaxyBackground />}
       <audio ref={remoteAudioRef} autoPlay />
 
-      {/* ── Sidebar ── */}
-      <aside className="msg-sidebar">
-        <div className="msg-sidebar-brand" onClick={() => navigate('/')}>
-          <div className="msg-brand-icon msg-avatar-brand">
-            <span style={{ fontSize: 16 }}>🌌</span>
+      {/* ── 2-Second Notification Toast Popup ── */}
+      {activePopup && (
+        <div
+          className="msg-popup-toast"
+          onClick={() => {
+            const targetContact = contacts.find(c => c.userId === activePopup.senderId);
+            if (targetContact) setSelectedContact(targetContact);
+            setActivePopup(null);
+          }}
+          style={{
+            position: 'fixed',
+            top: '20px',
+            right: '24px',
+            zIndex: 99999,
+            background: 'linear-gradient(135deg, rgba(15, 23, 50, 0.98) 0%, rgba(8, 12, 30, 0.98) 100%)',
+            border: '1px solid rgba(56, 189, 248, 0.6)',
+            borderRadius: '14px',
+            padding: '12px 18px',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.35)',
+            backdropFilter: 'blur(20px)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            minWidth: '280px',
+            maxWidth: '380px',
+            animation: 'toastSlideIn 0.25s ease-out forwards',
+            color: '#FFFFFF',
+          }}
+        >
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: 'linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#FFFFFF',
+              fontWeight: 800,
+              fontSize: '15px',
+              flexShrink: 0,
+              boxShadow: '0 0 10px rgba(56, 189, 248, 0.5)',
+            }}
+          >
+            {activePopup.title.charAt(0).toUpperCase()}
           </div>
-          <span className="msg-brand-name">HireMind AI</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#FFFFFF' }}>
+                💬 {activePopup.title}
+              </span>
+              <span style={{ fontSize: '10px', color: '#38BDF8', fontWeight: 600, background: 'rgba(56, 189, 248, 0.15)', padding: '1px 6px', borderRadius: '999px' }}>
+                2s Alert
+              </span>
+            </div>
+            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#CBD5E1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {activePopup.message}
+            </p>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); setActivePopup(null); }}
+            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '2px' }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* ── Left Sidebar (High Contrast & High Opacity) ── */}
+      <aside className="msg-sidebar">
+        <div className="msg-sidebar-brand" onClick={() => navigate('/hr-dashboard')}>
+          <div className="msg-brand-icon msg-avatar-brand">
+            <span style={{ fontSize: 18 }}>⚡</span>
+          </div>
+          <span className="msg-brand-name">TalentIQ HR</span>
         </div>
 
         <nav className="msg-nav-list">
-          <NavItem icon={<LayoutDashboard size={17} />} label="Dashboard" isUniverse={isUniverse} onClick={() => navigate('/hr-analytics')} />
-          <NavItem icon={<MessageSquare size={17} />} label="Messages" active isUniverse={isUniverse} onClick={() => {}} />
-          <NavItem icon={<Calendar size={17} />} label="Calendar" isUniverse={isUniverse} onClick={() => navigate('/hr-calendar')} />
-          <NavItem icon={<Users size={17} />} label="Applications" isUniverse={isUniverse} onClick={() => navigate('/hr-applications')} />
-          <NavItem icon={<Briefcase size={17} />} label="Jobs" isUniverse={isUniverse} onClick={() => navigate('/jobs')} />
+          <button onClick={() => navigate('/hr-dashboard')} className="msg-nav-item">
+            <LayoutDashboard size={17} /> Overview
+          </button>
+          <button onClick={() => navigate('/hr-jobs')} className="msg-nav-item">
+            <Briefcase size={17} /> Job Postings
+          </button>
+          <button onClick={() => navigate('/hr-applications')} className="msg-nav-item">
+            <Users size={17} /> Applications
+          </button>
+
+          {/* Candidate Messages with Blue Dot & Unread Count Badge */}
+          <button onClick={() => {}} className="msg-nav-item active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MessageSquare size={17} />
+              <span>Candidate Messages</span>
+            </div>
+            {totalUnreadCount > 0 && (
+              <span className="msg-nav-unread-badge" title={`${totalUnreadCount} unread message(s)`}>
+                <span className="msg-pulse-blue-dot" />
+                {totalUnreadCount}
+              </span>
+            )}
+          </button>
+
+          <button onClick={() => navigate('/hr-calendar')} className="msg-nav-item">
+            <Calendar size={17} /> Interviews
+          </button>
           <div className="msg-nav-divider" />
-          <NavItem icon={<Settings size={17} />} label="Settings" isUniverse={isUniverse} onClick={() => {}} />
-          <NavItem icon={<LogOut size={17} />} label="Sign Out" isUniverse={isUniverse} onClick={() => { logout(); navigate('/'); }} />
+          <button onClick={() => navigate('/hr-settings')} className="msg-nav-item">
+            <Settings size={17} /> Settings
+          </button>
+          <button onClick={() => { logout(); navigate('/login'); }} className="msg-nav-item sign-out">
+            <LogOut size={17} /> Sign Out
+          </button>
         </nav>
 
         <div className="msg-user-badge">
-          <div className="msg-user-name">{user ? `${user.firstName} ${user.lastName}` : 'HR Manager'}</div>
-          <div className="msg-user-email">{user?.email || ''}</div>
+          <div className="msg-user-name">{user ? `${user.firstName} ${user.lastName}` : 'Recruiter'}</div>
+          <div className="msg-user-email">{user?.email || 'hr.recruiter@gmail.com'}</div>
         </div>
       </aside>
 
-      {/* ── Contacts Panel ── */}
+      {/* ── Contacts Directory Panel (Never Overflows) ── */}
       <div className="msg-contacts-panel">
         <div className="msg-contacts-header">
           <div className="msg-contacts-title-row">
-            <h2 className="msg-contacts-title">Messages</h2>
-            {/* Theme Toggle Button */}
-            <button onClick={toggleTheme} className="msg-theme-btn">
-              {isUniverse ? <Sparkles size={12} /> : <Sun size={12} />}
-              {isUniverse ? 'Universe' : 'Light'}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2 className="msg-contacts-title">Candidate Directory 💬</h2>
+              <span className="msg-contacts-badge">{contacts.length}</span>
+            </div>
+
+            {/* Quick Light/Dark Toggle & Theme Dropdown Trigger */}
+            <div className="msg-theme-tools">
+              <button
+                onClick={toggleLightDark}
+                className="msg-theme-quick-btn"
+                title={theme === 'light' ? 'Switch to Cosmic Dark' : 'Switch to Solar Light'}
+              >
+                {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
+              </button>
+
+              <div className="msg-theme-dropdown-wrap">
+                <button
+                  onClick={() => setShowThemeMenu(!showThemeMenu)}
+                  className="msg-theme-select-btn"
+                  title="Choose Chat Theme"
+                >
+                  <Sparkles size={13} />
+                  <span className="msg-theme-name-label">{theme.toUpperCase()}</span>
+                  <ChevronDown size={13} />
+                </button>
+
+                {showThemeMenu && (
+                  <div className="msg-theme-menu">
+                    <button
+                      onClick={() => handleSelectTheme('galaxy')}
+                      className={`msg-theme-opt ${theme === 'galaxy' ? 'active' : ''}`}
+                    >
+                      <span>🌌 Cosmic Galaxy</span>
+                      {theme === 'galaxy' && <CheckCircle2 size={13} color="#A78BFA" />}
+                    </button>
+                    <button
+                      onClick={() => handleSelectTheme('moon')}
+                      className={`msg-theme-opt ${theme === 'moon' ? 'active' : ''}`}
+                    >
+                      <span>🌙 Lunar Moon</span>
+                      {theme === 'moon' && <CheckCircle2 size={13} color="#93C5FD" />}
+                    </button>
+                    <button
+                      onClick={() => handleSelectTheme('light')}
+                      className={`msg-theme-opt ${theme === 'light' ? 'active' : ''}`}
+                    >
+                      <span>☀️ Solar Daylight</span>
+                      {theme === 'light' && <CheckCircle2 size={13} color="#F59E0B" />}
+                    </button>
+                    <button
+                      onClick={() => handleSelectTheme('obsidian')}
+                      className={`msg-theme-opt ${theme === 'obsidian' ? 'active' : ''}`}
+                    >
+                      <span>🪐 Cyber Obsidian</span>
+                      {theme === 'obsidian' && <CheckCircle2 size={13} color="#34D399" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="msg-search-wrapper">
+          <div className="msg-search-box">
             <Search size={14} className="msg-search-icon" />
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search contacts..."
-              className="msg-search-input msg-input-field"
+              placeholder="Search candidate name, role, or email..."
+              className="msg-search-input"
             />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="msg-search-clear">
+                <X size={13} />
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="msg-contacts-scroll">
+        {/* Scrollable Contacts List */}
+        <div className="msg-contacts-list">
           {contactsLoading ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: isUniverse ? '#94A3B8' : '#64748B', fontSize: 13 }}>Loading contacts...</div>
+            <div className="msg-loading-text">Loading candidate directory...</div>
           ) : filteredContacts.length === 0 ? (
-            <div style={{ padding: '32px 16px', textAlign: 'center', color: isUniverse ? '#94A3B8' : '#64748B' }}>
-              <MessageSquare size={28} style={{ marginBottom: 8, opacity: 0.4 }} />
-              <div style={{ fontSize: 13 }}>No contacts yet</div>
-              <div style={{ fontSize: 11, marginTop: 4 }}>Contacts appear after candidates apply</div>
-            </div>
+            <div className="msg-empty-contacts">No candidate conversations found</div>
           ) : (
-            filteredContacts.map(contact => (
-              <button
-                key={contact.userId}
-                onClick={() => setSelectedContact(contact)}
-                className={`msg-contact-btn ${selectedContact?.userId === contact.userId ? 'selected' : ''}`}
-              >
-                <div className="msg-contact-avatar msg-avatar-brand">
-                  {contact.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="msg-contact-info">
-                  <div className="msg-contact-top">
-                    <span className="msg-contact-name">{contact.name}</span>
-                    {contact.unreadCount > 0 && (
-                      <span className="msg-unread-badge">
-                        {contact.unreadCount}
-                      </span>
+            filteredContacts.map(contact => {
+              const isSelected = selectedContact?.userId === contact.userId;
+              const hasUnread = contact.unreadCount > 0;
+              return (
+                <div
+                  key={contact.userId}
+                  onClick={() => setSelectedContact(contact)}
+                  className={`msg-contact-item ${isSelected ? 'selected' : ''}`}
+                >
+                  <div className="msg-avatar-contact msg-avatar-brand">
+                    {contact.name.charAt(0).toUpperCase()}
+                  </div>
+
+                  <div className="msg-contact-info">
+                    <div className="msg-contact-name-row">
+                      <span className="msg-contact-name">{contact.name}</span>
+                      {/* Unread Status: Glowing Blue Dot & Number Badge */}
+                      {hasUnread ? (
+                        <span className="msg-unread-pill" title={`${contact.unreadCount} unread message(s)`}>
+                          <span className="msg-unread-dot" />
+                          <span className="msg-unread-count-text">{contact.unreadCount}</span>
+                        </span>
+                      ) : (
+                        contact.lastMessageAt && (
+                          <span className="msg-contact-time">{formatMsgTime(contact.lastMessageAt)}</span>
+                        )
+                      )}
+                    </div>
+
+                    {contact.jobTitle && (
+                      <div className="msg-contact-company">
+                        🎯 {contact.jobTitle}
+                      </div>
                     )}
-                  </div>
-                  <div className="msg-contact-snippet">
-                    {contact.lastMessage || contact.email}
+
+                    <div className="msg-contact-snippet-row">
+                      <span className="msg-contact-snippet">
+                        {contact.lastMessage || contact.email}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </button>
-            ))
+              );
+            })
           )}
         </div>
       </div>
 
-      {/* ── Chat Area ── */}
-      {selectedContact ? (
-        <div className="msg-chat-main">
-          {/* Chat Header */}
-          <div className="msg-chat-header">
-            <div className="msg-chat-header-user">
-              <div className="msg-contact-avatar msg-avatar-brand">
-                {selectedContact.name.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <div className="msg-chat-header-name">{selectedContact.name}</div>
-                <div className="msg-chat-header-status">
-                  {otherTyping ? (
-                    <><Circle size={8} fill="#10b981" color="#10b981" /> <span style={{ color: '#10b981' }}>typing...</span></>
-                  ) : (
-                    <>{selectedContact.email}</>
-                  )}
+      {/* ── Main Chat Area (Strict Right: HR / Left: Candidate) ── */}
+      <div className="msg-chat-panel">
+        {selectedContact ? (
+          <>
+            {/* Top Chat Header */}
+            <div className="msg-chat-header">
+              <div className="msg-chat-header-user">
+                <div className="msg-avatar-contact active-avatar">
+                  {selectedContact.name.charAt(0).toUpperCase()}
                 </div>
-              </div>
-            </div>
-
-            {/* Call controls */}
-            <div className="msg-call-actions">
-              {callState === 'idle' && (
-                <button onClick={startCall} className="msg-call-btn-start">
-                  <Phone size={14} /> Audio Call
-                </button>
-              )}
-              {(callState === 'calling' || callState === 'in-call') && (
-                <div className="msg-call-active-bar">
-                  <div className={`msg-call-status-pulse ${callState === 'in-call' ? 'in-call' : 'calling'}`}>
-                    <Circle size={8} fill="currentColor" color="currentColor" style={{ animation: 'chatPulse 2s infinite' }} />
-                    {callState === 'in-call' ? `In call with ${callWith}` : `Calling ${callWith}...`}
+                <div>
+                  <div className="msg-chat-header-name">
+                    <span>{selectedContact.name}</span>
+                    <button
+                      className="msg-view-profile-btn"
+                      onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
+                      title="View Candidate Verified Portfolio & Resume"
+                    >
+                      <UserCheck size={13} style={{ marginRight: '4px' }} />
+                      View Candidate Profile 📄
+                    </button>
                   </div>
-                  <button onClick={toggleMute} className={`msg-mute-btn ${isMuted ? 'muted' : ''}`}>
-                    {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
-                  </button>
-                  <button onClick={hangUp} className="msg-hangup-btn">
-                    <PhoneOff size={14} /> End
-                  </button>
+                  <div className="msg-chat-status-line">
+                    <span className="msg-status-dot" />
+                    <span>{otherTyping ? 'Candidate is typing...' : 'Candidate Online'}</span>
+                    <span className="msg-company-tag">• {selectedContact.email}</span>
+                    {selectedContact.jobTitle && (
+                      <span className="msg-job-tag">• {selectedContact.jobTitle}</span>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="msg-stream">
-            {loading ? (
-              <div style={{ textAlign: 'center', color: isUniverse ? '#94A3B8' : '#64748B', paddingTop: 40 }}>Loading messages...</div>
-            ) : messages.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 60, color: isUniverse ? '#94A3B8' : '#64748B' }}>
-                <MessageSquare size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6, color: isUniverse ? '#F8FAFC' : '#1E293B' }}>No messages yet</div>
-                <div style={{ fontSize: 13 }}>Start the conversation with {selectedContact.name}</div>
               </div>
-            ) : (
-              <>
-                {messages.map((msg, idx) => {
-                  const isMe = msg.senderId === currentUserId;
+
+              {/* Action Buttons */}
+              <div className="msg-chat-header-actions">
+                <button
+                  onClick={() => setShowClearModal(true)}
+                  className="msg-header-btn msg-btn-danger"
+                  title="Clear Conversation"
+                >
+                  <Trash2 size={13} /> Clear Chat
+                </button>
+
+                <button
+                  onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
+                  className="msg-header-btn"
+                  title="Open Full Candidate Profile"
+                >
+                  <ExternalLink size={13} /> Full Profile
+                </button>
+
+                {callState === 'idle' && (
+                  <button onClick={startCall} className="msg-call-btn-start">
+                    <Phone size={14} /> Call Candidate
+                  </button>
+                )}
+                {(callState === 'calling' || callState === 'in-call') && (
+                  <div className="msg-call-active-bar">
+                    <div className={`msg-call-status-pulse ${callState === 'in-call' ? 'in-call' : 'calling'}`}>
+                      <Circle size={8} fill="currentColor" color="currentColor" style={{ animation: 'chatPulse 2s infinite' }} />
+                      {callState === 'in-call' ? `In call with ${callWith}` : `Calling ${callWith}...`}
+                    </div>
+                    <button onClick={toggleMute} className={`msg-mute-btn ${isMuted ? 'muted' : ''}`}>
+                      {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
+                    </button>
+                    <button onClick={hangUp} className="msg-hangup-btn">
+                      <PhoneOff size={14} /> End
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Candidate Screening Inquiries Strip */}
+            <div className="msg-quick-inquiries-bar">
+              <span className="msg-quick-label">⚡ Screening Templates:</span>
+              {[
+                "👋 Hello! We reviewed your profile and would love to connect.",
+                "📅 Are you available for a 20-minute technical screening call?",
+                "📄 Could you please share your updated resume and portfolio link?",
+                "🎉 Congratulations! We would like to move forward with the hiring process."
+              ].map((template, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => sendMessage(template)}
+                  className="msg-template-chip"
+                >
+                  {template}
+                </button>
+              ))}
+            </div>
+
+            {/* Messages Scroll Stream: Strictly Right (HR/Me) vs Left (Candidate) */}
+            <div className="msg-messages-scroll-area">
+              {loading ? (
+                <div className="msg-loading-history">Loading message history...</div>
+              ) : messages.length === 0 ? (
+                <div className="msg-empty-history">
+                  <MessageSquare size={40} style={{ opacity: 0.4 }} />
+                  <p>No messages yet. Send a note to {selectedContact.name} to begin screening!</p>
+                </div>
+              ) : (
+                messages.map((msg, idx) => {
+                  const isMe = Number(msg.senderId) === currentUserId;
                   return (
-                    <div key={msg.id || idx} className={`msg-row ${isMe ? 'me' : 'other'}`}>
+                    <div
+                      key={msg.id || idx}
+                      className={`msg-bubble-row ${isMe ? 'sent-by-me' : 'received-from-candidate'}`}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          visible: true,
+                          x: e.clientX,
+                          y: e.clientY,
+                          message: msg,
+                        });
+                      }}
+                    >
                       {!isMe && (
-                        <div className="msg-row-avatar msg-avatar-brand">
-                          {msg.senderName?.charAt(0) || '?'}
+                        <div className="msg-bubble-avatar-left" title={selectedContact.name}>
+                          {selectedContact.name.charAt(0)}
                         </div>
                       )}
-                      <div className="msg-content-wrapper">
-                        {!isMe && <div className="msg-sender-label">{msg.senderName}</div>}
-                        <div className={`msg-bubble ${isMe ? 'msg-bubble-me me' : 'msg-bubble-other other'}`}>
-                          {msg.content}
+
+                      <div className={`msg-bubble ${isMe ? 'bubble-me' : 'bubble-other'}`}>
+                        {/* Header distinction inside the bubble */}
+                        {!isMe ? (
+                          <div className="msg-bubble-sender-name">
+                            <UserIcon size={12} /> {selectedContact.name} (Candidate)
+                          </div>
+                        ) : (
+                          <div className="msg-bubble-sender-name" style={{ color: '#FDE047' }}>
+                            <ShieldCheck size={12} /> You (HR Recruiter)
+                          </div>
+                        )}
+
+                        <div className="msg-bubble-text">
+                          {msg.fileUrl ? (
+                            msg.type === 'IMAGE' || msg.fileUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                              <div className="msg-attachment-img-wrap">
+                                <img
+                                  src={`/api/v1/chat/files/${msg.fileUrl}`}
+                                  alt={msg.fileName || 'Photo attachment'}
+                                  className="msg-attachment-img"
+                                  onClick={() => window.open(`/api/v1/chat/files/${msg.fileUrl}`, '_blank')}
+                                />
+                                <span className="msg-attachment-caption">{msg.fileName || msg.content}</span>
+                              </div>
+                            ) : (
+                              <a
+                                href={`/api/v1/chat/files/${msg.fileUrl}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="msg-attachment-link"
+                              >
+                                <Paperclip size={14} /> {msg.fileName || msg.content}
+                              </a>
+                            )
+                          ) : (
+                            msg.content
+                          )}
                         </div>
-                        <div className={`msg-timestamp ${isMe ? 'me' : ''}`}>
-                          {formatMsgTime(msg.sentAt)}
+
+                        {/* Timestamp and Delivery/Read Acknowledgement */}
+                        <div className={`msg-bubble-meta ${isMe ? 'meta-right' : 'meta-left'}`}>
+                          <span className="msg-time-string">
+                            {formatMsgTime(msg.sentAt)}
+                          </span>
+                          {isMe && renderMessageAcknowledgement(msg)}
                         </div>
+                      </div>
+
+                      {/* Quick Hover Delete / Copy Action */}
+                      <div className="msg-bubble-hover-actions">
+                        <button
+                          onClick={() => handleDeleteMessage(msg)}
+                          className="msg-action-hover-btn"
+                          title="Delete Message"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(msg.content)}
+                          className="msg-action-hover-btn"
+                          title="Copy Message Text"
+                        >
+                          <Copy size={12} />
+                        </button>
                       </div>
                     </div>
                   );
-                })}
-                <div ref={messagesEndRef} />
-              </>
-            )}
-          </div>
+                })
+              )}
 
-          {/* Input */}
-          <div className="msg-chat-input-bar">
-            <input
-              value={inputText}
-              onChange={e => { setInputText(e.target.value); handleTyping(); }}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-              placeholder={`Message ${selectedContact.name}...`}
-              className="msg-input-field"
-            />
-            <button
-              onClick={sendMessage}
-              disabled={!inputText.trim() || !stompRef.current?.connected}
-              className={`msg-send-btn ${inputText.trim() ? 'active' : ''}`}
-            >
-              <Send size={18} />
-            </button>
+              {otherTyping && (
+                <div className="msg-bubble-row received-from-candidate">
+                  <div className="msg-bubble-avatar-left">
+                    {selectedContact.name.charAt(0)}
+                  </div>
+                  <div className="msg-bubble bubble-other typing-bubble">
+                    <span className="msg-typing-dot" />
+                    <span className="msg-typing-dot" />
+                    <span className="msg-typing-dot" />
+                    <span style={{ fontSize: '12px', marginLeft: '6px', color: '#94A3B8' }}>
+                      {selectedContact.name} is typing...
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* ── WhatsApp Style Bottom-Anchored Message Input Bar ── */}
+            <div className="msg-chat-input-bar">
+              {/* Hidden File Input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={(e) => handleFileUpload(e, false)}
+                style={{ display: 'none' }}
+                accept=".pdf,.doc,.docx,.txt,.zip,.csv"
+              />
+
+              {/* Hidden Photo Input */}
+              <input
+                type="file"
+                ref={photoInputRef}
+                onChange={(e) => handleFileUpload(e, true)}
+                style={{ display: 'none' }}
+                accept="image/*"
+              />
+
+              {/* 📎 File Attachment Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="msg-attach-btn"
+                title="Share Document / Resume / File"
+              >
+                <Paperclip size={18} />
+              </button>
+
+              {/* 🖼️ Photo / Image Share Button */}
+              <button
+                onClick={() => photoInputRef.current?.click()}
+                className="msg-attach-btn"
+                title="Share Photo / Screenshot"
+              >
+                <ImageIcon size={18} />
+              </button>
+
+              {/* Main Input Text Field */}
+              <input
+                value={inputText}
+                onChange={e => { setInputText(e.target.value); handleTyping(); }}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+                placeholder={`Message ${selectedContact.name}... (Press Enter to send)`}
+                className="msg-input-field"
+              />
+
+              {/* Send Button */}
+              <button
+                onClick={() => sendMessage()}
+                disabled={!inputText.trim()}
+                className={`msg-send-btn ${inputText.trim() ? 'active' : ''}`}
+                title="Send Message"
+              >
+                <Send size={17} />
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="msg-no-selected-placeholder">
+            <MessageSquare size={52} color="#6366F1" />
+            <h3>Select a Candidate to Begin Screening</h3>
+            <p>Choose an applicant from the left panel to review message threads or start real-time candidate interviews.</p>
           </div>
+        )}
+      </div>
+
+      {/* Context Menu for Messages */}
+      {contextMenu.visible && contextMenu.message && (
+        <div
+          className="msg-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              if (contextMenu.message) navigator.clipboard.writeText(contextMenu.message.content);
+              setContextMenu(prev => ({ ...prev, visible: false }));
+            }}
+            className="msg-context-item"
+          >
+            <Copy size={13} /> Copy Message
+          </button>
+          <button
+            onClick={() => {
+              if (contextMenu.message) handleDeleteMessage(contextMenu.message);
+              setContextMenu(prev => ({ ...prev, visible: false }));
+            }}
+            className="msg-context-item danger"
+          >
+            <Trash2 size={13} /> Delete Message
+          </button>
         </div>
-      ) : (
-        <div className="msg-empty-placeholder">
-          <div className="msg-placeholder-icon-circle">
-            <MessageSquare size={36} color="#6366f1" style={{ opacity: 0.6 }} />
-          </div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 600, color: isUniverse ? '#F8FAFC' : '#1E293B', marginBottom: 8 }}>Select a conversation</div>
-            <div style={{ fontSize: 14 }}>Choose a candidate from the left to start messaging</div>
+      )}
+
+      {/* Clear Confirmation Modal */}
+      {showClearModal && selectedContact && (
+        <div className="recs-modal-backdrop" onClick={() => setShowClearModal(false)}>
+          <div className="msg-confirm-modal" onClick={e => e.stopPropagation()}>
+            <Trash2 size={36} color="#EF4444" />
+            <h3>Clear Candidate Conversation?</h3>
+            <p>Are you sure you want to delete all messages with <strong>{selectedContact.name}</strong>? This action cannot be undone.</p>
+            <div className="msg-confirm-actions">
+              <button onClick={() => setShowClearModal(false)} className="cosmic-btn-modal-cancel">
+                Cancel
+              </button>
+              <button onClick={handleClearConversation} className="msg-btn-confirm-delete">
+                Yes, Delete Chat
+              </button>
+            </div>
           </div>
         </div>
       )}

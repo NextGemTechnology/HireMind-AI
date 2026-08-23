@@ -1,9 +1,9 @@
 /* ============================================================
-   TalentIQ — HR AI Copilot Page Styles
+   TalentIQ — HR AI Copilot Page Styles (High Visibility & Reflection)
    ============================================================ */
 
 .copilot-container {
-  max-width: 1140px;
+  max-width: 1180px;
   margin: 40px auto;
   padding: 0 24px;
   height: calc(100vh - 150px);
@@ -13,63 +13,79 @@
 
 /* ── Context Sidebar ─────────────────────────────────────── */
 .copilot-sidebar {
-  width: 300px;
-  padding: 20px;
+  width: 320px;
+  padding: 24px !important;
   display: flex;
   flex-direction: column;
   gap: 20px;
   flex-shrink: 0;
+  background: linear-gradient(135deg, rgba(20, 29, 56, 0.96) 0%, rgba(13, 19, 40, 0.98) 100%) !important;
+  border: 1px solid rgba(167, 139, 250, 0.42) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(24px) !important;
 }
 
 .copilot-sidebar-title {
-  font-size: 16px;
-  margin-bottom: 12px;
+  font-size: 17px !important;
+  margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
+  color: #FFFFFF !important;
+  font-weight: 700;
 }
 
 .copilot-sidebar-subtitle {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px !important;
+  color: #CBD5E1 !important;
   margin-bottom: 16px;
 }
 
 .copilot-mode-btn-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .copilot-mode-btn {
-  justify-content: flex-start;
-  font-size: 13px;
+  justify-content: flex-start !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  padding: 10px 14px !important;
+  border-radius: 10px !important;
 }
 
 .copilot-settings-box {
-  border-top: 1px solid var(--border-subtle);
-  padding-top: 20px;
+  border-top: 1px solid rgba(139, 92, 246, 0.25) !important;
+  padding-top: 18px;
 }
 
 .copilot-settings-heading {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 14px !important;
+  color: #F8FAFC !important;
+  font-weight: 600;
   margin-bottom: 12px;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .copilot-settings-label {
-  font-size: 11px;
-  color: var(--text-dim);
+  font-size: 12px !important;
+  color: #94A3B8 !important;
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-weight: 600;
 }
 
 .copilot-settings-select {
-  padding: 8px;
-  font-size: 12px;
+  padding: 10px 12px !important;
+  font-size: 13px !important;
+  background: rgba(10, 15, 32, 0.95) !important;
+  border: 1px solid rgba(167, 139, 250, 0.4) !important;
+  color: #FFFFFF !important;
+  border-radius: 10px !important;
 }
 
 /* ── Main Chat Panel ─────────────────────────────────────── */
@@ -78,14 +94,20 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: linear-gradient(135deg, rgba(20, 29, 56, 0.96) 0%, rgba(13, 19, 40, 0.98) 100%) !important;
+  border: 1px solid rgba(167, 139, 250, 0.42) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(24px) !important;
 }
 
 .copilot-chat-header {
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 18px 24px !important;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.25) !important;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: rgba(13, 19, 39, 0.6);
 }
 
 .copilot-status-indicator {
@@ -98,13 +120,14 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: var(--accent-emerald);
-  box-shadow: 0 0 8px var(--accent-emerald);
+  background: #10B981;
+  box-shadow: 0 0 10px #34D399;
 }
 
 .copilot-header-title {
-  font-size: 15px;
-  fontWeight: 600;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #FFFFFF !important;
 }
 
 /* ── Messages Stream ─────────────────────────────────────── */
@@ -114,47 +137,51 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 .copilot-msg-bubble {
-  max-width: 80%;
-  padding: 14px 18px;
-  border-radius: 16px;
-  font-size: 14px;
-  line-height: 1.6;
+  max-width: 82%;
+  padding: 16px 20px !important;
+  border-radius: 16px !important;
+  font-size: 14px !important;
+  line-height: 1.65 !important;
+  white-space: pre-wrap;
 }
 
 .copilot-msg-bubble.user {
   align-self: flex-end;
-  background: var(--gradient-brand);
-  color: #FFF;
-  border: none;
-  box-shadow: var(--shadow-glow);
+  background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%) !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(192, 132, 252, 0.5) !important;
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
 
 .copilot-msg-bubble.assistant {
   align-self: flex-start;
-  background: rgba(30, 41, 59, 0.8);
-  color: #FFF;
-  border: 1px solid var(--border-subtle);
+  background: linear-gradient(135deg, rgba(26, 36, 68, 0.95) 0%, rgba(17, 24, 48, 0.98) 100%) !important;
+  color: #F8FAFC !important;
+  border: 1px solid rgba(167, 139, 250, 0.38) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
 }
 
 .copilot-typing-bubble {
   align-self: flex-start;
   padding: 12px 18px;
-  border-radius: 16px;
-  background: rgba(30, 41, 59, 0.8);
+  border-radius: 14px;
+  background: rgba(26, 36, 68, 0.8) !important;
+  border: 1px solid rgba(167, 139, 250, 0.3) !important;
   font-size: 13px;
-  color: var(--text-muted);
+  color: #A78BFA !important;
 }
 
 /* ── Input Bar ───────────────────────────────────────────── */
 .copilot-input-bar {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border-subtle);
+  padding: 18px 24px !important;
+  border-top: 1px solid rgba(139, 92, 246, 0.25) !important;
   display: flex;
   gap: 12px;
+  background: rgba(13, 19, 39, 0.6);
 }
 
 @media (max-width: 768px) {

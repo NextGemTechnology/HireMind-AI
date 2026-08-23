@@ -70,11 +70,22 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final MailService mailService;
     private final AppProperties appProperties;
+    private final com.talentiq.security.jwt.TokenBlacklistService tokenBlacklistService;
+
+    // ── Email Validation: Must end with @gmail.com ───────────────────────────
+    private void validateGmailDomain(String email) {
+        if (email == null || !email.trim().endsWith("@gmail.com")) {
+            throw new BadRequestException("Only @gmail.com email addresses are allowed for registration and login.");
+        }
+    }
 
     // ── Register ──────────────────────────────────────────────────────────────
 
     @Override
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        validateGmailDomain(email);
+
         // Validate only CANDIDATE and HR roles are allowed for public registration
         if (request.getRole() == null
                 || (!request.getRole().equals(Role.ROLE_CANDIDATE)
@@ -83,13 +94,13 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // Email uniqueness check
-        if (userRepository.existsByEmail(request.getEmail().toLowerCase().trim())) {
+        if (userRepository.existsByEmail(email)) {
             throw new ConflictException("An account with this email already exists");
         }
 
         // Build user entity — ACTIVE status for instant usability
         User user = User.builder()
-                .email(request.getEmail().toLowerCase().trim())
+                .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .firstName(request.getFirstName().trim())
                 .lastName(request.getLastName().trim())
@@ -149,6 +160,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
+        validateGmailDomain(email);
 
         // Find user first for lockout check
         User user = userRepository.findByEmail(email)
@@ -179,13 +191,88 @@ public class AuthServiceImpl implements AuthService {
 
             return buildAuthResponse(authenticatedUser, accessToken, refreshToken.getToken());
 
-        } catch (BadCredentialsException ex) {
-            // Increment failed attempts and potentially lock
+        } catch (BadCredentialsException e) {
             handleFailedLogin(user);
-            throw ex;
+            throw e;
         } catch (DisabledException ex) {
             throw new UnauthorizedException("Please verify your email address before logging in");
         }
+    }
+
+    // ── Google OAuth Login / Registration ─────────────────────────────────────
+
+    @Override
+    public AuthResponse googleLogin(GoogleAuthRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        validateGmailDomain(email);
+
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user == null) {
+            // Auto-register new Google user
+            String fullName = StringUtils.hasText(request.getName()) ? request.getName().trim() : "Google User";
+            String[] parts = fullName.split("\\s+", 2);
+            String firstName = parts[0];
+            String lastName = parts.length > 1 ? parts[1] : "User";
+
+            Role role = request.getRole() != null ? request.getRole() : Role.ROLE_CANDIDATE;
+
+            user = User.builder()
+                    .email(email)
+                    .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .avatarUrl(request.getPicture())
+                    .status(UserStatus.ACTIVE)
+                    .emailVerified(true)
+                    .build();
+
+            user.addRole(role);
+            user = userRepository.save(user);
+
+            if (role.equals(Role.ROLE_CANDIDATE)) {
+                Candidate candidate = Candidate.builder()
+                        .user(user)
+                        .currentTitle("Open to Opportunities")
+                        .yearsExperience(1)
+                        .openToWork(true)
+                        .build();
+                candidateRepository.save(candidate);
+            } else if (role.equals(Role.ROLE_HR)) {
+                Company company = companyRepository.findByName("Google Recruiter Workspace").orElseGet(() ->
+                        companyRepository.save(Company.builder()
+                                .name("Google Recruiter Workspace")
+                                .slug("google-recruiter-" + System.currentTimeMillis())
+                                .verified(true)
+                                .active(true)
+                                .build())
+                );
+                HrProfile hrProfile = HrProfile.builder()
+                        .user(user)
+                        .company(company)
+                        .designation("Talent Acquisition Specialist")
+                        .companyAdmin(true)
+                        .build();
+                hrProfileRepository.save(hrProfile);
+            }
+            log.info("New user registered via Google OAuth: {} [{}]", user.getEmail(), role);
+        } else {
+            if (user.isLocked()) {
+                throw new UnauthorizedException("Account temporarily locked. Try again later.");
+            }
+            if (user.getStatus() != UserStatus.ACTIVE) {
+                user.setStatus(UserStatus.ACTIVE);
+                user.setEmailVerified(true);
+                userRepository.save(user);
+            }
+        }
+
+        UserPrincipal principal = new UserPrincipal(user);
+        String accessToken = jwtService.generateAccessToken(principal, user.getId());
+        RefreshToken refreshToken = createRefreshToken(user, httpRequest);
+
+        log.info("Google OAuth login successful: {}", email);
+        return buildAuthResponse(user, accessToken, refreshToken.getToken());
     }
 
     // ── Refresh Token ─────────────────────────────────────────────────────────
@@ -193,7 +280,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse refreshToken(RefreshTokenRequest request, HttpServletRequest httpRequest) {
         RefreshToken existing = refreshTokenRepository.findByToken(request.getRefreshToken())
-                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token. Please log in again."));
 
         if (!existing.isValid()) {
             // Token is expired or revoked — invalidate ALL user tokens (possible token theft)
@@ -215,12 +302,23 @@ public class AuthServiceImpl implements AuthService {
         return buildAuthResponse(user, newAccessToken, newRefreshToken.getToken());
     }
 
-    // ── Logout ────────────────────────────────────────────────────────────────
+    // ── Logout with Instant Token Blacklisting / Destruction ──────────────────
+
+    @Override
+    public void logout(Long userId, String accessToken) {
+        if (userId != null) {
+            refreshTokenRepository.revokeAllUserTokens(userId);
+        }
+        if (StringUtils.hasText(accessToken)) {
+            long remainingMs = jwtService.getRemainingExpiryMs(accessToken);
+            tokenBlacklistService.blacklistToken(accessToken, remainingMs);
+        }
+        log.info("User logged out (all refresh tokens revoked & access token blacklisted): userId={}", userId);
+    }
 
     @Override
     public void logout(Long userId) {
-        refreshTokenRepository.revokeAllUserTokens(userId);
-        log.info("User logged out (all tokens revoked): userId={}", userId);
+        logout(userId, null);
     }
 
     // ── Email Verification ────────────────────────────────────────────────────

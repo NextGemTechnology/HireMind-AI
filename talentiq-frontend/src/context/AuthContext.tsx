@@ -20,6 +20,7 @@ interface AuthContextType {
   isAdmin: boolean;
   login: (credentials: any) => Promise<void>;
   register: (data: any) => Promise<void>;
+  googleLogin: (data: any) => Promise<void>;
   logout: () => void;
 }
 
@@ -99,11 +100,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(authUser);
   };
 
-  const logout = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    setUser(null);
+  const googleLogin = async (data: any) => {
+    const res = await apiClient.post('/auth/google', data);
+    const authData = res.data.data;
+    if (authData.accessToken) {
+      localStorage.setItem('accessToken', authData.accessToken);
+    }
+    if (authData.refreshToken) {
+      localStorage.setItem('refreshToken', authData.refreshToken);
+    }
+    const authUser = parseUserFromAuthData(authData);
+    localStorage.setItem('user', JSON.stringify(authUser));
+    setUser(authUser);
+  };
+
+  const logout = async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (err) {
+      console.debug('Logout API call finished / token revoked');
+    } finally {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
   };
 
   const roles = user?.roles || [];
@@ -121,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isAdmin,
       login,
       register,
+      googleLogin,
       logout
     }}>
       {children}

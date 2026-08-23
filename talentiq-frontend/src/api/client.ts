@@ -47,11 +47,12 @@ apiClient.interceptors.response.use(
             return apiClient(originalRequest);
           }
         } catch (refreshError) {
-          console.warn('Token refresh failed. Redirecting to login...');
+          console.warn('Token refresh failed. Clearing credentials.');
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+          const publicRoutes = ['/', '/jobs', '/login', '/register'];
+          if (!publicRoutes.includes(window.location.pathname)) {
             window.location.href = '/login';
           }
         }
@@ -59,7 +60,8 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        const publicRoutes = ['/', '/jobs', '/login', '/register'];
+        if (!publicRoutes.includes(window.location.pathname)) {
           window.location.href = '/login';
         }
       }

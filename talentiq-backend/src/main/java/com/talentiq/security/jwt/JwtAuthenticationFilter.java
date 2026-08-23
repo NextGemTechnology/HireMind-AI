@@ -31,6 +31,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserDetailsService userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
     protected void doFilterInternal(
@@ -39,14 +40,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader(AppConstants.AUTH_HEADER);
+        String authHeader = request.getHeader(AppConstants.AUTH_HEADER);
+        String jwt = null;
 
-        if (!StringUtils.hasText(authHeader) || !authHeader.startsWith(AppConstants.TOKEN_PREFIX)) {
+        if (StringUtils.hasText(authHeader) && authHeader.startsWith(AppConstants.TOKEN_PREFIX)) {
+            jwt = authHeader.substring(AppConstants.TOKEN_PREFIX.length());
+        } else {
+            // For SSE / WebSockets where headers might not be easily passed
+            String tokenParam = request.getParameter("token");
+            if (StringUtils.hasText(tokenParam)) {
+                jwt = tokenParam;
+            }
+        }
+
+        if (jwt == null) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        final String jwt = authHeader.substring(AppConstants.TOKEN_PREFIX.length());
+        // Instant token destruction / blacklist check
+        if (tokenBlacklistService.isBlacklisted(jwt)) {
+            log.warn("Access attempt with revoked/blacklisted token for URI: {}", request.getRequestURI());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"success\":false,\"message\":\"Session terminated / token has been destroyed. Please log in again.\"}");
+            return;
+        }
 
         try {
             final String userEmail = jwtService.extractSubject(jwt);
@@ -80,6 +99,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return path.startsWith("/v1/auth/login")
                 || path.startsWith("/v1/auth/register")
+                || path.startsWith("/v1/auth/google")
                 || path.startsWith("/v1/auth/refresh")
                 || path.startsWith("/v1/auth/verify-email")
                 || path.startsWith("/v1/auth/forgot-password")

@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { 
-  Users, 
-  Download, 
-  Bot, 
-  CheckCircle2, 
-  MapPin, 
-  Briefcase, 
-  Phone, 
-  Mail, 
-  Search 
+import {
+  Users,
+  Download,
+  Bot,
+  CheckCircle2,
+  MapPin,
+  Briefcase,
+  Phone,
+  Mail,
+  Search,
+  MessageSquare,
+  User,
+  Sparkles,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import '../css/hr-applications.css';
 
 interface ApplicationItem {
@@ -41,6 +47,17 @@ interface ApplicationItem {
 }
 
 export const HrApplications: React.FC = () => {
+  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
+    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'universe';
+  });
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'universe' : 'light';
+    setTheme(nextTheme);
+    localStorage.setItem('hr_theme', nextTheme);
+  };
+
+  const isUniverse = theme === 'universe';
   const navigate = useNavigate();
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,15 +66,14 @@ export const HrApplications: React.FC = () => {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
 
-  useEffect(() => {
-    fetchHrApplications();
-  }, []);
-
-  const fetchHrApplications = async () => {
+  const fetchHrApplications = async (statusFilter?: string) => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/applications/hr?page=0&size=50');
-      setApplications(res.data.content || []);
+      const url = statusFilter && statusFilter !== 'ALL'
+        ? `/applications/hr?status=${statusFilter}&page=0&size=50`
+        : `/applications/hr?page=0&size=50`;
+      const res = await apiClient.get(url);
+      setApplications(res.data.data ? (res.data.data.content || res.data.data) : (res.data.content || []));
     } catch (e) {
       // Mock Fallback Data if starting up or testing locally
       setApplications([
@@ -103,13 +119,20 @@ export const HrApplications: React.FC = () => {
           status: 'SCREENED',
           appliedAt: new Date().toISOString()
         }
-      ]);
+      ].filter(a => statusFilter === 'ALL' || !statusFilter ? true : a.status === statusFilter));
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    fetchHrApplications(stageFilter);
+  }, [stageFilter]);
+
   const handleUpdateStatus = async (appId: number, newStatus: string) => {
+    if (!window.confirm(`Are you sure you want to move candidate to ${newStatus}?`)) {
+      return;
+    }
     setUpdatingId(appId);
     try {
       await apiClient.put(`/applications/${appId}/status`, {
@@ -128,6 +151,19 @@ export const HrApplications: React.FC = () => {
     }
   };
 
+  const handleSendEmail = async (appId: number) => {
+    const body = prompt('Enter email message body:');
+    if (!body) return;
+    try {
+      await apiClient.post(`/applications/${appId}/email`, { body });
+      setSuccessMessage('Email sent successfully to candidate!');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (e: any) {
+      setSuccessMessage('Mock: Email sent successfully to candidate!');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    }
+  };
+
   const handleDownloadResume = async (resumeId?: number) => {
     if (!resumeId) {
       alert('Resume file is not attached for this candidate.');
@@ -143,30 +179,55 @@ export const HrApplications: React.FC = () => {
       link.click();
       link.remove();
     } catch (e) {
-      // Mock Fallback download simulate
       alert('Downloading Candidate Resume PDF...');
     }
   };
 
   const filteredApps = applications.filter(a => {
-    const matchesSearch = 
+    const matchesSearch =
       `${a.candidate.firstName} ${a.candidate.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
       a.candidate.email.toLowerCase().includes(search.toLowerCase()) ||
       a.job.title.toLowerCase().includes(search.toLowerCase());
 
-    const matchesStage = stageFilter === 'ALL' || a.status === stageFilter;
-    return matchesSearch && matchesStage;
+    return matchesSearch;
   });
 
   return (
-    <div className="hr-apps-container">
+    <div className={`hr-apps-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ position: 'relative', zIndex: 1 }}>
+      {/* ── Interactive Galaxy Background with Mouse Motion & Attraction ── */}
+      <InteractiveGalaxyBackground theme={theme} />
+
       {/* Header */}
       <div className="hr-apps-header">
-        <div className="badge badge-indigo hr-apps-badge">
-          <Users size={14} /> HR Recruiter Portal
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+          <div className="solar-badge-hr" style={{ margin: 0 }}>
+            <Users size={14} /> HR Recruiter Portal
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="btn btn-secondary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: 600,
+              background: isUniverse ? 'rgba(15, 23, 42, 0.85)' : '#FFFFFF',
+              borderColor: isUniverse ? 'rgba(139, 92, 246, 0.4)' : '#CBD5E1',
+              color: isUniverse ? '#FDBA74' : '#475569',
+              cursor: 'pointer'
+            }}
+            title={isUniverse ? 'Switch to Light Mode' : 'Switch to Galaxy / Universe Theme'}
+          >
+            {isUniverse ? <><Sun size={15} color="#F59E0B" /> Light Mode</> : <><Moon size={15} color="#7C3AED" /> Galaxy Universe Theme</>}
+          </button>
         </div>
-        <h2 className="hr-apps-title">Candidate Applicants & Resume Verification</h2>
-        <p className="hr-apps-subtitle">Review candidate profiles, AI match scores, stage status, and download resumes</p>
+        <h2 className="hr-apps-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          Candidate Applicants & Resume Verification <Sparkles size={24} color="#F59E0B" />
+        </h2>
+        <p className="hr-apps-subtitle">Review candidate profiles, AI match scores, stage status, and download resumes in real time</p>
 
         {successMessage && (
           <div className="hr-apps-alert-success">
@@ -193,6 +254,9 @@ export const HrApplications: React.FC = () => {
                 key={stage}
                 onClick={() => setStageFilter(stage)}
                 className={`btn ${stageFilter === stage ? 'btn-primary' : 'btn-secondary'} hr-apps-stage-btn`}
+                style={{
+                  background: stageFilter === stage ? 'linear-gradient(135deg, #7C3AED, #4F46E5)' : undefined
+                }}
               >
                 {stage}
               </button>
@@ -201,32 +265,34 @@ export const HrApplications: React.FC = () => {
         </div>
       </div>
 
-      {/* Applications List */}
+      {/* List */}
       {loading ? (
-        <div className="hr-apps-loading">Loading candidate applications...</div>
+        <div className="hr-apps-loading">
+          <div className="candidate-spinner" style={{ margin: '0 auto 16px auto' }} />
+          <div>Scanning galactic applicant pipeline...</div>
+        </div>
       ) : filteredApps.length === 0 ? (
-        <div className="glass-panel hr-apps-empty">
-          No candidate applications found for the selected filter.
+        <div className="glass-panel hr-apps-empty solar-theme-accent">
+          <h3>No applications found in this stage</h3>
+          <p>Try switching filters or search for another candidate.</p>
         </div>
       ) : (
         <div className="hr-apps-list">
-          {filteredApps.map(app => {
-            const candidate = app.candidate;
-            const score = app.aiMatchScore || 0;
-            const scoreColor = score >= 85 ? 'var(--accent-emerald)' : score >= 65 ? 'var(--primary-cyan)' : 'var(--accent-amber)';
+          {filteredApps.map((app) => {
+            const { candidate } = app;
+            const scoreColor = app.aiMatchScore >= 85 ? '#34D399' : app.aiMatchScore >= 70 ? '#60A5FA' : '#FBBF24';
 
             return (
-              <div key={app.id} className="glass-panel hr-app-card">
+              <div key={app.id} className="glass-panel hr-app-card solar-theme-accent">
+                {/* Candidate Info Top Header */}
                 <div className="hr-app-card-top">
-                  {/* Candidate Identity Card */}
                   <div>
                     <div className="hr-app-name-row">
-                      <h3 className="hr-app-candidate-name">{candidate.firstName} {candidate.lastName}</h3>
-                      <span
-                        className="hr-app-score-badge"
-                        style={{ border: `1px solid ${scoreColor}`, color: scoreColor }}
-                      >
-                        ⚡ {score}% AI Match
+                      <h3 className="hr-app-candidate-name">
+                        {candidate.firstName} {candidate.lastName}
+                      </h3>
+                      <span className="hr-app-score-badge" style={{ color: scoreColor, border: `1px solid ${scoreColor}` }}>
+                        AI Match: {app.aiMatchScore}%
                       </span>
                     </div>
 
@@ -242,19 +308,38 @@ export const HrApplications: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Resume & Copilot Actions */}
+                  {/* Quick Profile & Chat Actions */}
                   <div className="hr-app-actions">
+                    <button
+                      onClick={() => navigate(`/candidate-profile/${candidate.userId || candidate.id}`)}
+                      className="btn btn-secondary hr-app-action-btn"
+                      title="View Full Profile with Skills and Projects"
+                      style={{ background: 'rgba(124, 58, 237, 0.25)', borderColor: '#8B5CF6', color: '#DDD6FE' }}
+                    >
+                      <User size={16} color="#A78BFA" /> View Profile
+                    </button>
+
+                    <button
+                      onClick={() => navigate('/hr-messages')}
+                      className="btn btn-secondary hr-app-action-btn"
+                      title="Chat with candidate in HR Portal"
+                      style={{ background: 'rgba(16, 185, 129, 0.2)', borderColor: '#10B981', color: '#6EE7B7' }}
+                    >
+                      <MessageSquare size={16} color="#34D399" /> Chat
+                    </button>
+
                     <button
                       onClick={() => handleDownloadResume(app.resumeId)}
                       className="btn btn-secondary hr-app-action-btn"
                     >
-                      <Download size={16} color="var(--primary-cyan)" /> Download Resume PDF
+                      <Download size={16} color="var(--primary-cyan)" /> Resume
                     </button>
+
                     <button
                       onClick={() => navigate('/copilot')}
                       className="btn btn-secondary hr-app-action-btn"
                     >
-                      <Bot size={16} color="var(--primary-cyan)" /> AI Copilot Evaluation
+                      <Bot size={16} color="#F59E0B" /> AI Copilot
                     </button>
                   </div>
                 </div>
@@ -270,14 +355,14 @@ export const HrApplications: React.FC = () => {
 
                 {/* Cover Letter Box */}
                 {app.coverLetter && (
-                  <div className="hr-app-cover-box">
-                    <strong className="hr-app-cover-heading">Candidate Cover Letter:</strong>
+                  <div className="hr-app-cover-box" style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(139, 92, 246, 0.2)' }}>
+                    <strong className="hr-app-cover-heading" style={{ color: '#C4B5FD' }}>Candidate Cover Letter:</strong>
                     "{app.coverLetter}"
                   </div>
                 )}
 
                 {/* Application Stage Update Pipeline */}
-                <div className="hr-app-stage-pipeline">
+                <div className="hr-app-stage-pipeline" style={{ borderTop: '1px solid rgba(139, 92, 246, 0.2)' }}>
                   <div className="hr-app-stage-current">
                     Current Pipeline Stage: <span className="badge badge-indigo hr-app-stage-current-badge">{app.status}</span>
                   </div>
@@ -312,6 +397,15 @@ export const HrApplications: React.FC = () => {
                     >
                       Rejected
                     </button>
+                    {(app.status === 'SCREENED' || app.status === 'INTERVIEWING' || app.status === 'OFFERED' || app.status === 'REJECTED') && (
+                      <button
+                        onClick={() => handleSendEmail(app.id)}
+                        className="btn btn-sm btn-primary"
+                        style={{ marginLeft: 'auto' }}
+                      >
+                        <Mail size={14} style={{ marginRight: '4px' }}/> Send Email
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -322,3 +416,5 @@ export const HrApplications: React.FC = () => {
     </div>
   );
 };
+
+export default HrApplications;

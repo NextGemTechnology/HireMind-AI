@@ -13,7 +13,10 @@ import {
   FolderGit2, 
   FileText,
   CheckCheck,
-  Users
+  Users,
+  MessageSquare,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 interface NotificationItem {
@@ -32,6 +35,18 @@ export const Navbar: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
+
+  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
+    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'universe';
+  });
+
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'universe' : 'light';
+    setTheme(next);
+    localStorage.setItem('hr_theme', next);
+    // Dispatch storage event or update body class
+    document.body.className = next === 'light' ? 'theme-light' : 'theme-universe';
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -118,6 +133,9 @@ export const Navbar: React.FC = () => {
               <Link to="/hr-applications" className="btn btn-secondary" style={{ border: location.pathname === '/hr-applications' ? '1px solid var(--primary-cyan)' : 'none' }}>
                 <Users size={16} color="var(--primary-cyan)" /> Applicants
               </Link>
+              <Link to="/hr-messages" className="btn btn-secondary" style={{ border: location.pathname === '/hr-messages' ? '1px solid var(--primary-cyan)' : 'none' }}>
+                <MessageSquare size={16} color="var(--primary-cyan)" /> HR Messages
+              </Link>
               <Link to="/copilot" className="btn btn-secondary" style={{ border: location.pathname === '/copilot' ? '1px solid var(--primary-cyan)' : 'none' }}>
                 <Bot size={16} color="var(--primary-cyan)" /> HR AI Copilot
               </Link>
@@ -132,6 +150,9 @@ export const Navbar: React.FC = () => {
               </Link>
               <Link to="/recommendations" className="btn btn-secondary" style={{ border: location.pathname === '/recommendations' ? '1px solid var(--primary-indigo)' : 'none' }}>
                 <Sparkles size={16} color="var(--primary-cyan)" /> AI Matches
+              </Link>
+              <Link to="/messages" className="btn btn-secondary" style={{ border: location.pathname === '/messages' ? '1px solid var(--primary-indigo)' : 'none' }}>
+                <MessageSquare size={16} color="var(--primary-cyan)" /> Messages
               </Link>
               <Link to="/my-applications" className="btn btn-secondary" style={{ border: location.pathname === '/my-applications' ? '1px solid var(--primary-indigo)' : 'none' }}>
                 <FileText size={16} /> Applications
@@ -221,6 +242,25 @@ export const Navbar: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Theme Toggle in Global Navbar */}
+            <button
+              onClick={toggleTheme}
+              className="btn btn-secondary"
+              style={{
+                width: '42px',
+                height: '42px',
+                padding: 0,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+              title={theme === 'universe' ? 'Switch to Light Mode' : 'Switch to Galaxy / Universe Theme'}
+            >
+              {theme === 'universe' ? <Sun size={18} color="#F59E0B" /> : <Moon size={18} color="#7C3AED" />}
+            </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: 'var(--text-main)' }}>

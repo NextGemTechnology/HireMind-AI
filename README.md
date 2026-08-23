@@ -1,165 +1,131 @@
-#  HireMe AI (TalentIQ) — Next-Gen AI Recruitment & Talent Intelligence Platform
+# 🪐 HireMind AI (TalentIQ) — Next-Gen AI Recruitment & Talent Intelligence Platform
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-emerald?style=for-the-badge&logo=github)](https://github.com/AbhayGupta002/HireMind-AI)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen?style=for-the-badge&logo=springboot)](https://spring.io/projects/spring-boot)
 [![React](https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react)](https://react.dev/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-orange?style=for-the-badge&logo=mysql)](https://www.mysql.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.4-orange?style=for-the-badge&logo=mysql)](https://www.mysql.com/)
+[![Redis](https://img.shields.io/badge/Redis-7.4-red?style=for-the-badge&logo=redis)](https://redis.io/)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
-**HireMind AI** (formerly TalentIQ) is an enterprise-grade, full-stack AI recruitment intelligence platform designed to streamline hiring workflows, compute candidate-to-job match scores, parse resumes, provide RAG-powered HR AI interview assistance, and automate applicant notifications.
+**HireMind AI** (formerly TalentIQ) is an enterprise-grade, full-stack AI recruitment intelligence platform designed to streamline hiring workflows, compute candidate-to-job match scores, parse resumes, provide RAG-powered HR AI interview assistance, offer real-time chat messaging, and automate applicant notifications.
 
 ---
 
-## Key Features
+## 🚀 Recent Core Technical Accomplishments
+
+### 🤖 AI Candidate Career Agent & 85%+ Instant Match Engine
+- **Interactive AI Career Agent (`/recommendations`)**: Real-time conversational agent where candidates can prompt for custom job lookups (e.g., *"suggest me java developer job"*) or automated resume analysis (e.g., *"based on my resume suggest me job"*).
+- **Resume Center Guardrail**: Automatically verifies resume upload status at `/portfolio`. Prompts candidate to upload before executing AI matching.
+- **Safety & Prompt Firewall**: Politely rejects off-topic prompts; detects script/database injection attempts and issues warnings before temporary access blocks.
+- **Sub-Millisecond Query Optimization**: Database composite indexes (`V13__add_recommendation_composite_indexes.sql`), index-constrained SQL queries, and Redis caching ensure instant results at scale.
+
+### 💬 Full-Duplex Candidate-to-HR Real-Time Chat System
+- **Real-Time STOMP & WebSockets (`/messages` & `/hr-messages`)**: SockJS + STOMP messaging pipeline over Nginx proxy supporting text chat, WebRTC audio calls, typing indicators, and file/photo uploads (`.pdf`, `.docx`, `.png`, `.jpg`).
+- **HR Candidate Messaging Desk (`/hr-messages`)**: WhatsApp-style bottom-anchored input bar, unread candidate blue-dot badges (`msg-unread-pill`), candidate verified profile drawer, right-click context menus (copy/delete), and clear chat confirmation modals.
+- **2-Second Global Popup Alert (`HrGlobalNotificationToast`)**: Instant floating toast notification banner when an HR recruiter receives a candidate message while navigating any page.
+- **4-Theme Selection Engine**: Toggle between **Cosmic Galaxy**, **Lunar Moon**, **Solar Daylight**, and **Cyber Obsidian** themes.
+- **Permanent Database Chat Retention**: Fixed WebSocket client-side optimistic message duplication and guaranteed 100% MySQL persistence across browser refreshes.
+
+### 🔑 Google OAuth & `@gmail.com` Domain Rule
+- **Google OAuth Login**: One-click Google Sign-In (`POST /v1/auth/google`) auto-provisioning verified candidate or HR accounts.
+- **Strict `@gmail.com` Rule**: Validation enforces that all registrations, password logins, and OAuth sign-ins strictly use `@gmail.com` email addresses.
+
+### 🛡️ Instant Token Invalidation & Blacklisting on Logout
+- **Redis Token Destruction Engine (`TokenBlacklistService`)**: Upon `POST /v1/auth/logout`, the JWT access token is stored in Redis (`jwt:blacklist:<token>`) with remaining TTL and refresh tokens are revoked.
+- **Filter-Level Security Interception**: `JwtAuthenticationFilter` and `WebSocketAuthInterceptor` reject blacklisted token requests with `HTTP 401 Unauthorized`.
+
+### 🌙 Unified Lunar Moon Theme
+- **Full-Bleed Celestial Theme**: Applied uniform Lunar Moon glassmorphism theme across candidate routes:
+  - `/my-applications` (*"Lunar Tracking Horizon"*, *"My Application Constellation"*, real-time counters: Total Applications, Interviewing, Offers Received, In Review).
+  - `/recommendations` (Full-bleed cosmic background canvas).
+
+---
+
+## 🏢 Platform Features
 
 ### 🏢 HR Recruiter Portal
--  **Live Job Publishing**: Post, edit, and publish technical job opportunities with customizable skill tags, experience levels, and salary ranges.
--  **Applicant Review & Resume Downloader**: View submitted candidate profiles, cover letters, and download original candidate resume PDFs (`.pdf`, `.docx`).
--  **Hiring Funnel Stage Pipeline**: Move candidates through recruitment stages (`APPLIED` ➔ `SCREENED` ➔ `INTERVIEWING` ➔ `OFFERED` ➔ `REJECTED`) with automatic candidate notifications.
--  **RAG HR AI Copilot**: Generate tailored interview questions, evaluate technical competencies, and synthesize candidate summaries in real time.
--  **Recruiter Telemetry & Analytics**: Stage-by-stage funnel conversion rates, average time-to-hire, and active job telemetry.
+- **Live Job Publishing**: Post and manage technical job listings with skill tags, experience levels, and compensation.
+- **Applicant Pipeline**: Progress applicants through stages (`APPLIED` ➔ `SCREENED` ➔ `INTERVIEWING` ➔ `OFFERED` ➔ `REJECTED`) with automated notifications.
+- **Resume Downloader**: View candidate profiles and download verified resume PDFs.
+- **RAG HR AI Copilot**: Generate interview questions, evaluate candidate fit, and synthesize summaries.
+- **Candidate Messages Desk**: Real-time WhatsApp-style chat with unread counters and global alerts.
 
-###  Candidate Applicant Portal
-- ⚡ **AI Match Scoring**: Algorithmic fit analysis (0–100%) comparing candidate profile skills against active job requirements.
--  **Resume Parser**: Automatic extraction of technical skills, experience history, and education details.
--  **Interactive Portfolio Showcase**: Create and highlight project demos, GitHub repositories, and live URLs.
--  **Application Tracker**: Monitor application status changes and receive real-time recruiter notifications.
-
-###  Security & Infrastructure
--  **Spring Security 6 & JWT**: Stateless token authentication with BCrypt strength 12 password hashing.
--  **Brute-Force & Lockout Protection**: Automatic 15-minute account lockout after 5 consecutive failed login attempts.
--  **Redis Cache & Rate Limiting**: Distributed session caching and sliding window rate limiting for public endpoints.
--  **Flyway Schema Versioning**: Automated database migration pipeline (`V1` through `V11`).
+### 🎯 Candidate Applicant Portal
+- ⚡ **AI Match Scoring (85%+ Fit)**: Automated skill compatibility scoring comparing parsed resume keywords against active HR job postings.
+- **Interactive AI Career Agent**: Conversational agent for customized job searches and resume analysis.
+- **3D Portfolio Showcase**: Project demos, verified skills, and GitHub repository links.
+- **Application Constellation Tracker**: Live stage tracking across active HR pipelines.
+- **Recruiter Chat Desk**: Direct messaging with hiring managers, tick acknowledgements, and WebRTC audio calling.
 
 ---
 
-##  Technology Stack
+## 🛠️ Technology Stack
 
 | Layer | Technologies & Tools |
 |---|---|
 | **Backend Framework** | Java 17, Spring Boot 3.3.4, Spring Security 6, Spring Data JPA, Hibernate |
-| **Database & Caching** | MySQL 8.0 (Dev/Prod), H2 (In-Memory Testing), Redis 7.0, Flyway Migrations |
+| **Real-Time & WebSockets** | STOMP, SockJS, WebRTC (Audio Calling), Spring Messaging |
+| **Database & Caching** | MySQL 8.4, Redis 7.4 (Token Blacklisting & Caching), Flyway Migrations (`V1` to `V13`) |
 | **Frontend Framework** | React 18, TypeScript, Vite 8, Lucide React Icons, Axios |
-| **AI & Automation** | RAG Pipeline, Vector Embeddings, Spring AI / OpenAI Integration |
-| **Build Tools** | Apache Maven 3.9+, Node.js 20+, npm |
+| **Security & Auth** | JWT with Redis Blacklisting, Google OAuth 2.0, Strict `@gmail.com` Domain Validation |
+| **Containerization** | Docker, Docker Compose, Nginx Reverse Proxy |
 
 ---
 
-##  Quick Start & Local Setup
+## ⚙️ Quick Start with Docker Compose
 
-### 1. Prerequisites
-Ensure you have the following installed locally:
-- **Java JDK 17+**
-- **Node.js 20+** & **npm**
-- **MySQL 8.0+** running on `localhost:3306`
-- **Redis Server** running on `localhost:6379`
-
----
-
-### 2. Database Provisioning
-Connect to your local MySQL instance and create the application databases:
-
-```sql
-CREATE DATABASE IF NOT EXISTS talentiq_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS talentiq_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-CREATE USER IF NOT EXISTS 'talentiq'@'localhost' IDENTIFIED BY 'TalentIQ@2024!';
-GRANT ALL PRIVILEGES ON talentiq_dev.* TO 'talentiq'@'localhost';
-GRANT ALL PRIVILEGES ON talentiq_test.* TO 'talentiq'@'localhost';
-FLUSH PRIVILEGES;
-```
-
----
-
-### 3. Backend Setup (`talentiq-backend`)
-
-1. Navigate to the backend directory:
+1. Clone the repository:
    ```bash
-   cd talentiq-backend
+   git clone https://github.com/AbhayGupta002/HireMind-AI.git
+   cd HireMind-AI
    ```
 
-2. Update database credentials in `src/main/resources/application-dev.yml` (if using a custom MySQL root password):
-   ```yaml
-   spring:
-     datasource:
-       url: jdbc:mysql://localhost:3306/talentiq_dev?useSSL=false&allowPublicKeyRetrieval=true
-       username: root
-       password: YOUR_LOCAL_MYSQL_PASSWORD
-   ```
-
-3. Compile and launch the Spring Boot application:
+2. Launch full-stack environment (MySQL, Redis, Backend, Frontend):
    ```bash
-   mvn clean spring-boot:run -Dspring-boot.run.jvmArguments="-Dspring.profiles.active=dev"
-   ```
-   *The backend REST API will start on `http://localhost:8080/api`.*
-
----
-
-### 4. Frontend Setup (`talentiq-frontend`)
-
-1. Navigate to the frontend directory:
-   ```bash
-   cd talentiq-frontend
+   docker compose up -d --build
    ```
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-   *The web app will open at `http://localhost:3000` with automated proxying to the backend API.*
+3. Access the web applications:
+   - **Frontend Application**: `http://localhost:3000`
+   - **Backend API Base**: `http://localhost:8081/api`
+   - **Swagger API Docs**: `http://localhost:8081/swagger-ui.html`
 
 ---
 
 ## 🔑 Quick Demo Login Credentials
 
-You can test the application immediately using the pre-configured role switcher on the login page (`http://localhost:3000/login`):
+Login with any `@gmail.com` address or use pre-configured test roles:
 
-| Role | Email | Password | Access Scope |
-|---|---|---|---|
-| 🎯 **Candidate** | `candidate@example.com` | `Password123!` | Job Search, AI Matches, Application Tracking, Portfolio |
-| 🏢 **HR Recruiter** | `hr@techcorp.com` | `Password123!` | Job Posting Modal, Candidate Applicants, Resume Download, HR Copilot |
-| 🛡️ **Super Admin** | `admin@talentiq.ai` | `Admin@123!` | Platform Metrics, User Lockouts, Corporate Verification |
+| Role | Email | Access Scope |
+|---|---|---|
+| 🎯 **Candidate** | `candidate.alex@gmail.com` | Job Search, AI Matches, Career Agent, Application Tracker, 3D Portfolio, Chat |
+| 🏢 **HR Recruiter** | `recruiter.hr@gmail.com` | Job Posting, Candidate Applicants, Candidate Messages, Resume Review, HR Copilot |
+| 🛡️ **Super Admin** | `admin.talentiq@gmail.com` | Platform Metrics, User Management, Verification |
 
 ---
 
-## 📡 REST API Reference
+## 📡 Key REST API Reference
 
 | Method | Endpoint | Description | Auth Required |
 |---|---|---|---|
-| `POST` | `/v1/auth/register` | Register new Candidate or HR Recruiter account | Public |
-| `POST` | `/v1/auth/login` | Authenticate user and issue JWT access & refresh tokens | Public |
-| `GET` | `/v1/users/me` | Fetch authenticated user profile details | Bearer JWT |
-| `GET` | `/v1/jobs` | Search & list active job postings | Public |
-| `POST` | `/v1/jobs` | Publish a new job posting | HR Only |
-| `GET` | `/v1/applications/hr` | List candidate applicants for HR recruiter's company | HR Only |
-| `PUT` | `/v1/applications/{id}/status` | Update application status (`SCREENED`, `INTERVIEWING`, etc.) | HR Only |
-| `GET` | `/v1/resumes/{id}` | Download candidate resume PDF | Authenticated |
-| `GET` | `/v1/recommendations/matches` | Get AI-matched jobs for authenticated candidate | Candidate Only |
-| `POST` | `/v1/copilot/chat` | Send prompt to RAG-powered HR AI Copilot | HR Only |
-
----
-
-##  Running Automated Tests
-
-Execute backend integration tests using the isolated H2 in-memory profile:
-
-```bash
-cd talentiq-backend
-mvn clean test
-```
+| `POST` | `/v1/auth/google` | Google OAuth Login / Fast Registration | Public (`@gmail.com`) |
+| `POST` | `/v1/auth/login` | Authenticate user & issue JWT | Public (`@gmail.com`) |
+| `POST` | `/v1/auth/logout` | Revoke refresh tokens & blacklist JWT in Redis | Bearer JWT |
+| `GET` | `/v1/recommendations/matches` | Get 85%+ AI-matched jobs for candidate | Candidate Only |
+| `POST` | `/v1/recommendations/agent/chat` | Chat with AI Candidate Career Agent | Candidate Only |
+| `GET` | `/v1/chat/conversations/{userId}` | Get message history with user | Authenticated |
+| `POST` | `/v1/chat/messages` | Send chat message (REST fallback) | Authenticated |
+| `POST` | `/v1/chat/upload` | Upload chat file/photo attachment | Authenticated |
+| `GET` | `/v1/applications/hr` | List candidate applicants for HR | HR Only |
+| `PUT` | `/v1/applications/{id}/status` | Update applicant hiring stage | HR Only |
 
 ---
 
 ## 📄 License
 
-Distributed under the **MIT License**. See `LICENSE` for more details.
+Distributed under the **MIT License**.
 
 ---
 
-###  Developed & Maintained by
+### 👨‍💻 Developed & Maintained by
 **Abhay Gupta** — [GitHub Profile](https://github.com/AbhayGupta002)

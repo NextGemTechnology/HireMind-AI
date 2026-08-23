@@ -23,4 +23,10 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
 
     @Query("SELECT j FROM Job j JOIN FETCH j.company WHERE j.status = 'ACTIVE' AND (j.expiresAt IS NULL OR j.expiresAt > CURRENT_TIMESTAMP)")
     Page<Job> findActiveJobs(Pageable pageable);
+
+    @Query("SELECT j FROM Job j JOIN FETCH j.company WHERE j.status = 'ACTIVE' AND (j.expiresAt IS NULL OR j.expiresAt > CURRENT_TIMESTAMP) ORDER BY j.createdAt DESC")
+    Page<Job> findRecentActiveJobs(Pageable pageable);
+
+    @Query("SELECT DISTINCT j FROM Job j JOIN FETCH j.company LEFT JOIN j.requiredSkills js WHERE j.status = 'ACTIVE' AND (j.expiresAt IS NULL OR j.expiresAt > CURRENT_TIMESTAMP) AND (LOWER(j.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(j.description) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(js.skillName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(j.location) LIKE LOWER(CONCAT('%', :keyword, '%'))) ORDER BY j.createdAt DESC")
+    Page<Job> searchActiveJobsByKeyword(@org.springframework.data.repository.query.Param("keyword") String keyword, Pageable pageable);
 }

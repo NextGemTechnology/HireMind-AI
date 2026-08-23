@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sparkles, User, Building2, CheckCircle2, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
+import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import '../css/register.css';
 
 type RegisterMode = 'CANDIDATE' | 'HR';
@@ -57,6 +58,9 @@ export const Register: React.FC = () => {
     setError('');
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
       setError('All fields are required'); return;
+    }
+    if (!form.email.trim().endsWith('@gmail.com')) {
+      setError('Registration requires a valid email ending with @gmail.com.'); return;
     }
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match'); return;
@@ -196,9 +200,12 @@ export const Register: React.FC = () => {
               </div>
 
               <div className="register-form-group">
-                <label className="register-label">Email Address *</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="register-label">Email Address *</label>
+                  <span style={{ fontSize: '11px', color: '#38BDF8' }}>Must end with @gmail.com</span>
+                </div>
                 <input className="register-input" type="email" required
-                  placeholder={mode === 'HR' ? 'recruiter@company.com' : 'you@example.com'}
+                  placeholder={mode === 'HR' ? 'recruiter.hr@gmail.com' : 'candidate.alex@gmail.com'}
                   value={form.email} onChange={e => update('email', e.target.value)} />
               </div>
 
@@ -225,6 +232,18 @@ export const Register: React.FC = () => {
                   Continue to {mode === 'CANDIDATE' ? 'Career Details' : 'Company Details'} <ArrowRight size={16} />
                 </button>
               </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', margin: '16px 0 6px', gap: '10px' }}>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
+                <span style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR</span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
+              </div>
+
+              <GoogleAuthButton
+                role={mode === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'}
+                label={`Fast Register with Google as ${mode === 'HR' ? 'HR Recruiter' : 'Candidate'}`}
+                onError={setError}
+              />
             </form>
           )}
 

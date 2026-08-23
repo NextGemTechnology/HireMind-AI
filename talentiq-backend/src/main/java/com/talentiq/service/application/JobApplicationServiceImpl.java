@@ -28,6 +28,7 @@ import com.talentiq.model.Resume;
 import com.talentiq.repository.resume.ResumeRepository;
 import com.talentiq.model.Notification;
 import com.talentiq.repository.notification.NotificationRepository;
+import com.talentiq.service.notification.NotificationService;
 import com.talentiq.model.User;
 import com.talentiq.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -56,7 +57,7 @@ public class JobApplicationServiceImpl implements JobApplicationService {
     private final UserRepository userRepository;
     private final JobRecommendationRepository recommendationRepository;
     private final RecommendationService recommendationService;
-    private final NotificationRepository notificationRepository;
+    private final NotificationService notificationService;
 
     @Override
     public JobApplicationDto.Response applyForJob(Long userId, JobApplicationDto.ApplyRequest request) {
@@ -126,15 +127,14 @@ public class JobApplicationServiceImpl implements JobApplicationService {
         // Notify HR recruiter who posted the job
         if (job.getPostedBy() != null) {
             String candidateName = candidate.getUser() != null ? (candidate.getUser().getFirstName() + " " + candidate.getUser().getLastName()) : "A candidate";
-            Notification hrAlert = Notification.builder()
-                    .user(job.getPostedBy())
-                    .title("New Applicant: " + candidateName)
-                    .message(candidateName + " applied for " + job.getTitle() + " (AI Match Score: " + matchScore.intValue() + "%)")
-                    .type("APPLICATION_STATUS")
-                    .linkUrl("/hr-applications")
-                    .read(false)
-                    .build();
-            notificationRepository.save(hrAlert);
+            
+            com.talentiq.dto.notification.NotificationDto.SendRequest req = new com.talentiq.dto.notification.NotificationDto.SendRequest();
+            req.setTitle("New Applicant: " + candidateName);
+            req.setMessage(candidateName + " applied for " + job.getTitle() + " (AI Match Score: " + matchScore.intValue() + "%)");
+            req.setType("APPLICATION_STATUS");
+            req.setLinkUrl("/hr-applications");
+            
+            notificationService.sendNotification(job.getPostedBy().getId(), req);
         }
 
         log.info("Candidate ID {} applied for Job ID {}", candidate.getId(), job.getId());
@@ -184,15 +184,13 @@ public class JobApplicationServiceImpl implements JobApplicationService {
 
         // Notify Candidate of status change
         if (application.getCandidate() != null && application.getCandidate().getUser() != null) {
-            Notification candidateAlert = Notification.builder()
-                    .user(application.getCandidate().getUser())
-                    .title("Application Status Update")
-                    .message("Your application for " + application.getJob().getTitle() + " has been updated to: " + newStatus)
-                    .type("APPLICATION_STATUS")
-                    .linkUrl("/my-applications")
-                    .read(false)
-                    .build();
-            notificationRepository.save(candidateAlert);
+            com.talentiq.dto.notification.NotificationDto.SendRequest req = new com.talentiq.dto.notification.NotificationDto.SendRequest();
+            req.setTitle("Application Status Update");
+            req.setMessage("Your application for " + application.getJob().getTitle() + " has been updated to: " + newStatus);
+            req.setType("APPLICATION_STATUS");
+            req.setLinkUrl("/my-applications");
+            
+            notificationService.sendNotification(application.getCandidate().getUser().getId(), req);
         }
 
         log.info("Application ID {} status updated from {} to {} by HR ID {}", applicationId, originalStatus, newStatus, hrProfile.getId());
@@ -201,17 +199,22 @@ public class JobApplicationServiceImpl implements JobApplicationService {
 
     @Override
     @Transactional(readOnly = true)
-    public PagedResponse<JobApplicationDto.Response> getApplicationsForHrCompany(Long hrUserId, Pageable pageable) {
+    public PagedResponse<JobApplicationDto.Response> getApplicationsForHrCompany(Long hrUserId, ApplicationStatus status, Pageable pageable) {
         HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
                 .orElseThrow(() -> new ForbiddenException("Only company HR members can view job applications"));
 
-        Page<JobApplication> applications = applicationRepository.findAllByJobCompanyId(hrProfile.getCompany().getId(), pageable);
+        Page<JobApplication> applications;
+        if (status != null) {
+            applications = applicationRepository.findAllByJobCompanyIdAndStatus(hrProfile.getCompany().getId(), status, pageable);
+        } else {
+            applications = applicationRepository.findAllByJobCompanyId(hrProfile.getCompany().getId(), pageable);
+        }
         return PagedResponse.of(applications.map(this::mapToResponse));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PagedResponse<JobApplicationDto.Response> getApplicationsForJob(Long hrUserId, Long jobId, Pageable pageable) {
+    public PagedResponse<JobApplicationDto.Response> getApplicationsForJob(Long hrUserId, Long jobId, ApplicationStatus status, Pageable pageable) {
         HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
                 .orElseThrow(() -> new ForbiddenException("Only company HR members can view job applications"));
 
@@ -222,7 +225,12 @@ public class JobApplicationServiceImpl implements JobApplicationService {
             throw new ForbiddenException("You do not have permissions to view applications for this job posting");
         }
 
-        Page<JobApplication> applications = applicationRepository.findAllByJobId(jobId, pageable);
+        Page<JobApplication> applications;
+        if (status != null) {
+            applications = applicationRepository.findAllByJobIdAndStatus(jobId, status, pageable);
+        } else {
+            applications = applicationRepository.findAllByJobId(jobId, pageable);
+        }
         return PagedResponse.of(applications.map(this::mapToResponse));
     }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
-import { Bot, Send, Sparkles, UserCheck, Briefcase, Settings } from 'lucide-react';
+import { Bot, Send, Sparkles, UserCheck, Briefcase, Settings, Sun, Moon } from 'lucide-react';
+import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import '../css/hr-copilot.css';
 
 interface ChatMessage {
@@ -16,6 +17,18 @@ export const HrCopilot: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [contextType, setContextType] = useState<'GENERAL' | 'CANDIDATE' | 'JOB'>('GENERAL');
   const [preferredModel, setPreferredModel] = useState('gpt-4o');
+
+  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
+    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'universe';
+  });
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'universe' : 'light';
+    setTheme(nextTheme);
+    localStorage.setItem('hr_theme', nextTheme);
+  };
+
+  const isUniverse = theme === 'universe';
 
   useEffect(() => {
     // Initial greeting
@@ -45,25 +58,27 @@ export const HrCopilot: React.FC = () => {
     setLoading(true);
 
     try {
-      // Post to backend API
-      const res = await apiClient.post('/copilot/conversations/1/messages', { content: userMsg.content });
-      const assistantMsg: ChatMessage = {
+      const res = await apiClient.post('/copilot/query', {
+        prompt: userMsg.content,
+        contextType: contextType,
+        model: preferredModel
+      });
+
+      const replyContent = res.data?.data?.response || res.data?.response || 'I have analyzed the request. Ready for follow-up evaluation questions.';
+
+      setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'ASSISTANT',
-        content: res.data.data.content,
+        content: replyContent,
         createdAt: new Date().toISOString()
-      };
-      setMessages(prev => [...prev, assistantMsg]);
+      }]);
     } catch (err) {
-      // Fallback Mock Assistant Response
-      let mockReply = 'I have analyzed the current candidate portfolio and job description. They show a 92% compatibility match on core Java & Spring Boot requirements. I recommend scheduling an initial 30-min technical screening call.';
-      if (contextType === 'CANDIDATE') {
-        mockReply = 'Candidate John Doe has 4 years of experience in distributed systems and microservices. Strengths include Kafka, Docker, and AWS. Growth area: GraphQL.';
-      } else if (contextType === 'JOB') {
-        mockReply = 'For Senior Microservices Architect position, key requirements are Java 17, Spring Boot, and Kubernetes. We currently have 3 matching candidate profiles with >85% scores.';
-      }
-
+      // Mock Intelligent Copilot fallback
       setTimeout(() => {
+        let mockReply = 'Based on the candidate match pipeline, candidate skills align 92% with the Job Specifications. Core proficiencies in Java 17, Spring Boot, and Kubernetes are fully verified.';
+        if (contextType === 'JOB') {
+          mockReply = 'Here are 3 tailored technical interview questions for this Job Posting:\n1. How would you design a distributed idempotency mechanism using Redis and MySQL in Spring Boot?\n2. Describe your approach to zero-downtime database migrations with Flyway.\n3. How do you monitor WebSocket connection drops under heavy load?';
+        }
         setMessages(prev => [...prev, {
           id: Date.now() + 1,
           role: 'ASSISTANT',
@@ -78,13 +93,30 @@ export const HrCopilot: React.FC = () => {
   };
 
   return (
-    <div className="copilot-container">
+    <div className={`copilot-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ position: 'relative', zIndex: 1 }}>
+      {/* ── Interactive Galaxy Background with Mouse Motion & Attraction ── */}
+      <InteractiveGalaxyBackground theme={theme} />
+
       {/* Context Sidebar */}
-      <div className="glass-panel copilot-sidebar">
+      <div className="glass-panel copilot-sidebar solar-theme-accent">
         <div>
-          <h3 className="copilot-sidebar-title">
-            <Bot size={18} color="var(--primary-cyan)" /> Copilot Context
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <h3 className="copilot-sidebar-title" style={{ margin: 0 }}>
+              <Bot size={18} color="var(--primary-cyan)" /> Copilot Context
+            </h3>
+            <button
+              onClick={toggleTheme}
+              className="btn btn-secondary"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                padding: '4px 10px', borderRadius: '16px', fontSize: '11px', fontWeight: 600,
+                cursor: 'pointer'
+              }}
+              title="Toggle Light / Galaxy Theme"
+            >
+              {isUniverse ? <Sun size={13} color="#F59E0B" /> : <Moon size={13} color="#7C3AED" />}
+            </button>
+          </div>
           <p className="copilot-sidebar-subtitle">Select active RAG context mode</p>
 
           <div className="copilot-mode-btn-group">
@@ -123,7 +155,7 @@ export const HrCopilot: React.FC = () => {
       </div>
 
       {/* Main Chat Panel */}
-      <div className="glass-panel copilot-chat-panel">
+      <div className="glass-panel copilot-chat-panel solar-theme-accent">
         {/* Header */}
         <div className="copilot-chat-header">
           <div className="copilot-status-indicator">
@@ -167,3 +199,5 @@ export const HrCopilot: React.FC = () => {
     </div>
   );
 };
+
+export default HrCopilot;

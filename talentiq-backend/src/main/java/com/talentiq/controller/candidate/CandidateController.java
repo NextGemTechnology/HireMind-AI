@@ -147,4 +147,13 @@ public class CandidateController {
         CandidateDto.Response profile = candidateService.getProfileById(id);
         return ResponseEntity.ok(ApiResponse.success(profile));
     }
+
+    @GetMapping("/user/{userId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get candidate profile by User ID")
+    public ResponseEntity<ApiResponse<CandidateDto.Response>> getCandidateByUserId(
+            @PathVariable Long userId) {
+        CandidateDto.Response profile = candidateService.getProfileByUserId(userId);
+        return ResponseEntity.ok(ApiResponse.success(profile));
+    }
 }

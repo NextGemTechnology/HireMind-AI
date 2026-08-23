@@ -1,5 +1,5 @@
 /* ============================================================
-   TalentIQ — HR Applications Page Styles
+   TalentIQ — HR Applications Page Styles (High Visibility & Reflection)
    ============================================================ */
 
 .hr-apps-container {
@@ -20,23 +20,29 @@
 .hr-apps-title {
   font-size: 32px;
   margin-bottom: 8px;
+  color: #FFFFFF !important;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .hr-apps-subtitle {
-  color: var(--text-muted);
+  color: #CBD5E1 !important;
+  font-size: 15px;
 }
 
 .hr-apps-alert-success {
   margin-top: 16px;
-  padding: 14px;
-  border-radius: 10px;
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  color: #34D399;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(16, 185, 129, 0.22) !important;
+  border: 1px solid rgba(52, 211, 153, 0.5) !important;
+  color: #6EE7B7 !important;
   font-size: 14px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
 }
 
 /* ── Filter Controls ─────────────────────────────────────── */
@@ -57,11 +63,24 @@
   position: absolute;
   left: 16px;
   top: 16px;
+  color: #A78BFA !important;
 }
 
 .hr-apps-search-input {
-  padding-left: 48px;
-  height: 50px;
+  padding-left: 48px !important;
+  height: 50px !important;
+  font-size: 14px !important;
+  font-weight: 500;
+  background: rgba(13, 19, 39, 0.95) !important;
+  border: 1px solid rgba(167, 139, 250, 0.45) !important;
+  color: #FFFFFF !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+}
+
+.hr-apps-search-input:focus {
+  border-color: #C084FC !important;
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.4), inset 0 1px 2px rgba(0, 0, 0, 0.4) !important;
 }
 
 .hr-apps-stage-filters {
@@ -71,21 +90,28 @@
 }
 
 .hr-apps-stage-btn {
-  font-size: 12px;
-  padding: 10px 14px;
+  font-size: 13px !important;
+  padding: 10px 16px !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
 }
 
 /* ── Applications List ───────────────────────────────────── */
 .hr-apps-loading {
   text-align: center;
   padding: 60px;
-  color: var(--text-muted);
+  color: #DDD6FE;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .hr-apps-empty {
   padding: 60px;
   text-align: center;
-  color: var(--text-muted);
+  color: #CBD5E1 !important;
+  background: rgba(17, 24, 48, 0.94) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  border-radius: 16px;
 }
 
 .hr-apps-list {
@@ -95,7 +121,19 @@
 }
 
 .hr-app-card {
-  padding: 28px;
+  padding: 28px !important;
+  background: linear-gradient(135deg, rgba(20, 29, 56, 0.95) 0%, rgba(13, 19, 40, 0.97) 100%) !important;
+  border: 1px solid rgba(167, 139, 250, 0.42) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+  backdrop-filter: blur(20px) !important;
+  transition: all 0.25s ease !important;
+}
+
+.hr-app-card:hover {
+  border-color: rgba(192, 132, 252, 0.75) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 28px rgba(124, 58, 237, 0.25) !important;
+  transform: translateY(-2px);
 }
 
 .hr-app-card-top {
@@ -110,42 +148,45 @@
 .hr-app-name-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
+  gap: 14px;
+  margin-bottom: 8px;
 }
 
 .hr-app-candidate-name {
-  font-size: 22px;
-  color: #FFF;
+  font-size: 24px !important;
+  color: #FFFFFF !important;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .hr-app-score-badge {
-  padding: 4px 12px;
+  padding: 4px 14px;
   border-radius: 20px;
   font-size: 13px;
-  font-weight: 700;
-  background: rgba(15, 23, 42, 0.8);
+  font-weight: 800;
+  background: rgba(15, 23, 42, 0.9) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
 .hr-app-candidate-headline {
-  font-size: 14px;
-  color: var(--primary-cyan);
+  font-size: 15px !important;
+  color: #38BDF8 !important;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .hr-app-candidate-meta {
   display: flex;
-  gap: 20px;
-  color: var(--text-muted);
-  font-size: 13px;
+  gap: 22px;
+  color: #CBD5E1 !important;
+  font-size: 13.5px;
   flex-wrap: wrap;
 }
 
 .hr-app-meta-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
 }
 
 .hr-app-actions {
@@ -155,38 +196,43 @@
 }
 
 .hr-app-action-btn {
-  font-size: 13px;
+  font-size: 13px !important;
+  font-weight: 600 !important;
   display: flex;
+  align-items: center;
   gap: 8px;
+  padding: 8px 16px !important;
+  border-radius: 10px !important;
 }
 
 .hr-app-skills-row {
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
 .hr-app-cover-box {
-  padding: 14px 18px;
-  border-radius: 10px;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid var(--border-subtle);
-  font-size: 13px;
-  color: var(--text-main);
-  line-height: 1.6;
+  padding: 16px 20px !important;
+  border-radius: 12px !important;
+  background: rgba(10, 15, 32, 0.8) !important;
+  border: 1px solid rgba(139, 92, 246, 0.28) !important;
+  font-size: 13.5px !important;
+  color: #E2E8F0 !important;
+  line-height: 1.65;
   margin-bottom: 20px;
 }
 
 .hr-app-cover-heading {
-  color: var(--text-muted);
+  color: #C4B5FD !important;
   display: block;
-  margin-bottom: 4px;
+  font-weight: 700;
+  margin-bottom: 6px;
 }
 
 .hr-app-stage-pipeline {
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
+  padding-top: 18px;
+  border-top: 1px solid rgba(139, 92, 246, 0.25) !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -195,12 +241,16 @@
 }
 
 .hr-app-stage-current {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px !important;
+  color: #CBD5E1 !important;
+  font-weight: 500;
 }
 
 .hr-app-stage-current-badge {
-  margin-left: 6px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  font-weight: 700;
+  font-size: 12px;
 }
 
 .hr-app-stage-actions {
@@ -211,6 +261,7 @@
 }
 
 .hr-app-stage-label {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: 13px !important;
+  color: #94A3B8 !important;
+  font-weight: 600;
 }

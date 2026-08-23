@@ -23,6 +23,15 @@ import org.springframework.web.bind.annotation.*;
 public class NotificationController {
 
     private final NotificationService notificationService;
+    private final com.talentiq.service.notification.SseNotificationService sseNotificationService;
+
+    @GetMapping(value = "/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Subscribe to Server-Sent Events (SSE) for real-time notifications")
+    public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamNotifications(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return sseNotificationService.subscribe(principal.getId());
+    }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'SUPER_ADMIN')")

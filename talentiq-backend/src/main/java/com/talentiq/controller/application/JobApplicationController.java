@@ -12,6 +12,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import com.talentiq.common.enums.ApplicationStatus;
+import com.talentiq.dto.application.EmailRequest;
+import com.talentiq.infrastructure.mail.MailService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class JobApplicationController {
 
     private final JobApplicationService applicationService;
+    private final MailService mailService;
 
     @PostMapping
     @PreAuthorize("hasRole('CANDIDATE')")
@@ -63,10 +67,11 @@ public class JobApplicationController {
     public ResponseEntity<PagedResponse<JobApplicationDto.Response>> getJobApplications(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long jobId,
+            @RequestParam(required = false) ApplicationStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "appliedAt"));
-        return ResponseEntity.ok(applicationService.getApplicationsForJob(principal.getId(), jobId, pageable));
+        return ResponseEntity.ok(applicationService.getApplicationsForJob(principal.getId(), jobId, status, pageable));
     }
 
     @GetMapping("/hr")
@@ -74,10 +79,30 @@ public class JobApplicationController {
     @Operation(summary = "List all applications submitted to HR company jobs (HR only)")
     public ResponseEntity<PagedResponse<JobApplicationDto.Response>> getHrCompanyApplications(
             @AuthenticationPrincipal UserPrincipal principal,
+            @RequestParam(required = false) ApplicationStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "appliedAt"));
-        return ResponseEntity.ok(applicationService.getApplicationsForHrCompany(principal.getId(), pageable));
+        return ResponseEntity.ok(applicationService.getApplicationsForHrCompany(principal.getId(), status, pageable));
+    }
+
+    @PostMapping("/{id}/email")
+    @PreAuthorize("hasRole('HR')")
+    @Operation(summary = "Send email to candidate for a specific application (HR only)")
+    public ResponseEntity<ApiResponse<Void>> sendApplicationEmail(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody EmailRequest emailRequest) {
+        // Retrieve application to get candidate email and job details
+        JobApplicationDto.Response app = applicationService.getApplicationDetails(principal.getId(), id);
+        String candidateEmail = app.getCandidate().getEmail();
+        String candidateName = app.getCandidate().getFirstName() + " " + app.getCandidate().getLastName();
+        String jobTitle = app.getJob().getTitle();
+        // HR name from principal
+        String hrName = principal.getFullName();
+        // Use existing MailService method; pass custom body
+        mailService.sendSelectionEmail(candidateEmail, candidateName, jobTitle, hrName, emailRequest.getBody());
+        return ResponseEntity.ok(ApiResponse.success("Email sent successfully"));
     }
 
     @GetMapping("/my")

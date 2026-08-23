@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Sparkles, User, Building2, ShieldCheck, LogIn, ArrowRight, RefreshCw, UserPlus } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
+import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import '../css/login.css';
 
 type LoginRoleMode = 'CANDIDATE' | 'HR' | 'ADMIN';
@@ -65,9 +66,13 @@ export const Login: React.FC = () => {
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!email.trim().endsWith('@gmail.com')) {
+      setError('Only @gmail.com email addresses are allowed for login.');
+      return;
+    }
     setLoading(true);
     try {
-      await login({ email, password });
+      await login({ email: email.trim(), password });
       const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
       const roles = savedUser.roles || [];
       const userIsHr = roles.includes('ROLE_HR') || roles.includes('HR') || selectedRole === 'HR';
@@ -91,13 +96,17 @@ export const Login: React.FC = () => {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
+    if (!regEmail.trim().endsWith('@gmail.com')) {
+      setRegError('Registration requires an email ending with @gmail.com.');
+      return;
+    }
     setRegLoading(true);
     try {
       if (selectedRole === 'HR') {
         await register({
           firstName: regFirstName,
           lastName: regLastName,
-          email: regEmail,
+          email: regEmail.trim(),
           password: regPassword,
           role: 'ROLE_HR',
           companyName: regCompany || 'My Enterprise Corp',
@@ -108,7 +117,7 @@ export const Login: React.FC = () => {
         await register({
           firstName: regFirstName,
           lastName: regLastName,
-          email: regEmail,
+          email: regEmail.trim(),
           password: regPassword,
           role: 'ROLE_CANDIDATE',
           desiredRole: regDesiredRole || 'Software Engineer',
@@ -203,16 +212,19 @@ export const Login: React.FC = () => {
             {/* Login Form */}
             <form onSubmit={handleLoginSubmit} className="login-form">
               <div className="login-form-group">
-                <label className="login-label">Email Address</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="login-label">Email Address</label>
+                  <span style={{ fontSize: '11px', color: '#38BDF8' }}>Must end with @gmail.com</span>
+                </div>
                 <input
                   type="email"
                   className="login-input"
                   placeholder={
                     selectedRole === 'HR'
-                      ? 'hr@company.com'
+                      ? 'recruiter.hr@gmail.com'
                       : selectedRole === 'ADMIN'
-                      ? 'admin@talentiq.ai'
-                      : 'candidate@example.com'
+                      ? 'admin.talentiq@gmail.com'
+                      : 'candidate.alex@gmail.com'
                   }
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -251,6 +263,18 @@ export const Login: React.FC = () => {
                   </span>
                 )}
               </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', margin: '14px 0 6px', gap: '10px' }}>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
+                <span style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR</span>
+                <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
+              </div>
+
+              <GoogleAuthButton
+                role={selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'}
+                label={`Continue with Google as ${selectedRole === 'HR' ? 'HR' : 'Candidate'}`}
+                onError={setError}
+              />
             </form>
 
             {/* 3D Flip Action Switcher Footer */}

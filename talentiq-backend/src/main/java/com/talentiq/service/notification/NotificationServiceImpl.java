@@ -30,6 +30,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationPreferencesRepository preferencesRepository;
     private final UserRepository userRepository;
     private final MailService mailService;
+    private final SseNotificationService sseNotificationService;
 
     @Override
     public NotificationDto.Response sendNotification(Long recipientUserId, NotificationDto.SendRequest request) {
@@ -54,8 +55,11 @@ public class NotificationServiceImpl implements NotificationService {
             mailService.sendSystemAlert(recipient.getEmail(), saved.getTitle(), saved.getMessage());
         }
 
+        NotificationDto.Response response = mapToResponse(saved);
+        sseNotificationService.sendNotification(recipientUserId, response);
+
         log.info("Notification sent to user ID {}: {}", recipientUserId, saved.getTitle());
-        return mapToResponse(saved);
+        return response;
     }
 
     @Override

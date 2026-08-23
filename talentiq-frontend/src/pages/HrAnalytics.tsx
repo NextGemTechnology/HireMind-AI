@@ -6,10 +6,11 @@ import {
   LayoutDashboard, MessageSquare, Calendar, Briefcase,
   Users, Star, UserCircle2, BarChart2,
   Settings, Search, Bell, TrendingUp, ChevronDown,
-  Plus, MoreVertical, Bot, RefreshCw, LogOut, Sun, Sparkles
+  Plus, MoreVertical, Bot, RefreshCw, LogOut, Sun, Moon
 } from 'lucide-react';
 import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
+import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import '../css/hr-analytics.css';
 
 /* ─── Types ─── */
@@ -392,7 +393,9 @@ export const HrAnalytics: React.FC = () => {
       color: styles.heading,
       fontFamily: "'Inter', 'Outfit', sans-serif",
       transition: 'background 0.3s, color 0.3s',
+      position: 'relative',
     }}>
+      <InteractiveGalaxyBackground theme={theme} />
 
       {/* ══════════ LEFT SIDEBAR ══════════ */}
       <aside style={{
@@ -504,15 +507,15 @@ export const HrAnalytics: React.FC = () => {
               borderRadius: '20px',
               border: isUniverse ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid #CBD5E1',
               background: isUniverse ? 'rgba(99, 102, 241, 0.15)' : '#F1F5F9',
-              color: isUniverse ? '#A78BFA' : '#475569',
+              color: isUniverse ? '#FDBA74' : '#475569',
               fontSize: '12px',
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
           >
-            {isUniverse ? <Sparkles size={14} color="#A78BFA" /> : <Sun size={14} color="#F59E0B" />}
-            {isUniverse ? 'Universe Mode' : 'Light Mode'}
+            {isUniverse ? <Sun size={14} color="#F59E0B" /> : <Moon size={14} color="#7C3AED" />}
+            {isUniverse ? 'Light Mode' : 'Galaxy Universe'}
           </button>
 
           {/* Refresh & Notifications */}

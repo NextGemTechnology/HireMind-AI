@@ -6,9 +6,10 @@ import {
   Calendar, ChevronLeft, ChevronRight, Clock, Mail,
   Plus, X, Check, LayoutDashboard, MessageSquare,
   Users, Briefcase, Settings, LogOut,
-  AlertCircle, Sun, Sparkles, Trash2, Video, ExternalLink,
-  CheckCircle2
+  AlertCircle, Sun, Trash2, Video, ExternalLink,
+  CheckCircle2, Moon
 } from 'lucide-react';
+import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import '../css/hr-calendar.css';
 
 /* ─── Types ─── */
@@ -286,6 +287,7 @@ export const HrCalendar: React.FC = () => {
 
   return (
     <div className={`calendar-page-wrapper ${isUniverse ? 'theme-universe' : 'theme-light'}`}>
+      <InteractiveGalaxyBackground theme={theme} />
       {/* ── Sidebar ── */}
       <aside className="cal-sidebar">
         <div className="cal-sidebar-brand" onClick={() => navigate('/')}>
@@ -323,8 +325,8 @@ export const HrCalendar: React.FC = () => {
           <div className="cal-header-actions">
             {/* Theme Toggle Button */}
             <button onClick={toggleTheme} className="cal-theme-btn">
-              {isUniverse ? <Sparkles size={14} /> : <Sun size={14} />}
-              {isUniverse ? 'Universe Mode' : 'Light Mode'}
+              {isUniverse ? <Sun size={14} color="#F59E0B" /> : <Moon size={14} color="#7C3AED" />}
+              {isUniverse ? 'Light Mode' : 'Galaxy Universe'}
             </button>
             <button onClick={() => setShowSelectModal(true)} className="cal-btn-select">
               <Mail size={15} /> Select Candidate

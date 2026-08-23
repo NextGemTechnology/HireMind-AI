@@ -26,8 +26,15 @@ public interface AuthService {
     AuthResponse refreshToken(RefreshTokenRequest request, HttpServletRequest httpRequest);
 
     /**
-     * Revoke all refresh tokens for the current user (logout from all devices).
+     * Authenticate or register with Google OAuth.
      */
+    AuthResponse googleLogin(GoogleAuthRequest request, HttpServletRequest httpRequest);
+
+    /**
+     * Revoke all refresh tokens and blacklist current JWT access token for instant expiration.
+     */
+    void logout(Long userId, String accessToken);
+
     void logout(Long userId);
 
     /**

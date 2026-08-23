@@ -96,6 +96,16 @@ public class JwtService {
         }
     }
 
+    public long getRemainingExpiryMs(String token) {
+        try {
+            Date exp = extractExpiration(token);
+            long diff = exp.getTime() - System.currentTimeMillis();
+            return Math.max(diff, 0);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     // ── Claims Extraction ─────────────────────────────────────────────────────
 
     public String extractSubject(String token) {

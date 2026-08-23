@@ -76,6 +76,22 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Login successful", response));
     }
 
+    // ── Google OAuth Login ───────────────────────────────────────────────────
+
+    @PostMapping("/google")
+    @SecurityRequirements
+    @Operation(
+            summary = "Google OAuth Login / Sign Up",
+            description = "Authenticate or register user via Google OAuth credential. Requires @gmail.com email."
+    )
+    public ResponseEntity<ApiResponse<AuthResponse>> googleLogin(
+            @Valid @RequestBody GoogleAuthRequest request,
+            HttpServletRequest httpRequest) {
+
+        AuthResponse response = authService.googleLogin(request, httpRequest);
+        return ResponseEntity.ok(ApiResponse.success("Google authentication successful", response));
+    }
+
     // ── Refresh Token ─────────────────────────────────────────────────────────
 
     @PostMapping("/refresh")
@@ -93,20 +109,27 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Token refreshed", response));
     }
 
-    // ── Logout ────────────────────────────────────────────────────────────────
+    // ── Logout with Instant Token Revocation ──────────────────────────────────
 
     @PostMapping("/logout")
     @Operation(
             summary = "Logout",
-            description = "Revokes all refresh tokens for the current user (logs out from all devices)."
+            description = "Revokes all refresh tokens and instantly blacklists the current JWT access token."
     )
     public ResponseEntity<ApiResponse<Void>> logout(
-            @AuthenticationPrincipal UserPrincipal principal) {
+            @AuthenticationPrincipal UserPrincipal principal,
+            HttpServletRequest httpRequest) {
 
-        if (principal != null) {
-            authService.logout(principal.getId());
+        String authHeader = httpRequest.getHeader("Authorization");
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
         }
-        return ResponseEntity.ok(ApiResponse.success("Logged out successfully"));
+
+        Long userId = principal != null ? principal.getId() : null;
+        authService.logout(userId, token);
+
+        return ResponseEntity.ok(ApiResponse.success("Logged out successfully and token destroyed"));
     }
 
     // ── Email Verification ────────────────────────────────────────────────────

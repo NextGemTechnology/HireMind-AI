@@ -1,0 +1,187 @@
+/* ============================================================
+   TalentIQ — Cosmic Quote & Galaxy Fact Toast Popup Styles
+   ============================================================ */
+
+.cosmic-popup-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+  background: rgba(12, 17, 34, 0.92);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 16px;
+  padding: 18px 20px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 20px rgba(124, 58, 237, 0.2);
+  z-index: 9999;
+  animation: cosmicSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  font-family: 'Inter', sans-serif;
+}
+
+@keyframes cosmicSlideIn {
+  0% { transform: translateY(30px) scale(0.95); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.cosmic-popup-glow {
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(25px);
+  opacity: 0.7;
+}
+
+.cosmic-popup-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cosmic-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cosmic-popup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.cosmic-popup-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cosmic-popup-icon-btn {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #94A3B8;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cosmic-popup-icon-btn:hover {
+  background: rgba(124, 58, 237, 0.3);
+  color: #FFFFFF;
+  border-color: #8B5CF6;
+  transform: scale(1.08);
+}
+
+.cosmic-popup-icon-btn.close:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #F87171;
+  border-color: #EF4444;
+}
+
+.cosmic-popup-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.cosmic-popup-text {
+  font-size: 13px;
+  color: #CBD5E1;
+  line-height: 1.55;
+  margin: 0;
+  font-style: normal;
+}
+
+.cosmic-popup-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+  font-size: 11px;
+}
+
+.cosmic-popup-source {
+  color: #A78BFA;
+  font-weight: 500;
+}
+
+.cosmic-timer-pill {
+  color: #64748B;
+  font-size: 10px;
+  background: rgba(15, 23, 42, 0.6);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Floating Minimized Widget */
+.cosmic-popup-minimized {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(12, 17, 34, 0.9);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  padding: 8px 16px;
+  border-radius: 24px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  color: #DDD6FE;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 9999;
+  transition: all 0.25s ease;
+  animation: cosmicFloat 3s ease-in-out infinite alternate;
+}
+
+.cosmic-popup-minimized:hover {
+  background: rgba(124, 58, 237, 0.35);
+  border-color: #A78BFA;
+  transform: translateY(-2px);
+  color: #FFFFFF;
+}
+
+.cosmic-mini-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #A78BFA;
+  box-shadow: 0 0 8px #C084FC;
+}
+
+@keyframes cosmicFloat {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-4px); }
+}
+
+@media (max-width: 480px) {
+  .cosmic-popup-toast {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}

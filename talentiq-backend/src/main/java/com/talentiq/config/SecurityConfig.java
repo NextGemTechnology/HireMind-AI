@@ -59,7 +59,9 @@ public class SecurityConfig {
             "/actuator/health",
             // WebSocket SockJS handshake endpoints
             "/ws/**",
-            "/ws/info/**"
+            "/ws/info/**",
+            // Chat file attachments (images, PDFs)
+            "/v1/chat/files/**"
     };
 
     @Bean

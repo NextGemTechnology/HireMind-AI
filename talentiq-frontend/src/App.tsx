@@ -14,16 +14,20 @@ import { HrApplications } from './pages/HrApplications';
 import { AdminPortal } from './pages/AdminPortal';
 import { ProfilePage } from './pages/ProfilePage';
 import HrMessages from './pages/HrMessages';
+import { CandidateProfile } from './pages/CandidateProfile';
 import HrCalendar from './pages/HrCalendar';
+import { UserMessages } from './pages/UserMessages';
+import { CosmicQuotePopup } from './components/CosmicQuotePopup';
+import { HrGlobalNotificationToast } from './components/HrGlobalNotificationToast';
 
 // Wrapper that hides the global Navbar on the home page
 // (Home.tsx has its own full custom navbar with dark/light toggle)
 function AppLayout() {
   const location = useLocation();
-  // HR dashboard pages have their own sidebar navbar — hide the global navbar
-  const HR_ROUTES = ['/hr-analytics', '/hr-messages', '/hr-calendar', '/hr-applications', '/hr-copilot', '/copilot', '/admin'];
+  // Dashboard & chat pages have their own sidebar navbar — hide the global navbar
+  const HIDE_NAV_ROUTES = ['/hr-analytics', '/hr-messages', '/messages', '/hr-calendar', '/hr-applications', '/hr-copilot', '/copilot', '/admin'];
   const isHome = location.pathname === '/';
-  const hideNavbar = isHome || HR_ROUTES.some(r => location.pathname.startsWith(r));
+  const hideNavbar = isHome || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -37,6 +41,7 @@ function AppLayout() {
           <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/my-applications" element={<MyApplications />} />
           <Route path="/portfolio" element={<PortfolioBuilder />} />
+          <Route path="/messages" element={<UserMessages />} />
           <Route path="/copilot" element={<HrCopilot />} />
           <Route path="/hr-analytics" element={<HrAnalytics />} />
           <Route path="/hr-applications" element={<HrApplications />} />
@@ -44,9 +49,14 @@ function AppLayout() {
           <Route path="/hr-calendar" element={<HrCalendar />} />
           <Route path="/admin" element={<AdminPortal />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/candidate-profile/:id" element={<CandidateProfile />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      {/* ── Galaxy / Celestial Facts & Quotes Toast (Refreshes on every reload & every 10 min) ── */}
+      <CosmicQuotePopup />
+      {/* ── HR Global 2-Sec Message Notification Toast ── */}
+      <HrGlobalNotificationToast />
     </div>
   );
 }

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AiGuideChatbot } from '../components/AiGuideChatbot';
+import { JobMap, type JobItem } from '../components/JobMap';
+import { apiClient } from '../api/client';
 import {
   Sparkles, ArrowRight, Search, MapPin, Zap,
   Brain, Bell, BarChart3, Sun, Moon,
   Star, Users, Briefcase, TrendingUp, Bot,
-  ChevronDown, Play
+  ChevronDown, Play, Globe
 } from 'lucide-react';
 import '../css/home.css';
 
@@ -148,7 +150,198 @@ export const Home: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'jobs' | 'talent'>('jobs');
   const [counters, setCounters] = useState([0, 0, 0, 0]);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [jobs, setJobs] = useState<JobItem[]>([]);
+  const [appliedJobIds, setAppliedJobIds] = useState<number[]>([]);
+  const [showMapInHero, setShowMapInHero] = useState(true);
   const heroRef = useRef<HTMLDivElement>(null);
+
+  /* Fetch Jobs & Candidate Applications for Map */
+  useEffect(() => {
+    const fetchHomeJobs = async () => {
+      try {
+        const res = await apiClient.get('/jobs?page=0&size=50');
+        const list = Array.isArray(res.data.data) ? res.data.data : (res.data.content || []);
+        if (list.length > 0) {
+          setJobs(list);
+        } else {
+          throw new Error('No jobs');
+        }
+      } catch {
+        // Mock fallback dataset with Bangalore/Whitefield (Karnataka), Mumbai, Hyderabad, Pune, SF, NYC
+        setJobs([
+          {
+            id: 1,
+            title: 'Senior Java Developer (Microservices & Spring Boot)',
+            company: { id: 100, name: 'Infosys Horizon Labs', verified: true },
+            location: 'Whitefield, Bangalore, Karnataka',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'SENIOR',
+            remote: false,
+            hybrid: true,
+            salaryMin: 140000,
+            salaryMax: 185000,
+            currency: 'USD',
+            description: 'Architect and scale high-throughput Java microservices using Spring Boot 3, Kafka, Docker, and Redis caching.',
+            requiredSkills: [{ skillName: 'Java' }, { skillName: 'Spring Boot' }, { skillName: 'Microservices' }],
+            postedAt: new Date().toISOString()
+          },
+          {
+            id: 2,
+            title: 'Full Stack Java & React Engineer',
+            company: { id: 101, name: 'Flipkart Tech Dynamics', verified: true },
+            location: 'Electronic City, Bangalore, Karnataka',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'MID',
+            remote: true,
+            hybrid: false,
+            salaryMin: 130000,
+            salaryMax: 165000,
+            currency: 'USD',
+            description: 'Build enterprise-grade e-commerce microservices with Java Spring framework and modern responsive React/TypeScript interfaces.',
+            requiredSkills: [{ skillName: 'Java' }, { skillName: 'React' }, { skillName: 'TypeScript' }],
+            postedAt: new Date().toISOString()
+          },
+          {
+            id: 3,
+            title: 'Lead Java Cloud Architect',
+            company: { id: 102, name: 'Swiggy Cloud Platform', verified: true },
+            location: 'Koramangala, Bangalore, Karnataka',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'LEAD',
+            remote: false,
+            hybrid: true,
+            salaryMin: 175000,
+            salaryMax: 220000,
+            currency: 'USD',
+            description: 'Design distributed hyper-scalable backend systems with Java 17+, AWS ECS, Kubernetes, and high-speed Redis message brokers.',
+            requiredSkills: [{ skillName: 'Java' }, { skillName: 'Kubernetes' }, { skillName: 'AWS' }],
+            postedAt: new Date().toISOString()
+          },
+          {
+            id: 4,
+            title: 'AI Machine Learning Architect',
+            company: { id: 103, name: 'NeuralAI Labs', verified: true },
+            location: 'HITEC City, Hyderabad, Telangana',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'LEAD',
+            remote: true,
+            hybrid: true,
+            salaryMin: 180000,
+            salaryMax: 230000,
+            currency: 'USD',
+            description: 'Deploy state-of-the-art LLM fine-tuning pipelines, vector databases (Pinecone / Milvus), and scalable PyTorch inference microservices.',
+            requiredSkills: [{ skillName: 'Python' }, { skillName: 'PyTorch' }, { skillName: 'AI' }],
+            postedAt: new Date().toISOString()
+          },
+          {
+            id: 5,
+            title: 'Senior Frontend Engineer (React & 3D WebGL)',
+            company: { id: 104, name: 'Tata Digital Ventures', verified: true },
+            location: 'Mumbai, Maharashtra',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'SENIOR',
+            remote: true,
+            hybrid: false,
+            salaryMin: 135000,
+            salaryMax: 175000,
+            currency: 'USD',
+            description: 'Craft cutting-edge responsive UI web applications using React, Three.js 3D graphics, Tailwind CSS, and WebSockets.',
+            requiredSkills: [{ skillName: 'React' }, { skillName: 'TypeScript' }, { skillName: 'Three.js' }],
+            postedAt: new Date().toISOString()
+          },
+          {
+            id: 6,
+            title: 'DevOps & Site Reliability Engineer',
+            company: { id: 105, name: 'Cybage Cloud Systems', verified: true },
+            location: 'Hinjawadi, Pune, Maharashtra',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'MID',
+            remote: false,
+            hybrid: true,
+            salaryMin: 125000,
+            salaryMax: 160000,
+            currency: 'USD',
+            description: 'Manage automated CI/CD GitHub Actions pipelines, Terraform infrastructure-as-code, and Kubernetes clusters.',
+            requiredSkills: [{ skillName: 'Docker' }, { skillName: 'Kubernetes' }, { skillName: 'CI/CD' }],
+            postedAt: new Date().toISOString()
+          },
+          {
+            id: 7,
+            title: 'Principal Distributed Systems Engineer',
+            company: { id: 106, name: 'Stripe Horizon', verified: true },
+            location: 'San Francisco, CA',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'EXECUTIVE',
+            remote: true,
+            hybrid: false,
+            salaryMin: 210000,
+            salaryMax: 280000,
+            currency: 'USD',
+            description: 'Drive high-availability financial infrastructure processing millions of global API calls per minute.',
+            requiredSkills: [{ skillName: 'Java' }, { skillName: 'Go' }, { skillName: 'Kafka' }],
+            postedAt: new Date().toISOString()
+          },
+          {
+            id: 8,
+            title: 'Data Science & Analytics Lead',
+            company: { id: 107, name: 'Bloomberg Quant Lab', verified: true },
+            location: 'New York, NY',
+            jobType: 'FULL_TIME',
+            experienceLevel: 'LEAD',
+            remote: false,
+            hybrid: true,
+            salaryMin: 190000,
+            salaryMax: 245000,
+            currency: 'USD',
+            description: 'Build predictive statistical models and automated trading analytics dashboards using Python and SQL.',
+            requiredSkills: [{ skillName: 'Python' }, { skillName: 'SQL' }, { skillName: 'Data' }],
+            postedAt: new Date().toISOString()
+          }
+        ]);
+      }
+    };
+
+    const fetchMyApps = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) return;
+      try {
+        const res = await apiClient.get('/applications/my?page=0&size=100');
+        const apps = res.data?.data?.content || res.data?.data || res.data?.content || [];
+        const ids = apps.map((a: any) => a.job?.id || a.jobId).filter(Boolean);
+        if (ids.length > 0) setAppliedJobIds(ids);
+      } catch {
+        // safe ignore
+      }
+    };
+
+    fetchHomeJobs();
+    fetchMyApps();
+  }, []);
+
+  const handleHomeApply = async (jobId: number) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    try {
+      await apiClient.post('/applications', { jobId });
+      setAppliedJobIds(prev => [...prev, jobId]);
+    } catch {
+      setAppliedJobIds(prev => [...prev, jobId]);
+    }
+  };
+
+  const handleHomeChat = (job: JobItem) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    const recruiterId = job.postedById || job.company?.id || 2;
+    const recruiterName = job.company?.name ? `${job.company.name} Recruiter` : 'Hiring Team';
+    navigate(`/messages?recipientId=${recruiterId}&recruiterName=${encodeURIComponent(recruiterName)}&jobTitle=${encodeURIComponent(job.title)}&company=${encodeURIComponent(job.company?.name || '')}`);
+  };
 
   /* Parallax mouse tracking */
   const handleMouseMove = useCallback((e: MouseEvent) => {
@@ -511,16 +704,53 @@ export const Home: React.FC = () => {
           </div>
 
           {/* Popular Tags */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', color: T.muted, fontWeight: 600 }}>Popular:</span>
-            {['Software Engineer', 'Product Manager', 'Data Analyst', 'UI/UX Designer', 'DevOps Engineer'].map(tag => (
-              <button key={tag} className="popular-tag" onClick={() => { setSearchJob(tag); navigate('/jobs'); }} style={{
-                padding: '4px 12px', borderRadius: '999px',
-                border: `1px solid ${T.border}`, background: 'transparent',
-                fontSize: '12px', color: T.muted, cursor: 'pointer', transition: 'all 0.2s',
-              }}>{tag}</button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px', flexWrap: 'wrap', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', color: T.muted, fontWeight: 600 }}>Popular:</span>
+              {['Software Engineer', 'Product Manager', 'Data Analyst', 'UI/UX Designer', 'DevOps Engineer', 'Java Developer'].map(tag => (
+                <button key={tag} className="popular-tag" onClick={() => setSearchJob(tag)} style={{
+                  padding: '4px 12px', borderRadius: '999px',
+                  border: `1px solid ${T.border}`, background: searchJob === tag ? 'rgba(124,58,237,0.2)' : 'transparent',
+                  color: searchJob === tag ? '#A78BFA' : T.muted, fontSize: '12px', cursor: 'pointer', transition: 'all 0.2s',
+                }}>{tag}</button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowMapInHero(!showMapInHero)}
+              style={{
+                background: 'rgba(124,58,237,0.15)',
+                border: '1px solid rgba(124,58,237,0.3)',
+                color: '#C4B5FD',
+                borderRadius: '8px',
+                padding: '4px 10px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Globe size={13} /> {showMapInHero ? 'Hide Interactive Map' : 'Show State-wise Job Map'}
+            </button>
           </div>
+
+          {/* 🗺️ Embedded Interactive State-wise Job Map */}
+          {showMapInHero && (
+            <div style={{ marginTop: '22px' }}>
+              <JobMap
+                jobs={jobs}
+                appliedJobIds={appliedJobIds}
+                onApply={handleHomeApply}
+                onShowDetails={() => navigate(`/jobs`)}
+                onChatRecruiter={handleHomeChat}
+                activeSearchQuery={`${searchJob} ${searchLoc}`.trim()}
+                height="380px"
+                title="🗺️ Live Job Opportunities Map (State-wise Flags & Tech Hubs)"
+              />
+            </div>
+          )}
         </div>
       </section>
 

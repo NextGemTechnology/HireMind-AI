@@ -56,4 +56,12 @@ public class ChatMessage {
     @Column(name = "sent_at", nullable = false, updatable = false)
     @Builder.Default
     private Instant sentAt = Instant.now();
+
+    /** URL/path to attached file (image, document). Null for plain text messages. */
+    @Column(name = "file_url", length = 500)
+    private String fileUrl;
+
+    /** Original filename of the attachment. */
+    @Column(name = "file_name", length = 255)
+    private String fileName;
 }
