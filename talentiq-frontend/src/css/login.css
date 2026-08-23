@@ -428,3 +428,82 @@
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
+
+/* ── Forgot Password & 4-Digit OTP Styles ─────────────────── */
+.forgot-step-pills {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.forgot-step-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+}
+
+.forgot-step-pill.active {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+}
+
+.forgot-step-pill.completed {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.otp-boxes-container {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.otp-box-input {
+  width: 58px;
+  height: 64px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 2px solid rgba(129, 140, 248, 0.35);
+  color: #f8fafc;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+  font-family: monospace;
+  outline: none;
+  transition: all 0.25s ease;
+}
+
+.otp-box-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 20px rgba(129, 140, 248, 0.5), inset 0 0 10px rgba(129, 140, 248, 0.2);
+  transform: translateY(-2px);
+}
+
+.login-success-alert {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #34d399;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+

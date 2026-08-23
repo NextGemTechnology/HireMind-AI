@@ -73,6 +73,12 @@ public class User extends AuditEntity {
     @Column(name = "password_reset_token_expires_at")
     private Instant passwordResetTokenExpiresAt;
 
+    @Column(name = "password_reset_otp", length = 10)
+    private String passwordResetOtp;
+
+    @Column(name = "password_reset_otp_expires_at")
+    private Instant passwordResetOtpExpiresAt;
+
     @Column(name = "last_login_at")
     private Instant lastLoginAt;
 

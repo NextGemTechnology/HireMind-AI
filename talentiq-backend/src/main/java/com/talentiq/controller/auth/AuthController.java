@@ -202,28 +202,40 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Verification email sent. Please check your inbox."));
     }
 
-    // ── Password Reset ────────────────────────────────────────────────────────
+    // ── Password Reset with 4-Digit OTP ───────────────────────────────────────
 
     @PostMapping("/forgot-password")
     @SecurityRequirements
     @Operation(
-            summary = "Request password reset",
-            description = "Sends a password reset link to the email address. " +
-                    "Always returns success to prevent email enumeration."
+            summary = "Request 4-digit password reset OTP",
+            description = "Generates and sends a 4-digit OTP to the user's email address."
     )
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
 
         authService.forgotPassword(request);
         return ResponseEntity.ok(ApiResponse.success(
-                "If this email is registered, you will receive a password reset link shortly."));
+                "A 4-digit OTP has been sent to your email. Please check your inbox."));
+    }
+
+    @PostMapping("/verify-otp")
+    @SecurityRequirements
+    @Operation(
+            summary = "Verify 4-digit password reset OTP",
+            description = "Validates the 4-digit OTP sent to the user's email address."
+    )
+    public ResponseEntity<ApiResponse<Void>> verifyOtp(
+            @Valid @RequestBody VerifyOtpRequest request) {
+
+        authService.verifyPasswordResetOtp(request);
+        return ResponseEntity.ok(ApiResponse.success("OTP verified successfully. You may now set a new password."));
     }
 
     @PostMapping("/reset-password")
     @SecurityRequirements
     @Operation(
             summary = "Reset password",
-            description = "Sets a new password using the one-time reset token from email."
+            description = "Sets a new password using verified 4-digit OTP or reset token."
     )
     public ResponseEntity<ApiResponse<Void>> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {

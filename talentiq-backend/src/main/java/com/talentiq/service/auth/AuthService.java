@@ -54,12 +54,17 @@ public interface AuthService {
     void resendVerificationEmail(String email);
 
     /**
-     * Initiate password reset. Sends reset email (always returns success, even if email not found).
+     * Initiate password reset by generating and emailing a 4-digit OTP.
      */
     void forgotPassword(ForgotPasswordRequest request);
 
     /**
-     * Complete password reset using the reset token from email.
+     * Verify the 4-digit OTP sent to the user's email.
+     */
+    void verifyPasswordResetOtp(VerifyOtpRequest request);
+
+    /**
+     * Complete password reset using verified 4-digit OTP or reset token and set new password.
      */
     void resetPassword(ResetPasswordRequest request);
 }

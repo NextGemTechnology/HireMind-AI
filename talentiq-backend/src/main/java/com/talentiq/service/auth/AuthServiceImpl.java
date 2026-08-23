@@ -433,39 +433,89 @@ public class AuthServiceImpl implements AuthService {
         log.info("Verification email resent to: {}", email);
     }
 
-    // ── Password Reset ────────────────────────────────────────────────────────
+    // ── Password Reset with 4-Digit OTP ───────────────────────────────────────
 
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail().toLowerCase().trim();
-        // Always return success — prevents email enumeration attacks
-        userRepository.findByEmail(email).ifPresent(user -> {
-            String resetToken = UUID.randomUUID().toString();
-            user.setPasswordResetToken(resetToken);
-            user.setPasswordResetTokenExpiresAt(
-                    Instant.now().plus(appProperties.getMail().getResetPasswordExpiryMinutes(), ChronoUnit.MINUTES));
-            userRepository.save(user);
-            mailService.sendPasswordResetEmail(user.getEmail(), user.getFirstName(), resetToken);
-            log.info("Password reset email sent to: {}", email);
-        });
+        validateGmailDomain(email);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("No registered account found with email: " + email));
+
+        // Generate 4-digit numeric OTP
+        int randomPin = new java.security.SecureRandom().nextInt(10000);
+        String otp = String.format("%04d", randomPin);
+
+        user.setPasswordResetOtp(otp);
+        user.setPasswordResetOtpExpiresAt(Instant.now().plus(10, ChronoUnit.MINUTES));
+        user.setPasswordResetToken(otp);
+        user.setPasswordResetTokenExpiresAt(Instant.now().plus(10, ChronoUnit.MINUTES));
+        userRepository.save(user);
+
+        mailService.sendPasswordResetOtpEmail(user.getEmail(), user.getFirstName(), otp);
+        log.info("4-Digit Password Reset OTP generated for user [{}]: {}", email, otp);
+    }
+
+    @Override
+    public void verifyPasswordResetOtp(VerifyOtpRequest request) {
+        String email = request.getEmail().toLowerCase().trim();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new BadRequestException("No registered account found with email: " + email));
+
+        boolean otpValid = false;
+        if (user.getPasswordResetOtp() != null && user.getPasswordResetOtp().equals(request.getOtp().trim())) {
+            otpValid = user.getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetOtpExpiresAt());
+        } else if (user.getPasswordResetToken() != null && user.getPasswordResetToken().equals(request.getOtp().trim())) {
+            otpValid = user.getPasswordResetTokenExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetTokenExpiresAt());
+        }
+
+        if (!otpValid) {
+            throw new BadRequestException("Invalid or expired 4-digit OTP. Please request a new code.");
+        }
+
+        log.info("4-Digit OTP verified successfully for email: {}", email);
     }
 
     @Override
     public void resetPassword(ResetPasswordRequest request) {
-        User user = userRepository.findByPasswordResetToken(request.getToken())
-                .orElseThrow(() -> new BadRequestException("Invalid or expired reset token"));
+        User user = null;
+        if (StringUtils.hasText(request.getEmail())) {
+            user = userRepository.findByEmail(request.getEmail().toLowerCase().trim())
+                    .orElse(null);
+        }
+        if (user == null && StringUtils.hasText(request.getToken())) {
+            user = userRepository.findByPasswordResetToken(request.getToken())
+                    .orElse(null);
+        }
 
-        if (user.getPasswordResetTokenExpiresAt() != null
-                && Instant.now().isAfter(user.getPasswordResetTokenExpiresAt())) {
-            throw new BadRequestException("Password reset token has expired. Please request a new one.");
+        if (user == null) {
+            throw new BadRequestException("Invalid password reset request. User not found.");
+        }
+
+        String providedOtpOrToken = StringUtils.hasText(request.getOtp()) ? request.getOtp().trim() : request.getToken();
+        if (!StringUtils.hasText(providedOtpOrToken)) {
+            throw new BadRequestException("4-digit OTP or reset token is required.");
+        }
+
+        boolean valid = false;
+        if (user.getPasswordResetOtp() != null && user.getPasswordResetOtp().equals(providedOtpOrToken)) {
+            valid = user.getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetOtpExpiresAt());
+        }
+        if (!valid && user.getPasswordResetToken() != null && user.getPasswordResetToken().equals(providedOtpOrToken)) {
+            valid = user.getPasswordResetTokenExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetTokenExpiresAt());
+        }
+
+        if (!valid) {
+            throw new BadRequestException("Invalid or expired 4-digit OTP. Please request a new code.");
         }
 
         userRepository.updatePassword(user.getId(), passwordEncoder.encode(request.getNewPassword()));
 
-        // Revoke all refresh tokens for security
+        // Revoke all refresh tokens & active sessions for security
         refreshTokenRepository.revokeAllUserTokens(user.getId());
 
-        log.info("Password reset successful for user: {}", user.getEmail());
+        log.info("Password reset successfully updated for user: {}", user.getEmail());
     }
 
     // ── Private Helpers ───────────────────────────────────────────────────────

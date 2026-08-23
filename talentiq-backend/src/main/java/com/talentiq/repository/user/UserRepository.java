@@ -44,6 +44,7 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     @Modifying
     @Query("UPDATE User u SET u.passwordHash = :newHash, u.passwordResetToken = NULL, " +
-            "u.passwordResetTokenExpiresAt = NULL WHERE u.id = :userId")
+            "u.passwordResetTokenExpiresAt = NULL, u.passwordResetOtp = NULL, " +
+            "u.passwordResetOtpExpiresAt = NULL, u.loginAttempts = 0, u.lockedUntil = NULL WHERE u.id = :userId")
     void updatePassword(@Param("userId") Long userId, @Param("newHash") String newHash);
 }

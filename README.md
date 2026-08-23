@@ -26,13 +26,27 @@
 - **4-Theme Selection Engine**: Toggle between **Cosmic Galaxy**, **Lunar Moon**, **Solar Daylight**, and **Cyber Obsidian** themes.
 - **Permanent Database Chat Retention**: Fixed WebSocket client-side optimistic message duplication and guaranteed 100% MySQL persistence across browser refreshes.
 
+### 🔐 4-Digit Email OTP Password Reset Recovery Flow
+- **Multi-Step OTP State Machine**: 
+  - **Step 1 (`POST /v1/auth/forgot-password`)**: Candidate, HR Recruiter, or Admin submits their registered `@gmail.com` address. Generates a cryptographically secure 4-digit numeric OTP (`password_reset_otp`) with a 10-minute expiry and dispatches a branded HTML email via `MailService`.
+  - **Step 2 (`POST /v1/auth/verify-otp`)**: Verifies the 4-digit code in real-time with automated digit jumping inputs and 60-second resend countdown timer.
+  - **Step 3 (`POST /v1/auth/reset-password`)**: Validates OTP, hashes new password with BCrypt, updates database credentials, clears OTP fields, and revokes all active refresh tokens and sessions.
+  - **Step 4**: Visual success confirmation and one-click transition back to Sign In.
+
+### 🚪 Dedicated Role-Based Portal Routes & Clean 401 Rejections
+- **Independent Portal Entrypoints**:
+  - `http://localhost:3000/login` — Dedicated Candidate Portal.
+  - `http://localhost:3000/hr-login` — Dedicated HR Recruiter Portal.
+  - `http://localhost:3000/admin-login` — Dedicated Super Admin Portal.
+- **RBAC URL Synchronization**: 3D perspective flip cards with synchronized route switching and cross-portal rejection returning clean `401 Unauthorized ("Invalid email or password")` to prevent user enumeration.
+
 ### 🔑 Google OAuth & `@gmail.com` Domain Rule
 - **Google OAuth Login**: One-click Google Sign-In (`POST /v1/auth/google`) auto-provisioning verified candidate or HR accounts.
-- **Strict `@gmail.com` Rule**: Validation enforces that all registrations, password logins, and OAuth sign-ins strictly use `@gmail.com` email addresses.
+- **Strict `@gmail.com` Rule**: Validation enforces that all registrations, password logins, and OAuth sign-ins strictly use `@gmail.com` email addresses (or `@talentiq.ai` for Platform Admins).
 
 ### 🛡️ Instant Token Invalidation & Blacklisting on Logout
-- **Redis Token Destruction Engine (`TokenBlacklistService`)**: Upon `POST /v1/auth/logout`, the JWT access token is stored in Redis (`jwt:blacklist:<token>`) with remaining TTL and refresh tokens are revoked.
-- **Filter-Level Security Interception**: `JwtAuthenticationFilter` and `WebSocketAuthInterceptor` reject blacklisted token requests with `HTTP 401 Unauthorized`.
+- **Redis Token Destruction Engine (`TokenBlacklistService`)**: Upon `POST /v1/auth/logout`, the JWT access token is stored in Redis (`jwt:blacklist:<token>`) with remaining TTL and refresh tokens are revoked in MySQL.
+- **Filter-Level Security Interception**: `JwtAuthenticationFilter` and `WebSocketAuthInterceptor` reject blacklisted token requests with `HTTP 401 Unauthorized`. Frontend wipes both `localStorage` and `sessionStorage`.
 
 ### 🌙 Unified Lunar Moon Theme
 - **Full-Bleed Celestial Theme**: Applied uniform Lunar Moon glassmorphism theme across candidate routes:

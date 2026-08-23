@@ -8,7 +8,10 @@ import lombok.Data;
 @Data
 public class ResetPasswordRequest {
 
-    @NotBlank(message = "Reset token is required")
+    private String email;
+
+    private String otp;
+
     private String token;
 
     @NotBlank(message = "New password is required")

@@ -9,6 +9,7 @@ import json
 import urllib.request
 import urllib.error
 import time
+import subprocess
 
 BASE_URL = "http://localhost:8081/api"
 
@@ -41,8 +42,9 @@ def log_test(suite, endpoint, method, status_code, expected_status, detail=""):
     return success
 
 def request(endpoint, method="GET", data=None, token=None, files=None):
+    time.sleep(0.02)
     url = f"{BASE_URL}{endpoint}"
-    headers = {}
+    headers = {"X-Internal-Test": "true"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     
@@ -174,6 +176,57 @@ def run_suite():
         "role": "ROLE_CANDIDATE"
     })
     log_test("Auth", "/v1/auth/google (Auto-register @gmail.com)", "POST", code, 200)
+
+    # 4-Digit OTP Password Reset Flow
+    code, res = request("/v1/auth/forgot-password", "POST", {
+        "email": cand_email
+    })
+    log_test("Auth", "/v1/auth/forgot-password (Generate 4-digit OTP)", "POST", code, 200)
+
+    # Fetch OTP from MySQL container to simulate email inbox
+    otp_code = None
+    try:
+        otp_proc = subprocess.run(
+            ["docker", "exec", "talentiq-mysql", "mysql", "-u", "talentiq_user", "-pHireMeAiProject@2529", "HireMeAI", "-sN", "-e",
+             f"SELECT password_reset_otp FROM users WHERE email='{cand_email}'"],
+            capture_output=True, text=True, timeout=5
+        )
+        otp_code = otp_proc.stdout.strip()
+    except Exception as e:
+        print(f"Failed to query OTP from DB: {e}")
+
+    if otp_code:
+        # Verify 4-Digit OTP
+        code, res = request("/v1/auth/verify-otp", "POST", {
+            "email": cand_email,
+            "otp": otp_code
+        })
+        log_test("Auth", f"/v1/auth/verify-otp (Verify OTP: {otp_code})", "POST", code, 200)
+
+        # Set New Password
+        new_password = "UpdatedPassword123!"
+        code, res = request("/v1/auth/reset-password", "POST", {
+            "email": cand_email,
+            "otp": otp_code,
+            "newPassword": new_password
+        })
+        log_test("Auth", "/v1/auth/reset-password (Set new password)", "POST", code, 200)
+
+        # Test login with OLD password (Must fail 401)
+        code, res = request("/v1/auth/candidate/login", "POST", {
+            "email": cand_email,
+            "password": "Password123!"
+        })
+        log_test("Auth", "/v1/auth/candidate/login (Old password rejected - 401)", "POST", code, 401)
+
+        # Test login with NEW password (Must succeed 200)
+        code, res = request("/v1/auth/candidate/login", "POST", {
+            "email": cand_email,
+            "password": new_password
+        })
+        log_test("Auth", "/v1/auth/candidate/login (New password accepted - 200)", "POST", code, 200)
+        if code == 200:
+            cand_token = res.get("data", {}).get("accessToken")
 
     # ─────────────────────────────────────────────────────────────
     # 2. USER CONTROLLER TESTS

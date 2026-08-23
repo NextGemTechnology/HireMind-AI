@@ -61,6 +61,18 @@ public class MailService {
     }
 
     /**
+     * Sends the 4-digit OTP password reset email.
+     */
+    @Async("mailExecutor")
+    public void sendPasswordResetOtpEmail(String toEmail, String firstName, String otp) {
+        String subject = "🔑 Your TalentIQ Password Reset OTP: " + otp;
+        String body = buildPasswordResetOtpHtml(firstName, otp, 10);
+
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Password reset 4-digit OTP email dispatched to: {} [OTP: {}]", toEmail, otp);
+    }
+
+    /**
      * Sends a welcome email after successful email verification.
      */
     @Async("mailExecutor")
@@ -208,6 +220,47 @@ public class MailService {
                 </table></td></tr></table>
                 </body></html>
                 """.formatted(firstName, resetUrl, expiryMinutes);
+    }
+
+    private String buildPasswordResetOtpHtml(String firstName, String otp, int expiryMinutes) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Reset Your Password OTP</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="580" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(129,140,248,0.25);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6,#ec4899);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:32px;margin-bottom:6px;">✨</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:800;letter-spacing:-0.02em;">HireMind AI · TalentIQ</h1>
+                  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">Password Reset Verification</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 12px;font-size:20px;font-weight:700;">Hi %s 👋</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 24px;font-size:15px;">
+                    We received a request to reset your password. Use the 4-digit verification code below to set a new password:
+                  </p>
+                  
+                  <div style="text-align:center;margin:28px 0;">
+                    <div style="display:inline-block;background:linear-gradient(135deg,rgba(99,102,241,0.18),rgba(236,72,153,0.18));border:2px solid #818cf8;border-radius:14px;padding:16px 32px;">
+                      <span style="font-size:38px;font-weight:900;letter-spacing:14px;color:#a5b4fc;font-family:monospace;margin-left:14px;">%s</span>
+                    </div>
+                  </div>
+                  
+                  <p style="color:#64748b;font-size:13px;text-align:center;margin:20px 0 6px;">
+                    ⏱️ This OTP is valid for <strong style="color:#e2e8f0;">%d minutes</strong>.
+                  </p>
+                  <p style="color:#64748b;font-size:12px;text-align:center;margin:0;">
+                    🔒 If you did not request this password reset, please ignore this email.
+                  </p>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#475569;font-size:12px;margin:0;">© 2026 HireMind AI · TalentIQ Platform</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(firstName, otp, expiryMinutes);
     }
 
     private String buildWelcomeHtml(String firstName, String dashboardUrl) {
