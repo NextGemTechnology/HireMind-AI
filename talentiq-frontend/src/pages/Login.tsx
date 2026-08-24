@@ -215,7 +215,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     try {
       const targetRole = selectedRole === 'HR'
         ? 'ROLE_HR'
-        : (selectedRole === 'ADMIN' ? 'ROLE_SUPER_ADMIN' : 'ROLE_CANDIDATE');
+        : (selectedRole === 'ADMIN' ? undefined : 'ROLE_CANDIDATE');
 
       await login({ email: trimmedEmail, password, requiredRole: targetRole });
 

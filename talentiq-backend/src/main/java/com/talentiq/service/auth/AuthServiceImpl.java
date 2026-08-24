@@ -218,8 +218,20 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest) {
-        request.setRequiredRole(Role.ROLE_SUPER_ADMIN);
-        return login(request, httpRequest);
+        request.setRequiredRole(null);
+        AuthResponse response = login(request, httpRequest);
+        User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim()).orElse(null);
+        if (user != null) {
+            boolean isAdmin = user.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
+                              user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN) ||
+                              user.getRoles().contains(Role.ROLE_APP_DEVELOPER) ||
+                              user.getRoles().contains(Role.ROLE_MANAGEMENT_TEAM) ||
+                              user.getRoles().contains(Role.ROLE_COMPANY_ADMIN);
+            if (!isAdmin) {
+                throw new BadCredentialsException("Invalid email or password");
+            }
+        }
+        return response;
     }
 
     @Override
@@ -259,7 +271,11 @@ public class AuthServiceImpl implements AuthService {
             if (request.getRequiredRole() != null) {
                 boolean hasRole = authenticatedUser.getRoles().contains(request.getRequiredRole());
                 if (!hasRole) {
-                    boolean isAdmin = authenticatedUser.getRoles().contains(Role.ROLE_SUPER_ADMIN) || authenticatedUser.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
+                    boolean isAdmin = authenticatedUser.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
+                                      authenticatedUser.getRoles().contains(Role.ROLE_PLATFORM_ADMIN) ||
+                                      authenticatedUser.getRoles().contains(Role.ROLE_APP_DEVELOPER) ||
+                                      authenticatedUser.getRoles().contains(Role.ROLE_MANAGEMENT_TEAM) ||
+                                      authenticatedUser.getRoles().contains(Role.ROLE_COMPANY_ADMIN);
                     if (!isAdmin) {
                         throw new BadCredentialsException("Invalid email or password");
                     }
@@ -588,22 +604,22 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private RuntimeException handleFailedLogin(User user) {
-        int attempts = user.getLoginAttempts() + 1;
-        user.setLoginAttempts(attempts);
         userRepository.incrementLoginAttempts(user.getId());
+        User updated = userRepository.findById(user.getId()).orElse(user);
+        int attempts = updated.getLoginAttempts();
 
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
-            user.setLockedUntil(Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
-            userRepository.save(user);
-            log.warn("Account temporarily locked for {} minutes due to {} failed login attempts: {}", LOCKOUT_MINUTES, attempts, user.getEmail());
-            throw new UnauthorizedException(
+            updated.setLockedUntil(Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            userRepository.save(updated);
+            log.warn("Account temporarily locked for {} minutes due to {} failed login attempts: {}", LOCKOUT_MINUTES, attempts, updated.getEmail());
+            return new UnauthorizedException(
                     String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts. Please try again after %d minutes or reset your password.",
                             LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES)
             );
         } else {
-            userRepository.save(user);
             int remaining = MAX_LOGIN_ATTEMPTS - attempts;
-            throw new BadCredentialsException(
+            if (remaining < 0) remaining = 0;
+            return new BadCredentialsException(
                     String.format("Invalid password. %d attempt%s remaining before account is temporarily locked for %d minutes.",
                             remaining, remaining == 1 ? "" : "s", LOCKOUT_MINUTES)
             );
