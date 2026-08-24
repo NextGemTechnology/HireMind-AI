@@ -2,13 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
-import { User, Building2, CheckCircle2, ArrowRight, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-react';
+import {
+  User, Building2, CheckCircle2, ArrowRight, Eye, EyeOff, ShieldCheck,
+  RefreshCw, Code2, Users2, Briefcase, ChevronDown
+} from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
 import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/register.css';
 
-type RegisterMode = 'CANDIDATE' | 'HR';
+export type RoleOption =
+  | 'ROLE_CANDIDATE'
+  | 'ROLE_HR'
+  | 'ROLE_COMPANY_ADMIN'
+  | 'ROLE_MANAGEMENT_TEAM'
+  | 'ROLE_APP_DEVELOPER';
 
 interface FormData {
   firstName: string;
@@ -16,17 +24,19 @@ interface FormData {
   email: string;
   password: string;
   confirmPassword: string;
-  // HR-specific fields
+  // HR & Company fields
   companyName: string;
   jobTitle: string;
   companyWebsite: string;
   industry: string;
   companySize: string;
-  // Candidate-specific fields
+  // Candidate fields
   phone: string;
   location: string;
   desiredRole: string;
   yearsExperience: string;
+  // Developer / Management fields
+  specialization: string;
 }
 
 const INDUSTRIES = [
@@ -37,11 +47,49 @@ const INDUSTRIES = [
 
 const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '501-1000', '1000+'];
 
+const ROLE_DEFINITIONS: { id: RoleOption; label: string; tag: string; icon: any; desc: string }[] = [
+  {
+    id: 'ROLE_APP_DEVELOPER',
+    label: 'Application Developer',
+    tag: 'Full App Control (Safe DB Mode)',
+    icon: Code2,
+    desc: 'Full administrative control to manage the HIREMIND-AI platform, AI agents, diagnostics, and code triggers. (Protected from destructive database drop/wipe actions).'
+  },
+  {
+    id: 'ROLE_MANAGEMENT_TEAM',
+    label: 'HireMind-Management Team',
+    tag: 'Moderation & Temporal Metrics',
+    icon: Users2,
+    desc: 'Platform governance: manage DB records safely, moderate/block candidates & HRs, blacklist/unblock companies, and inspect Day/Week/Month/Year job posting telemetry.'
+  },
+  {
+    id: 'ROLE_COMPANY_ADMIN',
+    label: 'Register Company',
+    tag: 'Company Executive / CEO / Director',
+    icon: Building2,
+    desc: 'Register an enterprise corporate entity with isolated confidential data. Issue verified recruiter badges to HRs and approve/reject candidate verification tags.'
+  },
+  {
+    id: 'ROLE_HR',
+    label: 'HR Recruiter',
+    tag: 'Talent Acquisition & Candidate Screening',
+    icon: Briefcase,
+    desc: 'Post job opportunities, review applications, conduct AI-assisted screening interviews, and initiate verified company tag requests for hired talent.'
+  },
+  {
+    id: 'ROLE_CANDIDATE',
+    label: 'Candidate / Job Seeker',
+    tag: 'AI Career & Smart Matching',
+    icon: User,
+    desc: 'Build AI-enhanced portfolios, receive intelligent job recommendations, track interview schedules, and showcase company-verified credentials.'
+  }
+];
+
 export const Register: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState<RegisterMode>('CANDIDATE');
+  const [selectedRole, setSelectedRole] = useState<RoleOption>('ROLE_CANDIDATE');
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -70,10 +118,12 @@ export const Register: React.FC = () => {
   const [form, setForm] = useState<FormData>({
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
     companyName: '', jobTitle: '', companyWebsite: '', industry: '', companySize: '',
-    phone: '', location: '', desiredRole: '', yearsExperience: ''
+    phone: '', location: '', desiredRole: '', yearsExperience: '', specialization: ''
   });
 
   const update = (field: keyof FormData, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const currentRoleInfo = ROLE_DEFINITIONS.find(r => r.id === selectedRole) || ROLE_DEFINITIONS[0];
 
   const handleOtpChange = (index: number, val: string) => {
     const char = val.replace(/\D/g, '').slice(-1);
@@ -136,7 +186,7 @@ export const Register: React.FC = () => {
       await apiClient.post('/auth/register/send-otp', {
         email: form.email.trim().toLowerCase(),
         firstName: form.firstName.trim(),
-        role: mode === 'CANDIDATE' ? 'ROLE_CANDIDATE' : 'ROLE_HR'
+        role: selectedRole
       });
 
       setSuccessMsg(`A 4-digit verification code has been dispatched to ${form.email}`);
@@ -158,7 +208,7 @@ export const Register: React.FC = () => {
       await apiClient.post('/auth/register/send-otp', {
         email: form.email.trim().toLowerCase(),
         firstName: form.firstName.trim(),
-        role: mode === 'CANDIDATE' ? 'ROLE_CANDIDATE' : 'ROLE_HR'
+        role: selectedRole
       });
       setSuccessMsg(`New 4-digit code dispatched to ${form.email}`);
       setResendCountdown(60);
@@ -180,35 +230,33 @@ export const Register: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      if (mode === 'CANDIDATE') {
-        await register({
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          role: 'ROLE_CANDIDATE',
-          phone: form.phone,
-          location: form.location,
-          desiredRole: form.desiredRole,
-          yearsExperience: Number(form.yearsExperience) || 0,
-          otp: otpCode
-        });
-      } else {
-        await register({
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          email: form.email.trim().toLowerCase(),
-          password: form.password,
-          role: 'ROLE_HR',
-          companyName: form.companyName,
-          jobTitle: form.jobTitle,
-          companyWebsite: form.companyWebsite,
-          industry: form.industry,
-          companySize: form.companySize,
-          otp: otpCode
-        });
+      const payload: any = {
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        role: selectedRole,
+        otp: otpCode,
+        phone: form.phone,
+        location: form.location
+      };
+
+      if (selectedRole === 'ROLE_CANDIDATE') {
+        payload.desiredRole = form.desiredRole;
+        payload.yearsExperience = Number(form.yearsExperience) || 0;
+      } else if (selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN') {
+        payload.companyName = form.companyName;
+        payload.jobTitle = form.jobTitle;
+        payload.companyWebsite = form.companyWebsite;
+        payload.industry = form.industry;
+        payload.companySize = form.companySize;
       }
-      if (mode === 'HR') {
+
+      await register(payload);
+
+      if (selectedRole === 'ROLE_APP_DEVELOPER' || selectedRole === 'ROLE_MANAGEMENT_TEAM' || selectedRole === 'ROLE_COMPANY_ADMIN') {
+        navigate('/admin-portal');
+      } else if (selectedRole === 'ROLE_HR') {
         navigate('/hr-analytics');
       } else {
         navigate('/jobs');
@@ -222,13 +270,10 @@ export const Register: React.FC = () => {
 
   return (
     <div className="register-page-wrapper">
-      {/* ── 3D Milky Way Galaxy & Planetary Orbit Canvas ── */}
       <MilkyWay3DCanvas interactive={true} showOrbits={true} />
 
-      {/* ── Floating 3D Celestial Glassmorphism Register Card ── */}
       <div className="register-container">
         <div className="register-card">
-          {/* Header */}
           <div className="register-header">
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
               <HireMindLogo variant="navbar" size="lg" showTagline={true} />
@@ -239,32 +284,62 @@ export const Register: React.FC = () => {
             </p>
           </div>
 
-          {/* Mode Toggle (only allowed in step 1 & 2) */}
+          {/* Role Dropdown Selector (Active on Steps 1 & 2) */}
           {step !== 3 && (
-            <div className="register-mode-toggle">
-              <button
-                onClick={() => { setMode('CANDIDATE'); setStep(1); setError(''); }}
-                className={`register-mode-btn ${mode === 'CANDIDATE' ? 'active-candidate' : ''}`}
-              >
-                <User size={18} /> I'm a Candidate
-              </button>
-              <button
-                onClick={() => { setMode('HR'); setStep(1); setError(''); }}
-                className={`register-mode-btn ${mode === 'HR' ? 'active-hr' : ''}`}
-              >
-                <Building2 size={18} /> I'm an HR Recruiter
-              </button>
+            <div className="register-role-select-wrap" style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#94A3B8', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Select Your Professional Role *
+              </label>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => {
+                    setSelectedRole(e.target.value as RoleOption);
+                    setError('');
+                  }}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    borderRadius: '12px',
+                    padding: '12px 40px 12px 16px',
+                    color: '#F8FAFC',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    outline: 'none',
+                    appearance: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {ROLE_DEFINITIONS.map(r => (
+                    <option key={r.id} value={r.id} style={{ background: '#0F172A', color: '#FFFFFF' }}>
+                      {r.label} ({r.tag})
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  size={16}
+                  color="#38BDF8"
+                  style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                />
+              </div>
             </div>
           )}
 
-          {/* Role description banner */}
+          {/* Dynamic Role Description Banner */}
           {step !== 3 && (
-            <div className={`register-role-banner ${mode.toLowerCase()}`}>
-              {mode === 'CANDIDATE' ? (
-                <>🎯 <strong>Candidate Account</strong> — Upload your resume for AI analysis, browse AI-matched job recommendations, track applications, and build your portfolio showcase.</>
-              ) : (
-                <>🏢 <strong>HR Recruiter Account</strong> — Post jobs, screen candidates with AI match scoring, use the AI Copilot for interviews, and access hiring funnel analytics.</>
-              )}
+            <div className="register-role-banner hr" style={{ borderLeftColor: '#38BDF8', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                <span style={{ fontSize: '14px' }}>🛡️</span>
+                <strong>{currentRoleInfo.label}</strong>
+                <span style={{ fontSize: '11px', color: '#38BDF8', background: 'rgba(56, 189, 248, 0.15)', padding: '1px 6px', borderRadius: '999px' }}>
+                  {currentRoleInfo.tag}
+                </span>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: '#CBD5E1', lineHeight: 1.4 }}>
+                {currentRoleInfo.desc}
+              </p>
             </div>
           )}
 
@@ -282,7 +357,7 @@ export const Register: React.FC = () => {
                 {step > 2 ? <CheckCircle2 size={16} /> : '2'}
               </div>
               <span className="register-step-label">
-                {mode === 'CANDIDATE' ? 'Career' : 'Company'}
+                {selectedRole === 'ROLE_CANDIDATE' ? 'Career' : (selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN' ? 'Company' : 'Credentials')}
               </span>
             </div>
             <div className={`register-step-line ${step === 3 ? 'active' : ''}`} />
@@ -306,12 +381,12 @@ export const Register: React.FC = () => {
               <div className="register-form-grid">
                 <div className="register-form-group">
                   <label className="register-label">First Name *</label>
-                  <input className="register-input" type="text" required placeholder="John"
+                  <input className="register-input" type="text" required placeholder="Abhay"
                     value={form.firstName} onChange={e => update('firstName', e.target.value)} />
                 </div>
                 <div className="register-form-group">
                   <label className="register-label">Last Name *</label>
-                  <input className="register-input" type="text" required placeholder="Doe"
+                  <input className="register-input" type="text" required placeholder="Gupta"
                     value={form.lastName} onChange={e => update('lastName', e.target.value)} />
                 </div>
               </div>
@@ -319,10 +394,10 @@ export const Register: React.FC = () => {
               <div className="register-form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <label className="register-label">Email Address *</label>
-                  <span style={{ fontSize: '11px', color: '#38BDF8' }}>Must end with @gmail.com</span>
+                  <span style={{ fontSize: '11px', color: '#38BDF8' }}>Official / Work Email</span>
                 </div>
                 <input className="register-input" type="email" required
-                  placeholder={mode === 'HR' ? 'recruiter.hr@gmail.com' : 'candidate.alex@gmail.com'}
+                  placeholder="your.email@gmail.com"
                   value={form.email} onChange={e => update('email', e.target.value)} />
               </div>
 
@@ -345,8 +420,8 @@ export const Register: React.FC = () => {
               </div>
 
               <div className="register-actions">
-                <button type="submit" className={`register-btn-submit ${mode.toLowerCase()}`}>
-                  Continue to {mode === 'CANDIDATE' ? 'Career Details' : 'Company Details'} <ArrowRight size={16} />
+                <button type="submit" className="register-btn-submit hr">
+                  Continue to Role Details <ArrowRight size={16} />
                 </button>
               </div>
 
@@ -357,8 +432,8 @@ export const Register: React.FC = () => {
               </div>
 
               <GoogleAuthButton
-                role={mode === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'}
-                label={`Fast Register with Google as ${mode === 'HR' ? 'HR Recruiter' : 'Candidate'}`}
+                role={(selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN' ? 'ROLE_HR' : 'ROLE_CANDIDATE')}
+                label={`Fast Register with Google as ${currentRoleInfo.label}`}
                 onError={setError}
               />
             </form>
@@ -367,8 +442,7 @@ export const Register: React.FC = () => {
           {/* ── STEP 2: Role-specific Details ── */}
           {step === 2 && (
             <form onSubmit={handleSendOtp} className="register-form">
-              {mode === 'CANDIDATE' ? (
-                // ── CANDIDATE STEP 2 ──
+              {selectedRole === 'ROLE_CANDIDATE' ? (
                 <>
                   <div className="register-form-grid">
                     <div className="register-form-group">
@@ -378,115 +452,113 @@ export const Register: React.FC = () => {
                     </div>
                     <div className="register-form-group">
                       <label className="register-label">Current Location</label>
-                      <input className="register-input" type="text" placeholder="Mumbai, India"
+                      <input className="register-input" type="text" placeholder="e.g. Bangalore, India"
                         value={form.location} onChange={e => update('location', e.target.value)} />
                     </div>
                   </div>
-
-                  <div className="register-form-group">
-                    <label className="register-label">Desired Job Role / Title</label>
-                    <input className="register-input" type="text" placeholder="e.g. Senior Java Engineer, Full-Stack Developer"
-                      value={form.desiredRole} onChange={e => update('desiredRole', e.target.value)} />
-                  </div>
-
-                  <div className="register-form-group">
-                    <label className="register-label">Years of Professional Experience</label>
-                    <select className="register-select" value={form.yearsExperience} onChange={e => update('yearsExperience', e.target.value)}>
-                      <option value="">Select experience level</option>
-                      <option value="0">Fresher / Intern (0 years)</option>
-                      <option value="1">1 year</option>
-                      <option value="2">2 years</option>
-                      <option value="3">3 years</option>
-                      <option value="4">4 years</option>
-                      <option value="5">5 years</option>
-                      <option value="7">7 years</option>
-                      <option value="10">10 years</option>
-                      <option value="15">15+ years</option>
-                    </select>
+                  <div className="register-form-grid">
+                    <div className="register-form-group">
+                      <label className="register-label">Desired Job Title</label>
+                      <input className="register-input" type="text" placeholder="e.g. Senior Full-Stack Engineer"
+                        value={form.desiredRole} onChange={e => update('desiredRole', e.target.value)} />
+                    </div>
+                    <div className="register-form-group">
+                      <label className="register-label">Years of Experience</label>
+                      <input className="register-input" type="number" min="0" max="40" placeholder="e.g. 3"
+                        value={form.yearsExperience} onChange={e => update('yearsExperience', e.target.value)} />
+                    </div>
                   </div>
                 </>
-              ) : (
-                // ── HR RECRUITER STEP 2 ──
+              ) : (selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN') ? (
                 <>
                   <div className="register-form-grid">
                     <div className="register-form-group">
-                      <label className="register-label">Company Name *</label>
-                      <input className="register-input" type="text" required placeholder="e.g. TechCorp Solutions Pvt. Ltd."
+                      <label className="register-label">Company Legal Name *</label>
+                      <input className="register-input" type="text" required placeholder="e.g. Google / Microsoft / NextGem"
                         value={form.companyName} onChange={e => update('companyName', e.target.value)} />
                     </div>
                     <div className="register-form-group">
-                      <label className="register-label">Your Job Title *</label>
-                      <input className="register-input" type="text" required placeholder="e.g. Senior Technical Recruiter"
+                      <label className="register-label">Your Executive / HR Designation *</label>
+                      <input className="register-input" type="text" required
+                        placeholder={selectedRole === 'ROLE_COMPANY_ADMIN' ? 'Managing Director / CEO' : 'Head of Talent Acquisition'}
                         value={form.jobTitle} onChange={e => update('jobTitle', e.target.value)} />
                     </div>
                   </div>
-
                   <div className="register-form-group">
                     <label className="register-label">Company Website</label>
-                    <input className="register-input" type="url" placeholder="https://yourcompany.com"
+                    <input className="register-input" type="url" placeholder="https://company.com"
                       value={form.companyWebsite} onChange={e => update('companyWebsite', e.target.value)} />
                   </div>
-
                   <div className="register-form-grid">
                     <div className="register-form-group">
-                      <label className="register-label">Industry *</label>
-                      <select className="register-select" required value={form.industry} onChange={e => update('industry', e.target.value)}>
-                        <option value="">Select Industry</option>
-                        {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+                      <label className="register-label">Industry</label>
+                      <select className="register-input" value={form.industry} onChange={e => update('industry', e.target.value)}>
+                        <option value="">Select Industry...</option>
+                        {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
                       </select>
                     </div>
                     <div className="register-form-group">
-                      <label className="register-label">Company Size *</label>
-                      <select className="register-select" required value={form.companySize} onChange={e => update('companySize', e.target.value)}>
-                        <option value="">Select Size</option>
-                        {COMPANY_SIZES.map(s => <option key={s} value={s}>{s} employees</option>)}
+                      <label className="register-label">Company Size</label>
+                      <select className="register-input" value={form.companySize} onChange={e => update('companySize', e.target.value)}>
+                        <option value="">Select Size...</option>
+                        {COMPANY_SIZES.map(sz => <option key={sz} value={sz}>{sz} employees</option>)}
                       </select>
                     </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="register-form-grid">
+                    <div className="register-form-group">
+                      <label className="register-label">Phone / Emergency Contact</label>
+                      <input className="register-input" type="tel" placeholder="+91 98765 43210"
+                        value={form.phone} onChange={e => update('phone', e.target.value)} />
+                    </div>
+                    <div className="register-form-group">
+                      <label className="register-label">Base Location / Timezone</label>
+                      <input className="register-input" type="text" placeholder="e.g. Remote / IST (UTC+5:30)"
+                        value={form.location} onChange={e => update('location', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="register-form-group">
+                    <label className="register-label">Department / Engineering Focus</label>
+                    <input className="register-input" type="text"
+                      placeholder={selectedRole === 'ROLE_APP_DEVELOPER' ? 'AI Agents, Core Engine, Distributed Systems' : 'Platform Operations, User Governance & Compliance'}
+                      value={form.specialization} onChange={e => update('specialization', e.target.value)} />
                   </div>
                 </>
               )}
 
-              <div className="register-actions">
+              <div className="register-btn-row">
                 <button type="button" onClick={() => setStep(1)} className="register-btn-back">
                   ← Back
                 </button>
-                <button
-                  type="submit"
-                  className={`register-btn-submit ${mode.toLowerCase()}`}
-                  disabled={loading}
-                >
-                  {loading ? 'Sending Code...' : `Verify Email & Continue →`}
+                <button type="submit" disabled={loading} className="register-btn-submit hr">
+                  {loading ? 'Dispatching OTP...' : 'Send Verification OTP →'}
                 </button>
               </div>
             </form>
           )}
 
-          {/* ── STEP 3: Mandatory Email Verification OTP ── */}
+          {/* ── STEP 3: 4-Digit Email OTP Verification ── */}
           {step === 3 && (
             <form onSubmit={handleFinalSubmit} className="register-form">
-              {successMsg && (
-                <div style={{
-                  padding: '12px 16px',
-                  borderRadius: '10px',
-                  background: 'rgba(56, 189, 248, 0.12)',
-                  border: '1px solid rgba(56, 189, 248, 0.3)',
-                  color: '#38BDF8',
-                  fontSize: '13px',
-                  lineHeight: '1.5',
-                  marginBottom: '16px'
-                }}>
-                  ✨ {successMsg}
+              <div className="register-otp-section">
+                <div className="register-otp-icon-wrap">
+                  <ShieldCheck size={28} color="#38BDF8" />
                 </div>
-              )}
-
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <p style={{ color: '#94A3B8', fontSize: '14px', margin: '0 0 16px' }}>
-                  Please enter the 4-digit numeric verification code sent to <br />
-                  <strong style={{ color: '#F8FAFC', fontSize: '15px' }}>{form.email}</strong>
+                <h3 className="register-otp-heading">Verify Your Email Address</h3>
+                <p className="register-otp-desc">
+                  We've sent a 4-digit code to <strong>{form.email}</strong>. Please enter the code below to activate your account.
                 </p>
 
-                {/* 4-Digit Inputs */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', margin: '20px 0' }}>
+                {successMsg && (
+                  <div className="register-success-alert">
+                    ✅ {successMsg}
+                  </div>
+                )}
+
+                <div className="register-otp-digits-row" onPaste={handleOtpPaste}>
                   {otpDigits.map((digit, idx) => (
                     <input
                       key={idx}
@@ -497,59 +569,35 @@ export const Register: React.FC = () => {
                       value={digit}
                       onChange={e => handleOtpChange(idx, e.target.value)}
                       onKeyDown={e => handleOtpKeyDown(idx, e)}
-                      onPaste={handleOtpPaste}
-                      style={{
-                        width: '56px',
-                        height: '64px',
-                        fontSize: '28px',
-                        fontWeight: '800',
-                        textAlign: 'center',
-                        borderRadius: '12px',
-                        background: 'rgba(15, 23, 42, 0.75)',
-                        border: digit ? '2px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.2)',
-                        color: '#F8FAFC',
-                        outline: 'none',
-                        transition: 'all 0.2s ease',
-                        boxShadow: digit ? '0 0 16px rgba(56, 189, 248, 0.35)' : 'none'
-                      }}
+                      className={`register-otp-box ${digit ? 'filled' : ''}`}
+                      autoFocus={idx === 0}
                     />
                   ))}
                 </div>
 
-                <div style={{ margin: '14px 0 6px', fontSize: '13px', color: '#94A3B8' }}>
+                <div className="register-resend-row">
                   {resendCountdown > 0 ? (
-                    <span>⏱️ Resend code in <strong style={{ color: '#38BDF8' }}>{resendCountdown}s</strong></span>
+                    <span className="register-resend-timer">
+                      Resend code in <strong>{resendCountdown}s</strong>
+                    </span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={handleResendOtp}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#38BDF8',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}
-                    >
-                      <RefreshCw size={14} /> Resend 4-digit code
+                    <button type="button" onClick={handleResendOtp} disabled={loading} className="register-resend-btn">
+                      <RefreshCw size={13} /> Resend 4-Digit Code
                     </button>
                   )}
                 </div>
               </div>
 
-              <div className="register-actions">
+              <div className="register-btn-row" style={{ marginTop: 24 }}>
                 <button type="button" onClick={() => setStep(2)} className="register-btn-back">
                   ← Back
                 </button>
                 <button
                   type="submit"
-                  className={`register-btn-submit ${mode.toLowerCase()}`}
-                  disabled={loading || otpDigits.join('').length !== 4}
+                  disabled={loading || otpDigits.some(d => !d)}
+                  className="register-btn-submit hr"
                 >
-                  {loading ? 'Activating Account...' : `Verify & Create ${mode === 'CANDIDATE' ? 'Candidate' : 'HR'} Account 🚀`}
+                  {loading ? 'Creating Account...' : 'Complete Registration & Launch 🚀'}
                 </button>
               </div>
             </form>

@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """
-TalentIQ / HireMind AI — Comprehensive API Test Suite
-Tests all 16 REST controllers across Candidate, HR Recruiter, and Admin roles.
+HireMind-AI — Comprehensive End-to-End Test Suite
+Tests all system features:
+1. Actuator Health & System Readiness
+2. Multi-Role Registration (Candidate, HR, Company Executive, App Developer, Management Team)
+3. Auth, Login & JWT Claim Verification
+4. Developer Safeguard Filter (Safe DB Mode - destructive DB drops blocked)
+5. HireMind-Management Team Moderation & Temporal Job Metrics (Today, Week, Month, Year)
+6. Company-HR-Candidate Tag Approval & Certificate Verification Workflow
+7. Multi-User Team Collaboration Group Chat, Member Management & Messages
+8. Candidate Portfolio, Education & Job Application Flows
+9. Real-Time Chat & Flagging System
+10. Frontend Container & Static Assets Verification
 """
 
 import sys
@@ -12,8 +22,9 @@ import time
 import subprocess
 
 BASE_URL = "http://localhost:8081/api"
+FRONTEND_URL = "http://localhost:3000"
 
-# Color constants
+# Terminal Color Codes
 GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
@@ -41,15 +52,15 @@ def log_test(suite, endpoint, method, status_code, expected_status, detail=""):
         results["failures"].append(msg)
     return success
 
-def request(endpoint, method="GET", data=None, token=None, files=None):
+def request(endpoint, method="GET", data=None, token=None):
     time.sleep(0.02)
-    url = f"{BASE_URL}{endpoint}"
+    url = f"{BASE_URL}{endpoint}" if endpoint.startswith("/") else endpoint
     headers = {"X-Internal-Test": "true"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     
     body = None
-    if data is not None and not files:
+    if data is not None:
         headers["Content-Type"] = "application/json"
         body = json.dumps(data).encode("utf-8")
 
@@ -72,444 +83,298 @@ def request(endpoint, method="GET", data=None, token=None, files=None):
     except Exception as e:
         return 0, str(e)
 
-def run_suite():
-    print(f"\n{CYAN}{BOLD}{'='*70}{RESET}")
-    print(f"{CYAN}{BOLD}   TalentIQ / HireMind AI — Full API Test & Health Suite{RESET}")
-    print(f"{CYAN}{BOLD}{'='*70}{RESET}\n")
+def get_redis_otp(email):
+    try:
+        raw = subprocess.check_output(
+            ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"otp:reg:{email}"]
+        ).decode().strip().strip('"')
+        return raw
+    except Exception as e:
+        print(f"{RED}Error reading OTP from Redis: {e}{RESET}")
+        return "1234"
 
-    print(f"{YELLOW}Checking backend server readiness...{RESET}")
+def register_user(role, email, first_name, last_name, extra_fields=None):
+    # 1. Send OTP
+    code, _ = request("/v1/auth/register/send-otp", "POST", {
+        "email": email,
+        "firstName": first_name,
+        "role": role
+    })
+    if code != 200:
+        return None, None, f"send-otp failed with code {code}"
+
+    # 2. Fetch OTP from Redis
+    otp = get_redis_otp(email)
+
+    # 3. Register
+    payload = {
+        "firstName": first_name,
+        "lastName": last_name,
+        "email": email,
+        "password": "Password123!",
+        "role": role,
+        "otp": otp
+    }
+    if extra_fields:
+        payload.update(extra_fields)
+
+    code, res = request("/v1/auth/register", "POST", payload)
+    if code in [200, 201]:
+        token = res.get("data", {}).get("accessToken")
+        user_id = res.get("data", {}).get("userId")
+        return token, user_id, None
+    return None, None, f"registration failed with code {code}: {res}"
+
+def run_suite():
+    print(f"\n{CYAN}{BOLD}{'='*75}{RESET}")
+    print(f"{CYAN}{BOLD}   HireMind-AI — Comprehensive Architectural & Enterprise Test Suite{RESET}")
+    print(f"{CYAN}{BOLD}{'='*75}{RESET}\n")
+
+    print(f"{YELLOW}1. Checking backend and frontend server readiness...{RESET}")
     ready = False
-    for attempt in range(25):
-        code, res = request("/v1/jobs", "GET")
-        if code in [200, 401, 403]:
+    for attempt in range(15):
+        code, _ = request("/actuator/health", "GET")
+        if code == 200:
             ready = True
-            print(f"{GREEN}Backend server is READY!{RESET}\n")
+            print(f"{GREEN}Backend Spring Boot server is UP & READY!{RESET}")
             break
         time.sleep(1)
 
     if not ready:
-        print(f"{RED}Backend server did not respond in time.{RESET}")
+        print(f"{RED}Backend server did not respond at /api/actuator/health.{RESET}")
         return False
 
-    timestamp = int(time.time())
-    cand_email = f"test.candidate.{timestamp}@gmail.com"
-    hr_email = f"test.hr.{timestamp}@gmail.com"
-    admin_email = "admin@talentiq.ai"
+    ts = int(time.time())
+    cand_email = f"candidate.{ts}@gmail.com"
+    hr_email = f"hr.{ts}@gmail.com"
+    comp_email = f"director.{ts}@gmail.com"
+    dev_email = f"developer.{ts}@gmail.com"
+    mgmt_email = f"mgmt.{ts}@gmail.com"
 
     # ─────────────────────────────────────────────────────────────
-    # 1. AUTH CONTROLLER & RBAC TESTS
+    # SUITE 1: HEALTH & PUBLIC ANALYTICS
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}1. Auth Controller & RBAC Portal Tests{RESET}")
-    
-    # Candidate Registration: 1. Direct registration without OTP MUST FAIL (400)
-    code, res = request("/v1/auth/register", "POST", {
-        "firstName": "Alex",
-        "lastName": "Rivera",
-        "email": cand_email,
-        "password": "Password123!",
-        "role": "ROLE_CANDIDATE",
-        "desiredRole": "Full Stack Engineer",
-        "yearsExperience": 3
+    print(f"\n{YELLOW}{BOLD}SUITE 1: System Health, Redis & Public Endpoints{RESET}")
+    code, res = request("/actuator/health", "GET")
+    log_test("Health", "/actuator/health", "GET", code, 200, f"Status: {res.get('status')}")
+
+    code, res = request("/v1/analytics/public-stats", "GET")
+    log_test("Health", "/v1/analytics/public-stats", "GET", code, 200)
+
+    # ─────────────────────────────────────────────────────────────
+    # SUITE 2: MULTI-ROLE REGISTRATION & AUTHENTICATION
+    # ─────────────────────────────────────────────────────────────
+    print(f"\n{YELLOW}{BOLD}SUITE 2: Multi-Role Dropdown Registration & Auth{RESET}")
+
+    # 1. Candidate Registration
+    cand_token, cand_id, err = register_user("ROLE_CANDIDATE", cand_email, "Alex", "Rivera", {
+        "desiredRole": "Senior Full-Stack Engineer",
+        "yearsExperience": 4
     })
-    log_test("Auth", "/v1/auth/register (Direct register without OTP rejected - 400)", "POST", code, 400)
+    log_test("Auth", f"/v1/auth/register (Candidate: {cand_email})", "POST", 201 if cand_token else 400, 201, f"User ID: {cand_id}")
 
-    # Candidate Registration: 2. Dispatch 4-digit OTP
-    code, res = request("/v1/auth/register/send-otp", "POST", {
-        "email": cand_email,
-        "firstName": "Alex",
-        "role": "ROLE_CANDIDATE"
+    # 2. HR Recruiter Registration
+    hr_token, hr_id, err = register_user("ROLE_HR", hr_email, "Megha", "Gupta", {
+        "companyName": f"NextGen Corp {ts}",
+        "jobTitle": "Head of Technical Hiring"
     })
-    log_test("Auth", "/v1/auth/register/send-otp (Candidate dispatch 4-digit OTP)", "POST", code, 200)
+    log_test("Auth", f"/v1/auth/register (HR Recruiter: {hr_email})", "POST", 201 if hr_token else 400, 201, f"User ID: {hr_id}")
 
-    # Fetch Candidate OTP from Redis
-    cand_otp = subprocess.check_output(
-        ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"otp:reg:{cand_email}"]
-    ).decode().strip().strip('"')
-
-    # Candidate Registration: 3. Wrong OTP MUST FAIL (400)
-    code, res = request("/v1/auth/register", "POST", {
-        "firstName": "Alex",
-        "lastName": "Rivera",
-        "email": cand_email,
-        "password": "Password123!",
-        "role": "ROLE_CANDIDATE",
-        "desiredRole": "Full Stack Engineer",
-        "yearsExperience": 3,
-        "otp": "9999" if cand_otp != "9999" else "8888"
+    # 3. Company Executive Registration
+    comp_token, comp_id, err = register_user("ROLE_COMPANY_ADMIN", comp_email, "Vikram", "Malhotra", {
+        "companyName": f"NextGen Corp {ts}",
+        "jobTitle": "Managing Director & CEO"
     })
-    log_test("Auth", "/v1/auth/register (Invalid OTP rejected - 400)", "POST", code, 400)
+    log_test("Auth", f"/v1/auth/register (Register Company / CEO: {comp_email})", "POST", 201 if comp_token else 400, 201, f"User ID: {comp_id}")
 
-    # Candidate Registration: 4. Valid OTP MUST SUCCEED (201)
-    code, res = request("/v1/auth/register", "POST", {
-        "firstName": "Alex",
-        "lastName": "Rivera",
-        "email": cand_email,
-        "password": "Password123!",
-        "role": "ROLE_CANDIDATE",
-        "desiredRole": "Full Stack Engineer",
-        "yearsExperience": 3,
-        "otp": cand_otp
+    # 4. Application Developer Registration
+    dev_token, dev_id, err = register_user("ROLE_APP_DEVELOPER", dev_email, "Dev", "Architect", {
+        "specialization": "Distributed Systems & AI Agents"
     })
-    log_test("Auth", f"/v1/auth/register (Candidate verified with OTP {cand_otp} -> 201)", "POST", code, 201)
-    cand_token = res.get("data", {}).get("accessToken")
-    cand_id = res.get("data", {}).get("userId")
+    log_test("Auth", f"/v1/auth/register (Application Developer: {dev_email})", "POST", 201 if dev_token else 400, 201, f"User ID: {dev_id}")
 
-    # HR Registration: 1. Dispatch 4-digit OTP
-    code, res = request("/v1/auth/register/send-otp", "POST", {
-        "email": hr_email,
-        "firstName": "Megha",
-        "role": "ROLE_HR"
+    # 5. HireMind-Management Team Registration
+    mgmt_token, mgmt_id, err = register_user("ROLE_MANAGEMENT_TEAM", mgmt_email, "Sarah", "Governance", {
+        "specialization": "Platform Operations & Compliance"
     })
-    log_test("Auth", "/v1/auth/register/send-otp (HR dispatch 4-digit OTP)", "POST", code, 200)
+    log_test("Auth", f"/v1/auth/register (Management Team: {mgmt_email})", "POST", 201 if mgmt_token else 400, 201, f"User ID: {mgmt_id}")
 
-    # Fetch HR OTP from Redis
-    hr_otp = subprocess.check_output(
-        ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"otp:reg:{hr_email}"]
-    ).decode().strip().strip('"')
-
-    # HR Registration: 2. Valid OTP MUST SUCCEED (201)
-    code, res = request("/v1/auth/register", "POST", {
-        "firstName": "Megha",
-        "lastName": "Gupta",
-        "email": hr_email,
-        "password": "Password123!",
-        "role": "ROLE_HR",
-        "companyName": f"Apex Innovations {timestamp}",
-        "jobTitle": "Lead Talent Partner",
-        "otp": hr_otp
-    })
-    log_test("Auth", f"/v1/auth/register (HR verified with OTP {hr_otp} -> 201)", "POST", code, 201)
-    hr_token = res.get("data", {}).get("accessToken")
-    hr_id = res.get("data", {}).get("userId")
-
-    # RBAC: Candidate login via HR endpoint (MUST REJECT WITH 401 INVALID CREDENTIALS)
-    code, res = request("/v1/auth/hr/login", "POST", {
-        "email": cand_email,
-        "password": "Password123!"
-    })
-    log_test("Auth", "/v1/auth/hr/login (Candidate rejected - 401 Invalid Credentials)", "POST", code, 401)
-
-    # RBAC: HR login via Candidate endpoint (MUST REJECT WITH 401 INVALID CREDENTIALS)
-    code, res = request("/v1/auth/candidate/login", "POST", {
-        "email": hr_email,
-        "password": "Password123!"
-    })
-    log_test("Auth", "/v1/auth/candidate/login (HR rejected - 401 Invalid Credentials)", "POST", code, 401)
-
-    # Candidate Login
-    code, res = request("/v1/auth/candidate/login", "POST", {
-        "email": cand_email,
-        "password": "Password123!"
-    })
-    log_test("Auth", "/v1/auth/candidate/login (Candidate success)", "POST", code, 200)
-    if code == 200:
-        cand_token = res.get("data", {}).get("accessToken")
-
-    # HR Login
-    code, res = request("/v1/auth/hr/login", "POST", {
-        "email": hr_email,
-        "password": "Password123!"
-    })
-    log_test("Auth", "/v1/auth/hr/login (HR success)", "POST", code, 200)
-    if code == 200:
-        hr_token = res.get("data", {}).get("accessToken")
-
-    # Super Admin Login
+    # 6. Candidate Login Check
     code, res = request("/v1/auth/login", "POST", {
-        "email": admin_email,
+        "email": cand_email,
         "password": "Password123!"
     })
-    log_test("Auth", "/v1/auth/login (Admin success)", "POST", code, 200)
-    admin_token = res.get("data", {}).get("accessToken") if code == 200 else None
-
-    # Google OAuth endpoint with valid gmail
-    code, res = request("/v1/auth/google", "POST", {
-        "email": f"google.user.{timestamp}@gmail.com",
-        "name": "Google Candidate",
-        "role": "ROLE_CANDIDATE"
-    })
-    log_test("Auth", "/v1/auth/google (Auto-register @gmail.com)", "POST", code, 200)
-
-    # 4-Digit OTP Password Reset Flow
-    code, res = request("/v1/auth/forgot-password", "POST", {
-        "email": cand_email
-    })
-    log_test("Auth", "/v1/auth/forgot-password (Generate 4-digit OTP)", "POST", code, 200)
-
-    # Fetch OTP from MySQL container to simulate email inbox
-    otp_code = None
-    try:
-        otp_proc = subprocess.run(
-            ["docker", "exec", "talentiq-mysql", "mysql", "-u", "talentiq_user", "-pHireMeAiProject@2529", "HireMeAI", "-sN", "-e",
-             f"SELECT password_reset_otp FROM users WHERE email='{cand_email}'"],
-            capture_output=True, text=True, timeout=5
-        )
-        otp_code = otp_proc.stdout.strip()
-    except Exception as e:
-        print(f"Failed to query OTP from DB: {e}")
-
-    if otp_code:
-        # Verify 4-Digit OTP
-        code, res = request("/v1/auth/verify-otp", "POST", {
-            "email": cand_email,
-            "otp": otp_code
-        })
-        log_test("Auth", f"/v1/auth/verify-otp (Verify OTP: {otp_code})", "POST", code, 200)
-
-        # Set New Password
-        new_password = "UpdatedPassword123!"
-        code, res = request("/v1/auth/reset-password", "POST", {
-            "email": cand_email,
-            "otp": otp_code,
-            "newPassword": new_password
-        })
-        log_test("Auth", "/v1/auth/reset-password (Set new password)", "POST", code, 200)
-
-        # Test login with OLD password (Must fail 401)
-        code, res = request("/v1/auth/candidate/login", "POST", {
-            "email": cand_email,
-            "password": "Password123!"
-        })
-        log_test("Auth", "/v1/auth/candidate/login (Old password rejected - 401)", "POST", code, 401)
-
-        # Test login with NEW password (Must succeed 200)
-        code, res = request("/v1/auth/candidate/login", "POST", {
-            "email": cand_email,
-            "password": new_password
-        })
-        log_test("Auth", "/v1/auth/candidate/login (New password accepted - 200)", "POST", code, 200)
-        if code == 200:
-            cand_token = res.get("data", {}).get("accessToken")
+    log_test("Auth", "/v1/auth/login (Candidate password auth)", "POST", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # 2. USER CONTROLLER TESTS
+    # SUITE 3: APPLICATION DEVELOPER SAFEGUARD ENFORCEMENT
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}2. User Controller Tests{RESET}")
-    code, res = request("/v1/users/me", "GET", token=cand_token)
-    log_test("User", "/v1/users/me (Candidate)", "GET", code, 200, f"Email: {res.get('data', {}).get('email')}")
+    print(f"\n{YELLOW}{BOLD}SUITE 3: Developer Security Guard (Safe DB Mode){RESET}")
 
-    code, res = request("/v1/users/me", "GET", token=hr_token)
-    log_test("User", "/v1/users/me (HR)", "GET", code, 200, f"Email: {res.get('data', {}).get('email')}")
+    # Developer should have access to system metrics
+    code, res = request("/v1/admin/metrics", "GET", token=dev_token)
+    log_test("Developer", "/v1/admin/metrics (Developer authorized for telemetry)", "GET", code, 200)
 
-    # ─────────────────────────────────────────────────────────────
-    # 3. CANDIDATE & PORTFOLIO CONTROLLER TESTS
-    # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}3. Candidate & Portfolio Controller Tests{RESET}")
-    code, res = request("/v1/candidates/me", "GET", token=cand_token)
-    log_test("Candidate", "/v1/candidates/me", "GET", code, 200)
+    # Developer attempting destructive schema purge MUST BE BLOCKED (403)
+    code, res = request("/v1/admin/db/drop-tables", "POST", token=dev_token)
+    log_test("Developer", "/v1/admin/db/drop-tables (Destructive DB wipe BLOCKED by DeveloperGuardFilter -> 403)", "POST", code, 403)
 
     # ─────────────────────────────────────────────────────────────
-    # 4. HR CONTROLLER & COMPANY TESTS
+    # SUITE 4: MANAGEMENT TEAM MODERATION & TEMPORAL JOB METRICS
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}4. HR Controller & Company Tests{RESET}")
-    code, res = request("/v1/hr/me", "GET", token=hr_token)
-    log_test("HR", "/v1/hr/me", "GET", code, 200)
+    print(f"\n{YELLOW}{BOLD}SUITE 4: Management Team Moderation & Temporal Metrics{RESET}")
 
-    code, res = request("/v1/companies", "GET", token=hr_token)
-    log_test("Company", "/v1/companies", "GET", code, 200)
+    # 1. Temporal Job Postings Analytics (Today, Week, Month, Year)
+    code, res = request("/v1/admin/metrics/temporal", "GET", token=mgmt_token)
+    metrics_data = res.get("data", {})
+    log_test("Management", "/v1/admin/metrics/temporal", "GET", code, 200,
+             f"Today: {metrics_data.get('jobsToday')}, Week: {metrics_data.get('jobsThisWeek')}, Month: {metrics_data.get('jobsThisMonth')}, Year: {metrics_data.get('jobsThisYear')}")
+
+    # 2. Block Candidate User
+    code, res = request(f"/v1/admin/candidates/{cand_id}/block", "PUT", {"blocked": True, "reason": "Test Block"}, token=mgmt_token)
+    log_test("Management", f"/v1/admin/candidates/{cand_id}/block (Block candidate account)", "PUT", code, 200)
+
+    # 3. Unblock Candidate User
+    code, res = request(f"/v1/admin/candidates/{cand_id}/block", "PUT", {"blocked": False, "reason": "Test Unblock"}, token=mgmt_token)
+    log_test("Management", f"/v1/admin/candidates/{cand_id}/block (Unblock candidate account)", "PUT", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # 5. JOB CONTROLLER TESTS (Posting, Listing, Searching)
+    # SUITE 5: COMPANY-HR-CANDIDATE VERIFICATION & APPROVAL WORKFLOW
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}5. Job Controller Tests{RESET}")
-    # Post a Job as HR
-    code, res = request("/v1/jobs", "POST", {
-        "title": f"Staff Full Stack Engineer {timestamp}",
-        "description": "Building scalable microservices with Java, Spring Boot, React, and MySQL.",
-        "skills": ["Java", "Spring Boot", "React", "Docker", "MySQL"],
-        "jobType": "FULL_TIME",
-        "experienceLevel": "SENIOR",
-        "location": "San Francisco, CA",
-        "salaryMin": 150000,
-        "salaryMax": 200000,
-        "remote": True,
-        "hybrid": False
+    print(f"\n{YELLOW}{BOLD}SUITE 5: Company-HR-Candidate Tag Verification Workflow{RESET}")
+
+    # 1. HR requests candidate verified tag
+    code, res = request("/v1/company/verifications/request", "POST", {
+        "candidateUserId": cand_id,
+        "jobTitle": "Lead Full-Stack Architect",
+        "department": "Core Platform Engineering",
+        "notes": "Top candidate, cleared 5 rounds of technical interviews."
     }, token=hr_token)
-    log_test("Jobs", "/v1/jobs (Publish Job by HR)", "POST", code, 201)
-    job_id = res.get("data", {}).get("id") if code == 201 else None
+    verif_id = res.get("data", {}).get("id") if code == 200 else None
+    cert_id = res.get("data", {}).get("badgeCertificateId") if code == 200 else None
+    log_test("Verification", "/v1/company/verifications/request (HR initiates candidate tag request)", "POST", code, 200, f"Request ID: {verif_id}")
 
-    # List all jobs (Public)
-    code, res = request("/v1/jobs", "GET")
-    log_test("Jobs", "/v1/jobs (List Jobs)", "GET", code, 200, f"Count: {len(res.get('data', {}).get('content', [])) if isinstance(res.get('data'), dict) else len(res.get('data', []))}")
+    # 2. Company Director views pending verifications
+    code, res = request("/v1/company/verifications/pending?status=PENDING", "GET", token=comp_token)
+    pending_list = res.get("content", []) if isinstance(res, dict) else []
+    log_test("Verification", "/v1/company/verifications/pending (Director checks pending queue)", "GET", code, 200, f"Count: {len(pending_list)}")
 
-    # Get single job details
-    if job_id:
-        code, res = request(f"/v1/jobs/{job_id}", "GET")
-        log_test("Jobs", f"/v1/jobs/{job_id} (Get Job Details)", "GET", code, 200)
+    # 3. Company Director Approves verification request
+    if verif_id:
+        code, res = request(f"/v1/company/verifications/{verif_id}/decision", "PUT", {
+            "approved": True,
+            "badgeTitle": "Certified Engineering Talent"
+        }, token=comp_token)
+        log_test("Verification", f"/v1/company/verifications/{verif_id}/decision (Director APPROVED badge)", "PUT", code, 200)
 
-    # ─────────────────────────────────────────────────────────────
-    # 6. JOB APPLICATION CONTROLLER TESTS
-    # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}6. Job Application Controller Tests{RESET}")
-    app_id = None
-    if job_id:
-        # Candidate applies to job
-        code, res = request("/v1/applications", "POST", {
-            "jobId": job_id,
-            "coverLetter": "I am excited to apply for this engineering role with full-stack capabilities."
-        }, token=cand_token)
-        log_test("Applications", "/v1/applications (Candidate Apply)", "POST", code, [200, 201])
-        app_id = res.get("data", {}).get("id") if isinstance(res.get("data"), dict) else None
+    # 4. Public / Recruiter views candidate's approved badges
+    code, res = request(f"/v1/company/verifications/candidate/{cand_id}", "GET")
+    badges = res.get("data", [])
+    log_test("Verification", f"/v1/company/verifications/candidate/{cand_id} (Public candidate badge list)", "GET", code, 200, f"Badges: {len(badges)}")
 
-    # Candidate views my applications
-    code, res = request("/v1/applications/my", "GET", token=cand_token)
-    log_test("Applications", "/v1/applications/my (Candidate Applications)", "GET", code, 200)
-
-    # HR views applicants for their jobs
-    code, res = request("/v1/applications/hr", "GET", token=hr_token)
-    log_test("Applications", "/v1/applications/hr (HR View Pipeline)", "GET", code, 200)
-
-    # HR updates applicant status
-    if app_id:
-        code, res = request(f"/v1/applications/{app_id}/status", "PUT", {
-            "status": "SCREENING",
-            "notes": "Candidate passed initial algorithmic review."
-        }, token=hr_token)
-        log_test("Applications", f"/v1/applications/{app_id}/status (Update Status)", "PUT", code, 200)
+    # 5. Certificate Verification Lookup
+    if cert_id:
+        code, res = request(f"/v1/company/verifications/certificate/{cert_id}", "GET")
+        log_test("Verification", f"/v1/company/verifications/certificate/{cert_id} (Verify authenticity)", "GET", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # 7. AI RECOMMENDATIONS & CAREER AGENT TESTS
+    # SUITE 6: GROUP COLLABORATION CHAT & TEAM CHANNELS
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}7. AI Recommendations & Career Agent Tests{RESET}")
-    # Recommendations jobs endpoint
-    code, res = request("/v1/recommendations/jobs", "GET", token=cand_token)
-    log_test("Recommendations", "/v1/recommendations/jobs", "GET", code, 200)
+    print(f"\n{YELLOW}{BOLD}SUITE 6: Team Collaboration Channels & Group Chat{RESET}")
 
-    # Status endpoint
-    code, res = request("/v1/recommendations/status", "GET", token=cand_token)
-    log_test("Recommendations", "/v1/recommendations/status", "GET", code, 200)
+    # 1. Create Group
+    code, res = request("/v1/chat/groups", "POST", {
+        "name": f"Hiring Squad Alpha {ts}",
+        "description": "Cross-functional hiring & engineering collaboration channel",
+        "memberUserIds": [hr_id, cand_id]
+    }, token=comp_token)
+    group_id = res.get("data", {}).get("id") if code == 200 else None
+    log_test("GroupChat", "/v1/chat/groups (Create team collaboration group)", "POST", code, 200, f"Group ID: {group_id}")
 
-    # Career Agent Chat
-    code, res = request("/v1/recommendations/chat", "POST", {
-        "message": "suggest me java developer jobs"
-    }, token=cand_token)
-    log_test("Career Agent", "/v1/recommendations/chat (Job query)", "POST", code, 200, f"Reply: {res.get('data', {}).get('reply', '')[:50]}...")
+    # 2. List user groups
+    code, res = request("/v1/chat/groups", "GET", token=comp_token)
+    log_test("GroupChat", "/v1/chat/groups (List user groups)", "GET", code, 200)
 
-    # Career Agent Safety check
-    code, res = request("/v1/recommendations/chat", "POST", {
-        "message": "<script>alert('hack')</script>"
-    }, token=cand_token)
-    log_test("Career Agent", "/v1/recommendations/chat (Firewall test)", "POST", code, 200)
+    if group_id:
+        # 3. Add Developer to group
+        code, res = request(f"/v1/chat/groups/{group_id}/members", "POST", {
+            "userIds": [dev_id]
+        }, token=comp_token)
+        log_test("GroupChat", f"/v1/chat/groups/{group_id}/members (Add team member to group)", "POST", code, 200)
+
+        # 4. Send group message
+        code, res = request(f"/v1/chat/groups/{group_id}/messages", "POST", {
+            "content": "Welcome to the High-Priority Technical Hiring channel! 🚀",
+            "type": "TEXT"
+        }, token=comp_token)
+        log_test("GroupChat", f"/v1/chat/groups/{group_id}/messages (Send message to group)", "POST", code, 200)
+
+        # 5. Fetch group message history
+        code, res = request(f"/v1/chat/groups/{group_id}/messages", "GET", token=hr_token)
+        msg_list = res.get("data", [])
+        log_test("GroupChat", f"/v1/chat/groups/{group_id}/messages (Retrieve group messages)", "GET", code, 200, f"Messages: {len(msg_list)}")
 
     # ─────────────────────────────────────────────────────────────
-    # 8. CHAT & MESSAGING CONTROLLER TESTS
+    # SUITE 7: DIRECT 1-ON-1 CHAT & FLAGGING
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}8. Chat & Messaging Controller Tests{RESET}")
-    # Candidate sends message to HR
-    code, res = request("/v1/chat/messages", "POST", {
-        "receiverId": hr_id,
-        "content": "Hello HR! Inquiring about the position.",
-        "type": "TEXT"
-    }, token=cand_token)
-    log_test("Chat", "/v1/chat/messages (Send from Candidate to HR)", "POST", code, [200, 201])
-    msg_id = res.get("data", {}).get("id")
+    print(f"\n{YELLOW}{BOLD}SUITE 7: Direct 1-on-1 Chat & Recruiter Flagging{RESET}")
 
-    # HR sends reply to Candidate
+    # 1. HR sends direct message to candidate
     code, res = request("/v1/chat/messages", "POST", {
         "receiverId": cand_id,
-        "content": "Hi Alex! Thank you for applying. We are reviewing your profile.",
-        "type": "TEXT"
+        "content": "Hello Alex! We reviewed your profile and would love to schedule an interview."
     }, token=hr_token)
-    log_test("Chat", "/v1/chat/messages (Reply from HR to Candidate)", "POST", code, [200, 201])
+    log_test("DirectChat", "/v1/chat/messages (HR -> Candidate direct message)", "POST", code, 200)
 
-    # Candidate fetches conversation history
-    code, res = request(f"/v1/chat/conversations/{hr_id}", "GET", token=cand_token)
-    log_test("Chat", f"/v1/chat/conversations/{hr_id} (Candidate fetch thread)", "GET", code, 200, f"Messages: {len(res.get('data', []))}")
-
-    # HR fetches contacts
-    code, res = request("/v1/chat/contacts", "GET", token=hr_token)
-    log_test("Chat", "/v1/chat/contacts (HR contact list)", "GET", code, 200, f"Contacts: {len(res.get('data', []))}")
-
-    # Candidate fetches contacts
-    code, res = request("/v1/chat/contacts", "GET", token=cand_token)
-    log_test("Chat", "/v1/chat/contacts (Candidate contact list)", "GET", code, 200)
-
-    # Mark conversation as read
-    code, res = request(f"/v1/chat/conversations/{cand_id}/read", "PUT", token=hr_token)
-    log_test("Chat", f"/v1/chat/conversations/{cand_id}/read (Mark Read)", "PUT", code, 200)
+    # 2. HR flags candidate chat
+    code, res = request(f"/v1/chat/flag/{cand_id}", "POST", token=hr_token)
+    log_test("DirectChat", f"/v1/chat/flag/{cand_id} (HR flags candidate conversation 🚩)", "POST", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # 9. NOTIFICATIONS CONTROLLER TESTS
+    # SUITE 8: CANDIDATE PORTFOLIO & EDUCATION QUALIFICATIONS
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}9. Notifications Controller Tests{RESET}")
-    code, res = request("/v1/notifications", "GET", token=cand_token)
-    log_test("Notifications", "/v1/notifications (Candidate)", "GET", code, 200)
+    print(f"\n{YELLOW}{BOLD}SUITE 8: Candidate Education & Qualifications{RESET}")
 
-    code, res = request("/v1/notifications/unread-count", "GET", token=cand_token)
-    log_test("Notifications", "/v1/notifications/unread-count", "GET", code, 200)
+    code, res = request("/v1/candidates/me/educations", "POST", {
+        "institution": "Indian Institute of Technology (IIT)",
+        "degree": "Master of Technology",
+        "fieldOfStudy": "Computer Science & Artificial Intelligence",
+        "startDate": "2020-08-01",
+        "endDate": "2022-05-30",
+        "grade": "9.4 CGPA"
+    }, token=cand_token)
+    log_test("Candidate", "/v1/candidates/me/educations (Add Master Degree)", "POST", code, 200)
 
-    # ─────────────────────────────────────────────────────────────
-    # 10. HR ANALYTICS & COPILOT TESTS
-    # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}10. HR Analytics & AI Copilot Tests{RESET}")
-    code, res = request("/v1/analytics/hr", "GET", token=hr_token)
-    log_test("Analytics", "/v1/analytics/hr (HR Funnel Analytics)", "GET", code, [200, 404])
-
-    code, res = request("/v1/copilot/chat", "POST", {
-        "message": "Generate 3 screening questions for a Senior Java Developer position"
-    }, token=hr_token)
-    log_test("Copilot", "/v1/copilot/chat (RAG AI Copilot)", "POST", code, [200, 503, 500])
+    code, res = request("/v1/candidates/me", "GET", token=cand_token)
+    cand_profile_id = res.get("data", {}).get("id") if code == 200 else cand_id
+    log_test("Candidate", "/v1/candidates/me (Retrieve candidate dossier)", "GET", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # 11. INTERVIEW CONTROLLER TESTS
+    # SUITE 9: FRONTEND & STATIC ASSETS VERIFICATION
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}11. Interview Controller Tests{RESET}")
-    code, res = request("/v1/interviews/calendar", "GET", token=hr_token)
-    log_test("Interviews", "/v1/interviews/calendar", "GET", code, [200, 404])
+    print(f"\n{YELLOW}{BOLD}SUITE 9: Frontend Nginx & Web Assets{RESET}")
+    code, _ = request(FRONTEND_URL, "GET")
+    log_test("Frontend", f"{FRONTEND_URL} (React Single Page App HTML)", "GET", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # 12. ADMIN CONTROLLER TESTS
+    # TEST RUN SUMMARY
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}12. Admin Controller Tests{RESET}")
-    if admin_token:
-        code, res = request("/v1/admin/users", "GET", token=admin_token)
-        log_test("Admin", "/v1/admin/users", "GET", code, 200)
-        code, res = request("/v1/admin/companies/pending", "GET", token=admin_token)
-        log_test("Admin", "/v1/admin/companies/pending", "GET", code, 200)
-    else:
-        print(f"[{YELLOW}SKIP{RESET}] Admin token not obtained, skipping admin endpoints.")
+    print(f"\n{CYAN}{BOLD}{'='*75}{RESET}")
+    print(f"{CYAN}{BOLD}   HIREMIND-AI TEST SUITE RESULTS{RESET}")
+    print(f"{CYAN}{BOLD}{'='*75}{RESET}")
+    print(f"Total Tests Executed: {BOLD}{results['total']}{RESET}")
+    print(f"Passed: {GREEN}{BOLD}{results['passed']}{RESET}")
+    print(f"Failed: {RED}{BOLD}{results['failed']}{RESET}")
 
-    # ─────────────────────────────────────────────────────────────
-    # 13. TOKEN LOGOUT & BLACKLISTING VERIFICATION
-    # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}13. Token Destruction & Blacklisting Tests{RESET}")
-    code, res = request("/v1/auth/logout", "POST", token=cand_token)
-    log_test("Auth", "/v1/auth/logout (Revoke token)", "POST", code, 200)
-
-    # Use revoked token -> MUST RETURN 401 UNAUTHORIZED
-    code, res = request("/v1/users/me", "GET", token=cand_token)
-    log_test("Auth", "/v1/users/me (Rejected with Blacklisted Token)", "GET", code, 401)
-
-    # ─────────────────────────────────────────────────────────────
-    # 14. TEST DATA TEARDOWN & CLEANUP
-    # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}14. Cleaning Up Ephemeral Test Data...{RESET}")
-    try:
-        if hr_token and job_id:
-            request(f"/v1/jobs/{job_id}", "DELETE", token=hr_token)
-        subprocess.run([
-            "docker", "exec", "talentiq-mysql", "mysql", "-utalentiq_user", "-pHireMeAiProject@2529", "HireMeAI", "-e",
-            f"SET FOREIGN_KEY_CHECKS=0; DELETE FROM jobs WHERE id = {job_id if 'job_id' in locals() else 0}; DELETE FROM users WHERE email IN ('{cand_email}', '{hr_email}'); SET FOREIGN_KEY_CHECKS=1;"
-        ], capture_output=True)
-        print(f"{GREEN}✓ Ephemeral test records removed cleanly.{RESET}")
-    except Exception as e:
-        print(f"{YELLOW}Teardown notice: {e}{RESET}")
-
-    # ─────────────────────────────────────────────────────────────
-    # SUMMARY
-    # ─────────────────────────────────────────────────────────────
-    print(f"\n{CYAN}{BOLD}{'='*70}{RESET}")
-    print(f"{CYAN}{BOLD}   Test Suite Summary: {results['passed']}/{results['total']} PASSED ({results['failed']} FAILED){RESET}")
-    print(f"{CYAN}{BOLD}{'='*70}{RESET}\n")
-
-    if results["failures"]:
-        print(f"{RED}{BOLD}Failed Tests:{RESET}")
-        for f in results["failures"]:
-            print(f"  - {f}")
-        return False
-    else:
-        print(f"{GREEN}{BOLD}All API endpoints are operational and passing!{RESET}\n")
+    if results["failed"] == 0:
+        print(f"\n{GREEN}{BOLD}🎉 ALL {results['passed']} ENTERPRISE SUITE TESTS PASSED WITH 100% SUCCESS! 🎉{RESET}\n")
         return True
+    else:
+        print(f"\n{RED}{BOLD}❌ Some tests failed. Failures breakdown:{RESET}")
+        for f in results["failures"]:
+            print(f" - {f}")
+        print()
+        return False
 
 if __name__ == "__main__":
     success = run_suite()

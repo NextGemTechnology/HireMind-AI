@@ -97,10 +97,8 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // Validate role
-        if (request.getRole() == null
-                || (!request.getRole().equals(Role.ROLE_CANDIDATE)
-                && !request.getRole().equals(Role.ROLE_HR))) {
-            throw new BadRequestException("Only CANDIDATE and HR roles can self-register");
+        if (request.getRole() == null) {
+            throw new BadRequestException("Role is required for registration");
         }
 
         // Enforce Redis sliding-window rate limit
@@ -131,11 +129,9 @@ public class AuthServiceImpl implements AuthService {
         }
         redisOtpService.verifyRegistrationOtp(email, request.getOtp());
 
-        // 2. Validate only CANDIDATE and HR roles are allowed for public registration
-        if (request.getRole() == null
-                || (!request.getRole().equals(Role.ROLE_CANDIDATE)
-                && !request.getRole().equals(Role.ROLE_HR))) {
-            throw new BadRequestException("Only CANDIDATE and HR roles can self-register");
+        // 2. Validate role
+        if (request.getRole() == null) {
+            throw new BadRequestException("Role is required for registration");
         }
 
         // 3. Email uniqueness check
@@ -157,7 +153,7 @@ public class AuthServiceImpl implements AuthService {
         user.addRole(request.getRole());
         User savedUser = userRepository.save(user);
 
-        // Auto-create Candidate or HR Profile record
+        // Auto-create Candidate, HR, or Company profile
         if (request.getRole().equals(Role.ROLE_CANDIDATE)) {
             Candidate candidate = Candidate.builder()
                     .user(savedUser)
@@ -167,7 +163,7 @@ public class AuthServiceImpl implements AuthService {
                     .openToWork(true)
                     .build();
             candidateRepository.save(candidate);
-        } else if (request.getRole().equals(Role.ROLE_HR)) {
+        } else if (request.getRole().equals(Role.ROLE_HR) || request.getRole().equals(Role.ROLE_COMPANY_ADMIN)) {
             String companyName = StringUtils.hasText(request.getCompanyName()) ? request.getCompanyName().trim() : "Company (" + savedUser.getFirstName() + ")";
             String slug = companyName.toLowerCase().replaceAll("[^a-z0-9]", "-") + "-" + System.currentTimeMillis();
             Company company = companyRepository.findByName(companyName).orElseGet(() ->
@@ -184,8 +180,11 @@ public class AuthServiceImpl implements AuthService {
             HrProfile hrProfile = HrProfile.builder()
                     .user(savedUser)
                     .company(company)
-                    .designation(StringUtils.hasText(request.getJobTitle()) ? request.getJobTitle() : "HR Recruiter")
-                    .companyAdmin(true)
+                    .designation(StringUtils.hasText(request.getJobTitle()) ? request.getJobTitle() : (request.getRole().equals(Role.ROLE_COMPANY_ADMIN) ? "Company Director / CEO" : "HR Recruiter"))
+                    .companyAdmin(request.getRole().equals(Role.ROLE_COMPANY_ADMIN))
+                    .companyVerified(true)
+                    .companyVerifiedAt(Instant.now())
+                    .companyVerifiedTitle(request.getRole().equals(Role.ROLE_COMPANY_ADMIN) ? "Verified Company Executive" : "Verified Talent Partner")
                     .build();
             hrProfileRepository.save(hrProfile);
         }

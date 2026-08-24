@@ -17,4 +17,12 @@ public interface AdminService {
     CompanyDto.Response verifyCompany(Long adminUserId, Long companyId, AdminDto.CompanyVerificationRequest request);
 
     AdminDto.SystemMetricsResponse getSystemMetrics(Long adminUserId);
+
+    AdminDto.TemporalJobMetricsResponse getTemporalJobMetrics(Long adminUserId);
+
+    UserDto.Response setCandidateBlockStatus(Long adminUserId, Long candidateId, AdminDto.ModerationRequest request);
+
+    UserDto.Response setHrBlockStatus(Long adminUserId, Long hrProfileId, AdminDto.ModerationRequest request);
+
+    CompanyDto.Response setCompanyBlacklistStatus(Long adminUserId, Long companyId, AdminDto.ModerationRequest request);
 }

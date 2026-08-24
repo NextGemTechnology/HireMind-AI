@@ -22,8 +22,8 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/v1/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'SUPER_ADMIN')")
-@Tag(name = "Admin Management", description = "Platform administration, user lockout controls, and company verification workflows")
+@PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'SUPER_ADMIN', 'MANAGEMENT_TEAM', 'APP_DEVELOPER')")
+@Tag(name = "Admin Management", description = "Platform administration, moderation, and temporal job metrics")
 public class AdminController {
 
     private final AdminService adminService;
@@ -74,5 +74,46 @@ public class AdminController {
             @AuthenticationPrincipal UserPrincipal principal) {
         AdminDto.SystemMetricsResponse metrics = adminService.getSystemMetrics(principal.getId());
         return ResponseEntity.ok(ApiResponse.success(metrics));
+    }
+
+    @GetMapping("/metrics/temporal")
+    @Operation(summary = "Get temporal job posting metrics for Today, This Week, This Month, and This Year")
+    public ResponseEntity<ApiResponse<AdminDto.TemporalJobMetricsResponse>> getTemporalJobMetrics(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        AdminDto.TemporalJobMetricsResponse metrics = adminService.getTemporalJobMetrics(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(metrics));
+    }
+
+    @PutMapping("/candidates/{id}/block")
+    @Operation(summary = "Block or unblock candidate account (Management Team & Admin)")
+    public ResponseEntity<ApiResponse<UserDto.Response>> setCandidateBlock(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody AdminDto.ModerationRequest request) {
+        UserDto.Response response = adminService.setCandidateBlockStatus(principal.getId(), id, request);
+        String msg = Boolean.TRUE.equals(request.getBlocked()) ? "Candidate account blocked" : "Candidate account unblocked";
+        return ResponseEntity.ok(ApiResponse.success(msg, response));
+    }
+
+    @PutMapping("/hrs/{id}/block")
+    @Operation(summary = "Block or unblock HR account (Management Team & Admin)")
+    public ResponseEntity<ApiResponse<UserDto.Response>> setHrBlock(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody AdminDto.ModerationRequest request) {
+        UserDto.Response response = adminService.setHrBlockStatus(principal.getId(), id, request);
+        String msg = Boolean.TRUE.equals(request.getBlocked()) ? "HR account blocked" : "HR account unblocked";
+        return ResponseEntity.ok(ApiResponse.success(msg, response));
+    }
+
+    @PutMapping("/companies/{id}/blacklist")
+    @Operation(summary = "Blacklist or unblock company (Management Team & Admin)")
+    public ResponseEntity<ApiResponse<CompanyDto.Response>> setCompanyBlacklist(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody AdminDto.ModerationRequest request) {
+        CompanyDto.Response response = adminService.setCompanyBlacklistStatus(principal.getId(), id, request);
+        String msg = Boolean.TRUE.equals(request.getBlocked()) ? "Company blacklisted" : "Company whitelisted / unblocked";
+        return ResponseEntity.ok(ApiResponse.success(msg, response));
     }
 }

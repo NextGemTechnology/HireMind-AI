@@ -74,4 +74,8 @@ public class Company extends AuditEntity {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "is_blacklisted", nullable = false)
+    @Builder.Default
+    private boolean blacklisted = false;
 }

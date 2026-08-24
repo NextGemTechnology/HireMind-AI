@@ -45,4 +45,14 @@ public class HrProfile extends AuditEntity {
     @Column(name = "is_active", nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(name = "is_company_verified", nullable = false)
+    @Builder.Default
+    private boolean companyVerified = false;
+
+    @Column(name = "company_verified_at")
+    private java.time.Instant companyVerifiedAt;
+
+    @Column(name = "company_verified_title", length = 150)
+    private String companyVerifiedTitle;
 }

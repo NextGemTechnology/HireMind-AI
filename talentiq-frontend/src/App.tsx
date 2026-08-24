@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { AdminThemeProvider } from './context/AdminThemeContext';
 import { Navbar } from './components/Navbar';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
@@ -18,7 +19,9 @@ import HrMessages from './pages/HrMessages';
 import { CandidateProfile } from './pages/CandidateProfile';
 import HrCalendar from './pages/HrCalendar';
 import { UserMessages } from './pages/UserMessages';
+import { GroupCollaborationChat } from './pages/GroupCollaborationChat';
 import { CosmicQuotePopup } from './components/CosmicQuotePopup';
+import { DrinkWaterReminder } from './components/DrinkWaterReminder';
 import Contact from './pages/Contact';
 import About from './pages/About';
 import Terms from './pages/Terms';
@@ -30,7 +33,7 @@ import { HrGlobalNotificationToast } from './components/HrGlobalNotificationToas
 function AppLayout() {
   const location = useLocation();
   // Dashboard & chat pages have their own sidebar navbar — hide the global navbar
-  const HIDE_NAV_ROUTES = ['/hr-analytics', '/hr-messages', '/messages', '/hr-calendar', '/hr-applications', '/hr-copilot', '/copilot', '/admin'];
+  const HIDE_NAV_ROUTES = ['/hr-analytics', '/hr-messages', '/messages', '/hr-calendar', '/hr-applications', '/hr-copilot', '/copilot', '/admin', '/team-chat'];
   const isHome = location.pathname === '/';
   const hideNavbar = isHome || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
 
@@ -49,12 +52,14 @@ function AppLayout() {
           <Route path="/my-applications" element={<MyApplications />} />
           <Route path="/portfolio" element={<PortfolioBuilder />} />
           <Route path="/messages" element={<UserMessages />} />
+          <Route path="/team-chat" element={<GroupCollaborationChat />} />
           <Route path="/copilot" element={<HrCopilot />} />
           <Route path="/hr-analytics" element={<HrAnalytics />} />
           <Route path="/hr-applications" element={<HrApplications />} />
           <Route path="/hr-messages" element={<HrMessages />} />
           <Route path="/hr-calendar" element={<HrCalendar />} />
           <Route path="/admin" element={<AdminPortal />} />
+          <Route path="/admin-portal" element={<AdminPortal />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/about" element={<About />} />
@@ -64,6 +69,8 @@ function AppLayout() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      {/* ── 40-Minute Drink Water Hydration Reminder Toast ── */}
+      <DrinkWaterReminder />
       {/* ── Galaxy / Celestial Facts & Quotes Toast (Refreshes on every reload & every 10 min) ── */}
       <CosmicQuotePopup />
       {/* ── HR Global 2-Sec Message Notification Toast ── */}
@@ -75,11 +82,13 @@ function AppLayout() {
 export function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrowserRouter>
-          <AppLayout />
-        </BrowserRouter>
-      </AuthProvider>
+      <AdminThemeProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppLayout />
+          </BrowserRouter>
+        </AuthProvider>
+      </AdminThemeProvider>
     </ThemeProvider>
   );
 }

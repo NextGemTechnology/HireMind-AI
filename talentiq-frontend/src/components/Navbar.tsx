@@ -15,6 +15,7 @@ import {
   FileText,
   CheckCheck,
   Users,
+  Users2,
   MessageSquare,
   Sun,
   Moon
@@ -125,6 +126,12 @@ export const Navbar: React.FC = () => {
           ) : (
             <Link to="/jobs" className={`btn btn-secondary nav-link-btn ${location.pathname === '/jobs' ? 'active-link' : ''}`}>
               <Briefcase size={16} /> Jobs
+            </Link>
+          )}
+
+          {isAuthenticated && (
+            <Link to="/team-chat" className={`btn btn-secondary nav-link-btn ${location.pathname === '/team-chat' ? 'active-link' : ''}`}>
+              <Users2 size={16} color="var(--primary-cyan)" /> Team Channels
             </Link>
           )}
 

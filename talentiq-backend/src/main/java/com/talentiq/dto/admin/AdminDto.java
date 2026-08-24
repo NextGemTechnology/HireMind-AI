@@ -42,6 +42,24 @@ public class AdminDto {
 
     @Data
     @Builder
+    public static class TemporalJobMetricsResponse {
+        private long jobsToday;
+        private long jobsThisWeek;
+        private long jobsThisMonth;
+        private long jobsThisYear;
+        private long totalJobs;
+        private long activeJobs;
+    }
+
+    @Data
+    public static class ModerationRequest {
+        @NotNull(message = "Action flag is required")
+        private Boolean blocked;
+        private String reason;
+    }
+
+    @Data
+    @Builder
     public static class AuditLogResponse {
         private Long id;
         private String action;

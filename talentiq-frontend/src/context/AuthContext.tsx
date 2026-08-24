@@ -142,7 +142,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const roles = user?.roles || [];
   const isCandidate = roles.includes('ROLE_CANDIDATE') || roles.includes('CANDIDATE');
   const isHr = roles.includes('ROLE_HR') || roles.includes('HR');
-  const isAdmin = roles.includes('ROLE_SUPER_ADMIN') || roles.includes('ROLE_PLATFORM_ADMIN') || roles.includes('SUPER_ADMIN');
+  const isAdmin = roles.includes('ROLE_SUPER_ADMIN') ||
+                  roles.includes('ROLE_PLATFORM_ADMIN') ||
+                  roles.includes('ROLE_APP_DEVELOPER') ||
+                  roles.includes('ROLE_MANAGEMENT_TEAM') ||
+                  roles.includes('ROLE_COMPANY_ADMIN') ||
+                  roles.includes('SUPER_ADMIN');
 
   return (
     <AuthContext.Provider value={{

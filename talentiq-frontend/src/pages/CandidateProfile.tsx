@@ -7,6 +7,7 @@ import {
   Sparkles, CheckCircle2, Globe, Code2,
   Building2, Calendar, Award, BookOpen
 } from 'lucide-react';
+import { CandidateVerifiedBadge } from '../components/CandidateVerifiedBadge';
 import '../css/candidate-profile.css';
 
 interface SkillItem {
@@ -207,6 +208,9 @@ export const CandidateProfile: React.FC = () => {
                 </a>
               )}
             </div>
+
+            {/* Official Company Verified Badges */}
+            <CandidateVerifiedBadge candidateUserId={candidate.userId || candidate.id} />
           </div>
         </div>
 

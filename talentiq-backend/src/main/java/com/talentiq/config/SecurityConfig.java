@@ -43,6 +43,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthFilter;
     private final UserDetailsService userDetailsService;
     private final RateLimitFilter rateLimitFilter;
+    private final com.talentiq.security.DeveloperGuardFilter developerGuardFilter;
 
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
@@ -64,7 +65,10 @@ public class SecurityConfig {
             "/ws/**",
             "/ws/info/**",
             // Chat file attachments (images, PDFs)
-            "/v1/chat/files/**"
+            "/v1/chat/files/**",
+            // Public candidate verification certificate endpoints
+            "/v1/company/verifications/candidate/**",
+            "/v1/company/verifications/certificate/**"
     };
 
     @Bean
@@ -84,7 +88,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/v1/jobs/**").permitAll()
-                        .requestMatchers("/v1/admin/**").hasAnyRole("PLATFORM_ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/v1/admin/**").hasAnyRole("PLATFORM_ADMIN", "SUPER_ADMIN", "MANAGEMENT_TEAM", "APP_DEVELOPER")
                         .anyRequest().authenticated()
                 )
 
@@ -111,6 +115,7 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(developerGuardFilter, JwtAuthenticationFilter.class)
 
                 .build();
     }
