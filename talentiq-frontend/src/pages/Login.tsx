@@ -5,6 +5,7 @@ import { apiClient } from '../api/client';
 import {
   User,
   Building2,
+  Shield,
   ShieldCheck,
   LogIn,
   ArrowRight,
@@ -56,6 +57,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   // Login Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [adminLoginRole, setAdminLoginRole] = useState<'ROLE_APP_DEVELOPER' | 'ROLE_MANAGEMENT_TEAM' | 'ROLE_COMPANY_ADMIN'>('ROLE_APP_DEVELOPER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -215,7 +217,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     try {
       const targetRole = selectedRole === 'HR'
         ? 'ROLE_HR'
-        : (selectedRole === 'ADMIN' ? undefined : 'ROLE_CANDIDATE');
+        : (selectedRole === 'ADMIN' ? adminLoginRole : 'ROLE_CANDIDATE');
 
       await login({ email: trimmedEmail, password, requiredRole: targetRole });
 
@@ -234,14 +236,22 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       if (selectedRole === 'HR') {
         if (!userIsHr && !userIsAdmin) {
           logout();
-          setError('Invalid email or password');
+          setError('Invalid email, password, or role');
           return;
         }
         navigate('/hr-analytics');
       } else if (selectedRole === 'ADMIN') {
-        if (!userIsAdmin) {
+        const hasSelectedRole = roles.includes(adminLoginRole) ||
+                                roles.includes('ROLE_SUPER_ADMIN') ||
+                                roles.includes('ROLE_PLATFORM_ADMIN');
+        if (!hasSelectedRole) {
           logout();
-          setError('Invalid email or password');
+          const roleLabel = adminLoginRole === 'ROLE_APP_DEVELOPER'
+            ? 'Application Developer'
+            : adminLoginRole === 'ROLE_MANAGEMENT_TEAM'
+            ? 'Management Team'
+            : 'Register Company';
+          setError(`Unauthorized: Your account is not registered as ${roleLabel}.`);
           return;
         }
         navigate('/admin');
@@ -254,7 +264,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         navigate('/jobs');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      setError(err.response?.data?.message || 'Invalid email, password, or role');
     } finally {
       setLoading(false);
     }
@@ -852,6 +862,36 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
 
                 {/* Login Form */}
                 <form onSubmit={handleLoginSubmit} className="login-form">
+                  {selectedRole === 'ADMIN' && (
+                    <div className="login-form-group">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="login-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Shield size={14} color="#FB7185" /> Admin Designation / Role
+                        </label>
+                        <span style={{ fontSize: '11px', color: '#FB7185' }}>
+                          Role Verified by Security
+                        </span>
+                      </div>
+                      <select
+                        className="login-input"
+                        value={adminLoginRole}
+                        onChange={(e) => setAdminLoginRole(e.target.value as any)}
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.95)',
+                          color: '#F8FAFC',
+                          border: '1px solid rgba(251, 113, 133, 0.45)',
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                        required
+                      >
+                        <option value="ROLE_APP_DEVELOPER">👨💻 Application Developer (App Control)</option>
+                        <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team</option>
+                        <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Manage Team)</option>
+                      </select>
+                    </div>
+                  )}
+
                   <div className="login-form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label className="login-label">Email Address</label>
@@ -918,7 +958,11 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                           ? 'Candidate'
                           : selectedRole === 'HR'
                           ? 'HR Recruiter'
-                          : 'Super Admin'}{' '}
+                          : adminLoginRole === 'ROLE_APP_DEVELOPER'
+                          ? 'Application Developer'
+                          : adminLoginRole === 'ROLE_MANAGEMENT_TEAM'
+                          ? 'Management Team'
+                          : 'Register Company'}{' '}
                         <ArrowRight size={15} />
                       </span>
                     )}
@@ -1037,9 +1081,9 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                       className="login-input"
                       style={{ background: '#0F172A', color: '#F8FAFC', cursor: 'pointer', border: '1px solid rgba(251, 113, 133, 0.5)' }}
                     >
-                      <option value="ROLE_APP_DEVELOPER">👨‍💻 Application Developer (Full App Control)</option>
-                      <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team (Moderation & Metrics)</option>
-                      <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Executive / CEO / Director)</option>
+                      <option value="ROLE_APP_DEVELOPER">👨‍💻 Application Developer (App Control)</option>
+                      <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team</option>
+                      <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Manage Team)</option>
                     </select>
                   </div>
                 )}

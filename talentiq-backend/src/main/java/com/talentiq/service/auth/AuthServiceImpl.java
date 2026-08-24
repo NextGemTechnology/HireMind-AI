@@ -218,17 +218,23 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest) {
-        request.setRequiredRole(null);
         AuthResponse response = login(request, httpRequest);
         User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim()).orElse(null);
         if (user != null) {
-            boolean isAdmin = user.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
-                              user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN) ||
-                              user.getRoles().contains(Role.ROLE_APP_DEVELOPER) ||
-                              user.getRoles().contains(Role.ROLE_MANAGEMENT_TEAM) ||
-                              user.getRoles().contains(Role.ROLE_COMPANY_ADMIN);
-            if (!isAdmin) {
-                throw new BadCredentialsException("Invalid email or password");
+            if (request.getRequiredRole() != null) {
+                boolean hasRole = user.getRoles().contains(request.getRequiredRole());
+                if (!hasRole && !user.getRoles().contains(Role.ROLE_SUPER_ADMIN) && !user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN)) {
+                    throw new BadCredentialsException("Selected role does not match this account's authorized designation");
+                }
+            } else {
+                boolean isAdmin = user.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
+                                  user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN) ||
+                                  user.getRoles().contains(Role.ROLE_APP_DEVELOPER) ||
+                                  user.getRoles().contains(Role.ROLE_MANAGEMENT_TEAM) ||
+                                  user.getRoles().contains(Role.ROLE_COMPANY_ADMIN);
+                if (!isAdmin) {
+                    throw new BadCredentialsException("Invalid email, password, or role");
+                }
             }
         }
         return response;
@@ -268,17 +274,14 @@ public class AuthServiceImpl implements AuthService {
             UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
             User authenticatedUser = principal.getUser();
 
-            // RBAC Portal Enforcement: Verify user possesses the required role for the portal
+            // RBAC Role Verification: Verify user possesses the specific selected role for login
             if (request.getRequiredRole() != null) {
                 boolean hasRole = authenticatedUser.getRoles().contains(request.getRequiredRole());
                 if (!hasRole) {
-                    boolean isAdmin = authenticatedUser.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
-                                      authenticatedUser.getRoles().contains(Role.ROLE_PLATFORM_ADMIN) ||
-                                      authenticatedUser.getRoles().contains(Role.ROLE_APP_DEVELOPER) ||
-                                      authenticatedUser.getRoles().contains(Role.ROLE_MANAGEMENT_TEAM) ||
-                                      authenticatedUser.getRoles().contains(Role.ROLE_COMPANY_ADMIN);
-                    if (!isAdmin) {
-                        throw new BadCredentialsException("Invalid email or password");
+                    boolean isSuperAdmin = authenticatedUser.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
+                                           authenticatedUser.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
+                    if (!isSuperAdmin) {
+                        throw new BadCredentialsException("Selected role does not match this account's authorized designation");
                     }
                 }
             }
