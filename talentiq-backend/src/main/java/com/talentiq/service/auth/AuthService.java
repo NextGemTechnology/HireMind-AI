@@ -10,8 +10,12 @@ import jakarta.servlet.http.HttpServletRequest;
 public interface AuthService {
 
     /**
-     * Register a new user account. Sends verification email. Returns the auth tokens
-     * only if email verification is disabled (dev mode). Otherwise, requires verification first.
+     * Send 4-digit verification OTP to user email before registration.
+     */
+    void sendRegistrationOtp(SendRegistrationOtpRequest request, HttpServletRequest httpRequest);
+
+    /**
+     * Register a new user account with mandatory 4-digit email verification OTP.
      */
     AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest);
 

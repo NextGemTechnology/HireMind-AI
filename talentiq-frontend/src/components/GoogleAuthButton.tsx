@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 
 interface GoogleAuthButtonProps {
@@ -15,6 +16,7 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
   onError
 }) => {
   const { googleLogin } = useAuth();
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -75,26 +77,26 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           gap: '12px',
-          background: 'rgba(255, 255, 255, 0.08)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          background: isLight ? '#FFFFFF' : 'rgba(255, 255, 255, 0.08)',
+          border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.2)',
           borderRadius: '12px',
           padding: '12px 16px',
-          color: '#FFFFFF',
+          color: isLight ? '#0F172A' : '#FFFFFF',
           fontSize: '14px',
           fontWeight: 600,
           cursor: 'pointer',
           transition: 'all 0.2s ease',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+          boxShadow: isLight ? '0 2px 8px rgba(0, 0, 0, 0.06)' : '0 4px 12px rgba(0, 0, 0, 0.3)',
           marginTop: '12px',
           marginBottom: '16px',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+          e.currentTarget.style.background = isLight ? '#F1F5F9' : 'rgba(255, 255, 255, 0.15)';
+          e.currentTarget.style.borderColor = isLight ? '#94A3B8' : 'rgba(255, 255, 255, 0.4)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+          e.currentTarget.style.background = isLight ? '#FFFFFF' : 'rgba(255, 255, 255, 0.08)';
+          e.currentTarget.style.borderColor = isLight ? '#CBD5E1' : 'rgba(255, 255, 255, 0.2)';
         }}
       >
         {/* Official Google Multicolor 'G' Icon */}
@@ -137,14 +139,14 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
         >
           <div
             style={{
-              background: '#0F172A',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
+              background: isLight ? '#FFFFFF' : '#0F172A',
+              border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.2)',
               borderRadius: '20px',
               padding: '30px',
               maxWidth: '420px',
               width: '100%',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
-              color: '#FFFFFF',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              color: isLight ? '#0F172A' : '#FFFFFF',
               fontFamily: "'Inter', sans-serif",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -155,7 +157,7 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
                   width: '40px',
                   height: '40px',
                   borderRadius: '12px',
-                  background: '#FFFFFF',
+                  background: isLight ? '#F1F5F9' : '#FFFFFF',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -181,8 +183,8 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
                 </svg>
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700 }}>Google Sign-In</h3>
-                <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+                <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: isLight ? '#0F172A' : '#FFFFFF' }}>Google Sign-In</h3>
+                <p style={{ margin: '2px 0 0', fontSize: '12px', color: isLight ? '#64748B' : '#94A3B8' }}>
                   Only <strong>@gmail.com</strong> accounts supported
                 </p>
               </div>
@@ -190,7 +192,7 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
 
             <form onSubmit={handleGoogleAuthSubmit}>
               <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#CBD5E1', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: isLight ? '#334155' : '#CBD5E1', marginBottom: '6px' }}>
                   Full Name
                 </label>
                 <input
@@ -202,9 +204,9 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
                     width: '100%',
                     padding: '10px 14px',
                     borderRadius: '10px',
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    color: '#FFFFFF',
+                    background: isLight ? '#FFFFFF' : 'rgba(255, 255, 255, 0.06)',
+                    border: isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.2)',
+                    color: isLight ? '#0F172A' : '#FFFFFF',
                     outline: 'none',
                     fontSize: '13px',
                   }}
@@ -213,7 +215,7 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
               </div>
 
               <div style={{ marginBottom: '18px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#CBD5E1', marginBottom: '6px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: isLight ? '#334155' : '#CBD5E1', marginBottom: '6px' }}>
                   Gmail Address (Must end with @gmail.com)
                 </label>
                 <input
@@ -225,9 +227,9 @@ export const GoogleAuthButton: React.FC<GoogleAuthButtonProps> = ({
                     width: '100%',
                     padding: '10px 14px',
                     borderRadius: '10px',
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: !googleEmail.endsWith('@gmail.com') && googleEmail.length > 5 ? '1px solid #EF4444' : '1px solid rgba(255, 255, 255, 0.2)',
-                    color: '#FFFFFF',
+                    background: isLight ? '#FFFFFF' : 'rgba(255, 255, 255, 0.06)',
+                    border: !googleEmail.endsWith('@gmail.com') && googleEmail.length > 5 ? '1px solid #EF4444' : isLight ? '1px solid #CBD5E1' : '1px solid rgba(255, 255, 255, 0.2)',
+                    color: isLight ? '#0F172A' : '#FFFFFF',
                     outline: 'none',
                     fontSize: '13px',
                   }}

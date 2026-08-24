@@ -46,35 +46,37 @@ export const AdminPortal: React.FC = () => {
     setLoading(true);
     try {
       const [mRes, uRes, cRes] = await Promise.all([
-        apiClient.get('/admin/metrics'),
-        apiClient.get('/admin/users?page=0&size=10'),
-        apiClient.get('/admin/companies/pending?page=0&size=10')
+        apiClient.get('/admin/metrics').catch(() => ({ data: { data: null } })),
+        apiClient.get('/admin/users?page=0&size=10').catch(() => ({ data: { content: [] } })),
+        apiClient.get('/admin/companies/pending?page=0&size=10').catch(() => ({ data: { content: [] } }))
       ]);
-      setMetrics(mRes.data.data);
-      setUsers(uRes.data.content || []);
-      setPendingCompanies(cRes.data.content || []);
-    } catch (e) {
-      // Mock Fallback Admin Data
-      setMetrics({
-        totalUsers: 1250,
-        activeUsers: 1210,
-        lockedUsers: 40,
-        totalCompanies: 85,
-        verifiedCompanies: 78,
-        pendingCompanies: 7,
-        totalJobs: 340,
-        totalApplications: 2890,
-        totalResumes: 1180
+      setMetrics(mRes.data.data || {
+        totalUsers: 0,
+        activeUsers: 0,
+        lockedUsers: 0,
+        totalCompanies: 0,
+        verifiedCompanies: 0,
+        pendingCompanies: 0,
+        totalJobs: 0,
+        totalApplications: 0,
+        totalResumes: 0
       });
-
-      setUsers([
-        { id: 1, email: 'candidate@example.com', firstName: 'John', lastName: 'Doe', status: 'ACTIVE', roles: ['ROLE_CANDIDATE'] },
-        { id: 2, email: 'spammer@example.com', firstName: 'Bad', lastName: 'Actor', status: 'SUSPENDED', roles: ['ROLE_CANDIDATE'] }
-      ]);
-
-      setPendingCompanies([
-        { id: 10, name: 'CyberDyn Systems', website: 'https://cyberdyn.com', industry: 'Cybersecurity', verified: false }
-      ]);
+      setUsers(uRes.data.content || uRes.data.data?.content || []);
+      setPendingCompanies(cRes.data.content || cRes.data.data?.content || []);
+    } catch (e) {
+      setMetrics({
+        totalUsers: 0,
+        activeUsers: 0,
+        lockedUsers: 0,
+        totalCompanies: 0,
+        verifiedCompanies: 0,
+        pendingCompanies: 0,
+        totalJobs: 0,
+        totalApplications: 0,
+        totalResumes: 0
+      });
+      setUsers([]);
+      setPendingCompanies([]);
     } finally {
       setLoading(false);
     }

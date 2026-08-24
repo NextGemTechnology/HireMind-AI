@@ -18,6 +18,8 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
 
     boolean existsBySlug(String slug);
 
+    long countByStatus(com.talentiq.common.enums.JobStatus status);
+
     @EntityGraph(attributePaths = {"company", "requiredSkills"})
     Page<Job> findAllByCompanyId(Long companyId, Pageable pageable);
 

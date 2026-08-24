@@ -12,9 +12,9 @@
 
 /* ── Light Theme ─────────────────────────────────────────── */
 .calendar-page-wrapper.theme-light,
-.theme-light {
-  background: #F8FAFC !important;
-  color: #0F172A !important;
+.theme-light .calendar-page-wrapper {
+  background: var(--bg-dark) !important;
+  color: var(--text-main) !important;
 }
 
 .calendar-page-wrapper.theme-light h1,
@@ -23,7 +23,7 @@
 .calendar-page-wrapper.theme-light h4,
 .calendar-page-wrapper.theme-light h5,
 .calendar-page-wrapper.theme-light h6 {
-  color: #0F172A !important;
+  color: var(--heading-color) !important;
 }
 
 .calendar-page-wrapper.theme-light .cal-sidebar {

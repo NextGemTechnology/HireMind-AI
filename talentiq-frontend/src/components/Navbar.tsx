@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { 
   Sparkles, 
@@ -18,6 +19,8 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
+import { HireMindLogo } from './HireMindLogo';
+import '../css/navbar.css';
 
 interface NotificationItem {
   id: number;
@@ -29,24 +32,13 @@ interface NotificationItem {
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, isCandidate, isHr, isAdmin, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
-
-  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
-    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'universe';
-  });
-
-  const toggleTheme = () => {
-    const next = theme === 'light' ? 'universe' : 'light';
-    setTheme(next);
-    localStorage.setItem('hr_theme', next);
-    // Dispatch storage event or update body class
-    document.body.className = next === 'light' ? 'theme-light' : 'theme-universe';
-  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -87,154 +79,96 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <nav style={{
-      position: 'sticky',
-      top: 0,
-      zIndex: 100,
-      background: 'rgba(15, 23, 42, 0.85)',
-      backdropFilter: 'blur(16px)',
-      borderBottom: '1px solid var(--border-subtle)',
-      padding: '0 24px',
-      height: '70px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between'
-    }}>
-      <Link to={isHr ? '/hr-analytics' : isAdmin ? '/admin' : '/'} style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}>
-        <div style={{
-          width: '42px',
-          height: '42px',
-          borderRadius: '12px',
-          background: 'var(--gradient-brand)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--shadow-glow)'
-        }}>
-          <Sparkles size={24} color="#FFF" />
-        </div>
-        <div>
-          <span style={{ fontSize: '20px', fontWeight: 800, letterSpacing: '-0.02em', color: '#FFF' }}>
-            Talent<span className="text-gradient">IQ</span>
-          </span>
-          <span style={{ display: 'block', fontSize: '10px', color: 'var(--primary-cyan)', fontWeight: 600, letterSpacing: '0.1em' }}>
-            AI INTELLIGENCE
-          </span>
-        </div>
+    <nav className="global-navbar">
+      <Link to={isHr ? '/hr-analytics' : isAdmin ? '/admin' : '/'} className="nav-brand-link">
+        <HireMindLogo variant="navbar" size="md" />
       </Link>
 
       {isAuthenticated && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div className="nav-links-group">
           {isHr ? (
             <>
-              <Link to="/hr-analytics" className="btn btn-secondary" style={{ border: location.pathname === '/hr-analytics' ? '1px solid var(--primary-indigo)' : 'none' }}>
+              <Link to="/hr-analytics" className={`btn btn-secondary nav-link-btn ${location.pathname === '/hr-analytics' ? 'active-link' : ''}`}>
                 <BarChart3 size={16} color="var(--primary-cyan)" /> HR Dashboard
               </Link>
-              <Link to="/hr-applications" className="btn btn-secondary" style={{ border: location.pathname === '/hr-applications' ? '1px solid var(--primary-cyan)' : 'none' }}>
+              <Link to="/hr-applications" className={`btn btn-secondary nav-link-btn ${location.pathname === '/hr-applications' ? 'active-cyan' : ''}`}>
                 <Users size={16} color="var(--primary-cyan)" /> Applicants
               </Link>
-              <Link to="/hr-messages" className="btn btn-secondary" style={{ border: location.pathname === '/hr-messages' ? '1px solid var(--primary-cyan)' : 'none' }}>
+              <Link to="/hr-messages" className={`btn btn-secondary nav-link-btn ${location.pathname === '/hr-messages' ? 'active-cyan' : ''}`}>
                 <MessageSquare size={16} color="var(--primary-cyan)" /> HR Messages
               </Link>
-              <Link to="/copilot" className="btn btn-secondary" style={{ border: location.pathname === '/copilot' ? '1px solid var(--primary-cyan)' : 'none' }}>
+              <Link to="/copilot" className={`btn btn-secondary nav-link-btn ${location.pathname === '/copilot' ? 'active-cyan' : ''}`}>
                 <Bot size={16} color="var(--primary-cyan)" /> HR AI Copilot
               </Link>
-              <Link to="/jobs" className="btn btn-secondary" style={{ border: location.pathname === '/jobs' ? '1px solid var(--primary-indigo)' : 'none' }}>
+              <Link to="/jobs" className={`btn btn-secondary nav-link-btn ${location.pathname === '/jobs' ? 'active-link' : ''}`}>
                 <Briefcase size={16} /> Jobs
               </Link>
             </>
           ) : isCandidate ? (
             <>
-              <Link to="/jobs" className="btn btn-secondary" style={{ border: location.pathname === '/jobs' ? '1px solid var(--primary-indigo)' : 'none' }}>
+              <Link to="/jobs" className={`btn btn-secondary nav-link-btn ${location.pathname === '/jobs' ? 'active-link' : ''}`}>
                 <Briefcase size={16} /> Jobs
               </Link>
-              <Link to="/recommendations" className="btn btn-secondary" style={{ border: location.pathname === '/recommendations' ? '1px solid var(--primary-indigo)' : 'none' }}>
+              <Link to="/recommendations" className={`btn btn-secondary nav-link-btn ${location.pathname === '/recommendations' ? 'active-link' : ''}`}>
                 <Sparkles size={16} color="var(--primary-cyan)" /> AI Matches
               </Link>
-              <Link to="/messages" className="btn btn-secondary" style={{ border: location.pathname === '/messages' ? '1px solid var(--primary-indigo)' : 'none' }}>
+              <Link to="/messages" className={`btn btn-secondary nav-link-btn ${location.pathname === '/messages' ? 'active-link' : ''}`}>
                 <MessageSquare size={16} color="var(--primary-cyan)" /> Messages
               </Link>
-              <Link to="/my-applications" className="btn btn-secondary" style={{ border: location.pathname === '/my-applications' ? '1px solid var(--primary-indigo)' : 'none' }}>
+              <Link to="/my-applications" className={`btn btn-secondary nav-link-btn ${location.pathname === '/my-applications' ? 'active-link' : ''}`}>
                 <FileText size={16} /> Applications
               </Link>
-              <Link to="/portfolio" className="btn btn-secondary" style={{ border: location.pathname === '/portfolio' ? '1px solid var(--primary-indigo)' : 'none' }}>
+              <Link to="/portfolio" className={`btn btn-secondary nav-link-btn ${location.pathname === '/portfolio' ? 'active-link' : ''}`}>
                 <FolderGit2 size={16} /> Portfolio
               </Link>
             </>
           ) : (
-            <Link to="/jobs" className="btn btn-secondary" style={{ border: location.pathname === '/jobs' ? '1px solid var(--primary-indigo)' : 'none' }}>
+            <Link to="/jobs" className={`btn btn-secondary nav-link-btn ${location.pathname === '/jobs' ? 'active-link' : ''}`}>
               <Briefcase size={16} /> Jobs
             </Link>
           )}
 
           {isAdmin && (
-            <Link to="/admin" className="btn btn-secondary" style={{ border: location.pathname === '/admin' ? '1px solid var(--accent-rose)' : 'none' }}>
+            <Link to="/admin" className={`btn btn-secondary nav-link-btn ${location.pathname === '/admin' ? 'active-rose' : ''}`}>
               <ShieldCheck size={16} color="var(--accent-rose)" /> Admin Portal
             </Link>
           )}
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="nav-right-actions">
         {isAuthenticated ? (
           <>
             <div style={{ position: 'relative' }}>
               <button 
                 onClick={() => setShowNotifications(!showNotifications)} 
-                className="btn btn-secondary"
-                style={{ position: 'relative', width: '42px', height: '42px', padding: 0, borderRadius: '50%' }}
+                className="btn btn-secondary nav-circle-btn"
+                aria-label="Notifications"
               >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '2px',
-                    right: '2px',
-                    width: '18px',
-                    height: '18px',
-                    borderRadius: '50%',
-                    background: 'var(--accent-rose)',
-                    color: '#FFF',
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
+                  <span className="nav-badge-count">
                     {unreadCount}
                   </span>
                 )}
               </button>
 
               {showNotifications && (
-                <div className="glass-panel" style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: '52px',
-                  width: '360px',
-                  padding: '16px',
-                  zIndex: 200,
-                  background: 'var(--bg-glass-heavy)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <h4 style={{ fontSize: '14px' }}>Notifications</h4>
+                <div className="glass-panel nav-notifications-dropdown">
+                  <div className="dropdown-header">
+                    <h4>Notifications</h4>
                     <button onClick={handleMarkAllRead} className="btn btn-sm btn-secondary" style={{ fontSize: '11px' }}>
                       <CheckCheck size={12} /> Mark all read
                     </button>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                  <div className="notifications-list">
                     {notifications.length === 0 ? (
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '16px' }}>No notifications yet</p>
+                      <p className="notification-empty">No notifications yet</p>
                     ) : (
                       notifications.map(n => (
-                        <div key={n.id} style={{
-                          padding: '10px',
-                          borderRadius: '8px',
-                          background: n.read ? 'rgba(255, 255, 255, 0.02)' : 'rgba(99, 102, 241, 0.1)',
-                          border: '1px solid var(--border-subtle)'
-                        }}>
-                          <div style={{ fontSize: '13px', fontWeight: 600, color: n.read ? 'var(--text-muted)' : 'var(--text-main)' }}>{n.title}</div>
-                          <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>{n.message}</div>
+                        <div key={n.id} className={`notification-item ${n.read ? 'read' : 'unread'}`}>
+                          <div className="notif-title" style={{ color: n.read ? 'var(--text-muted)' : 'var(--text-main)' }}>{n.title}</div>
+                          <div className="notif-msg">{n.message}</div>
                         </div>
                       ))
                     )}
@@ -246,53 +180,42 @@ export const Navbar: React.FC = () => {
             {/* Theme Toggle in Global Navbar */}
             <button
               onClick={toggleTheme}
-              className="btn btn-secondary"
-              style={{
-                width: '42px',
-                height: '42px',
-                padding: 0,
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer'
-              }}
+              className="btn btn-secondary nav-circle-btn"
               title={theme === 'universe' ? 'Switch to Light Mode' : 'Switch to Galaxy / Universe Theme'}
+              aria-label="Toggle Theme"
             >
               {theme === 'universe' ? <Sun size={18} color="#F59E0B" /> : <Moon size={18} color="#7C3AED" />}
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Link to="/profile" style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', color: 'var(--text-main)' }}>
-                <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '50%',
-                  background: 'var(--gradient-brand)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: '14px',
-                  color: '#FFF'
-                }}>
+              <Link to="/profile" className="nav-user-profile-link">
+                <div className="nav-user-avatar">
                   {user?.firstName?.charAt(0) || 'U'}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600 }}>{user?.firstName} {user?.lastName}</span>
-                  <span style={{ fontSize: '11px', color: 'var(--primary-cyan)' }}>
+                  <span className="nav-user-name">{user?.firstName} {user?.lastName}</span>
+                  <span className="nav-user-role">
                     {isHr ? 'HR Recruiter' : isAdmin ? 'Platform Admin' : 'Candidate'}
                   </span>
                 </div>
               </Link>
 
-              <button onClick={handleLogout} className="btn btn-secondary btn-sm" title="Logout">
+              <button onClick={handleLogout} className="btn btn-secondary btn-sm" title="Logout" aria-label="Logout">
                 <LogOut size={16} />
               </button>
             </div>
           </>
         ) : (
-          <div style={{ display: 'flex', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button
+              onClick={toggleTheme}
+              className="btn btn-secondary nav-circle-btn"
+              style={{ width: '38px', height: '38px' }}
+              title={theme === 'universe' ? 'Switch to Light Mode' : 'Switch to Galaxy / Universe Theme'}
+              aria-label="Toggle Theme"
+            >
+              {theme === 'universe' ? <Sun size={17} color="#F59E0B" /> : <Moon size={17} color="#7C3AED" />}
+            </button>
             <Link to="/login" className="btn btn-secondary">Sign In</Link>
             <Link to="/register" className="btn btn-primary">Get Started</Link>
           </div>
@@ -301,3 +224,5 @@ export const Navbar: React.FC = () => {
     </nav>
   );
 };
+
+export default Navbar;

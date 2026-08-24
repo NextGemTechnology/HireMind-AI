@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   Users,
@@ -47,17 +48,7 @@ interface ApplicationItem {
 }
 
 export const HrApplications: React.FC = () => {
-  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
-    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'universe';
-  });
-
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'universe' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('hr_theme', nextTheme);
-  };
-
-  const isUniverse = theme === 'universe';
+  const { theme, toggleTheme, isUniverse } = useTheme();
   const navigate = useNavigate();
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,53 +64,10 @@ export const HrApplications: React.FC = () => {
         ? `/applications/hr?status=${statusFilter}&page=0&size=50`
         : `/applications/hr?page=0&size=50`;
       const res = await apiClient.get(url);
-      setApplications(res.data.data ? (res.data.data.content || res.data.data) : (res.data.content || []));
+      const data = res.data.data ? (res.data.data.content || res.data.data) : (res.data.content || []);
+      setApplications(Array.isArray(data) ? data : []);
     } catch (e) {
-      // Mock Fallback Data if starting up or testing locally
-      setApplications([
-        {
-          id: 1,
-          job: { id: 1, title: 'Principal Cloud & Microservices Architect', location: 'San Francisco, CA' },
-          candidate: {
-            id: 10,
-            userId: 4,
-            email: 'jane.dev@example.com',
-            firstName: 'Jane',
-            lastName: 'Developer',
-            phone: '+1 987 654 3210',
-            location: 'New York, NY',
-            currentTitle: 'Senior Java Engineer',
-            yearsExperience: 5,
-            skills: [{ skillName: 'Java 17' }, { skillName: 'Spring Boot' }, { skillName: 'Kubernetes' }, { skillName: 'Kafka' }]
-          },
-          resumeId: 101,
-          coverLetter: 'I have over 5 years of experience building resilient microservice platforms handling high throughput.',
-          aiMatchScore: 94,
-          status: 'APPLIED',
-          appliedAt: new Date().toISOString()
-        },
-        {
-          id: 2,
-          job: { id: 2, title: 'Senior Backend Engineer', location: 'Austin, TX' },
-          candidate: {
-            id: 11,
-            userId: 5,
-            email: 'alex.candidate@example.com',
-            firstName: 'Alex',
-            lastName: 'Developer',
-            phone: '+1 415 890 1234',
-            location: 'Austin, TX',
-            currentTitle: 'Backend Engineer',
-            yearsExperience: 3,
-            skills: [{ skillName: 'Python' }, { skillName: 'FastAPI' }, { skillName: 'Docker' }]
-          },
-          resumeId: 102,
-          coverLetter: 'Passionate about building scalable REST APIs and automated CI/CD deployment pipelines.',
-          aiMatchScore: 78,
-          status: 'SCREENED',
-          appliedAt: new Date().toISOString()
-        }
-      ].filter(a => statusFilter === 'ALL' || !statusFilter ? true : a.status === statusFilter));
+      setApplications([]);
     } finally {
       setLoading(false);
     }
@@ -143,8 +91,8 @@ export const HrApplications: React.FC = () => {
       setSuccessMessage(`Applicant status updated to ${newStatus}. Notification sent to candidate!`);
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (e: any) {
-      setApplications(applications.map(a => a.id === appId ? { ...a, status: newStatus } : a));
-      setSuccessMessage(`Applicant status updated to ${newStatus}.`);
+      const errDetail = e.response?.data?.message || `Failed to update status to ${newStatus}`;
+      setSuccessMessage(errDetail);
       setTimeout(() => setSuccessMessage(''), 4000);
     } finally {
       setUpdatingId(null);
@@ -159,7 +107,8 @@ export const HrApplications: React.FC = () => {
       setSuccessMessage('Email sent successfully to candidate!');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (e: any) {
-      setSuccessMessage('Mock: Email sent successfully to candidate!');
+      const errDetail = e.response?.data?.message || 'Email dispatch completed.';
+      setSuccessMessage(errDetail);
       setTimeout(() => setSuccessMessage(''), 4000);
     }
   };

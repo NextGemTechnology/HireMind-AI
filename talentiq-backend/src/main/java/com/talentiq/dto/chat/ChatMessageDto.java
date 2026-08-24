@@ -54,6 +54,7 @@ public class ChatMessageDto {
         private long unreadCount;
         private String lastMessage;
         private Instant lastMessageAt;
+        private boolean flagged;
     }
 
     /** A single chat message response sent to clients */

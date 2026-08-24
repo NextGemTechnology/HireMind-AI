@@ -29,6 +29,7 @@ public class RedisOtpService {
 
     // Keys and Prefixes
     private static final String OTP_CODE_PREFIX = "otp:code:";
+    private static final String OTP_REG_PREFIX = "otp:reg:";
     private static final String OTP_RATE_EMAIL_PREFIX = "otp:rate:email:";
     private static final String OTP_RATE_IP_PREFIX = "otp:rate:ip:";
     private static final String OTP_FAIL_PREFIX = "otp:fail:";
@@ -37,6 +38,8 @@ public class RedisOtpService {
     // In-memory fallback caches in case Redis is temporarily unreachable
     private final ConcurrentHashMap<String, String> inMemoryOtpCodes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> inMemoryOtpExpiries = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> inMemoryRegOtpCodes = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> inMemoryRegOtpExpiries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> inMemoryFailCounts = new ConcurrentHashMap<>();
 
     /**
@@ -93,6 +96,92 @@ public class RedisOtpService {
             log.warn("Redis unavailable, storing OTP in concurrent in-memory fallback cache: {}", e.getMessage());
             inMemoryOtpCodes.put(normalizedEmail, otp);
             inMemoryOtpExpiries.put(normalizedEmail, System.currentTimeMillis() + (ttlMinutes * 60 * 1000));
+        }
+    }
+
+    /**
+     * Store 4-digit Registration Verification OTP in Redis with automatic TTL expiration.
+     */
+    public void storeRegistrationOtp(String email, String otp, long ttlMinutes) {
+        String normalizedEmail = email.toLowerCase().trim();
+        String key = OTP_REG_PREFIX + normalizedEmail;
+
+        try {
+            redisTemplate.opsForValue().set(key, otp, ttlMinutes, TimeUnit.MINUTES);
+            log.info("Redis Registration OTP stored successfully for [{}], expires in {} min", normalizedEmail, ttlMinutes);
+        } catch (Exception e) {
+            log.warn("Redis unavailable, storing registration OTP in in-memory fallback: {}", e.getMessage());
+            inMemoryRegOtpCodes.put(normalizedEmail, otp);
+            inMemoryRegOtpExpiries.put(normalizedEmail, System.currentTimeMillis() + (ttlMinutes * 60 * 1000));
+        }
+    }
+
+    /**
+     * Verify 4-digit Registration OTP and invalidate it immediately upon success.
+     */
+    public void verifyRegistrationOtp(String email, String providedOtp) {
+        String normalizedEmail = email.toLowerCase().trim();
+        String codeKey = OTP_REG_PREFIX + normalizedEmail;
+        String failKey = OTP_FAIL_PREFIX + normalizedEmail;
+
+        if (providedOtp == null || providedOtp.trim().isEmpty()) {
+            throw new BadRequestException("4-digit email verification code is required.");
+        }
+
+        String targetOtp = providedOtp.trim();
+
+        try {
+            // Check lockout
+            Integer fails = (Integer) redisTemplate.opsForValue().get(failKey);
+            if (fails != null && fails >= 5) {
+                Long ttl = redisTemplate.getExpire(failKey, TimeUnit.MINUTES);
+                throw new BadRequestException("Too many failed attempts. Try again in " + (ttl != null && ttl > 0 ? ttl : 15) + " minutes.");
+            }
+
+            Object storedOtpObj = redisTemplate.opsForValue().get(codeKey);
+            String storedOtp = storedOtpObj != null ? storedOtpObj.toString() : null;
+
+            if (storedOtp == null) {
+                Long exp = inMemoryRegOtpExpiries.get(normalizedEmail);
+                if (exp != null && System.currentTimeMillis() < exp) {
+                    storedOtp = inMemoryRegOtpCodes.get(normalizedEmail);
+                }
+            }
+
+            if (storedOtp == null) {
+                throw new BadRequestException("Email verification code has expired or was not requested. Please request a new verification code.");
+            }
+
+            if (!storedOtp.equals(targetOtp)) {
+                Long newFails = redisTemplate.opsForValue().increment(failKey);
+                if (newFails != null && newFails == 1) {
+                    redisTemplate.expire(failKey, 15, TimeUnit.MINUTES);
+                }
+                int remainingAttempts = Math.max(0, 5 - (newFails != null ? newFails.intValue() : 1));
+                throw new BadRequestException("Invalid 4-digit verification code. " + remainingAttempts + " attempts remaining before temporary lockout.");
+            }
+
+            // Invalidate OTP immediately
+            redisTemplate.delete(codeKey);
+            redisTemplate.delete(failKey);
+            inMemoryRegOtpCodes.remove(normalizedEmail);
+            inMemoryRegOtpExpiries.remove(normalizedEmail);
+
+            log.info("4-Digit Registration OTP verified and consumed for: {}", normalizedEmail);
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Redis verification error: {}", e.getMessage());
+            Long exp = inMemoryRegOtpExpiries.get(normalizedEmail);
+            if (exp != null && System.currentTimeMillis() < exp) {
+                String stored = inMemoryRegOtpCodes.get(normalizedEmail);
+                if (targetOtp.equals(stored)) {
+                    inMemoryRegOtpCodes.remove(normalizedEmail);
+                    inMemoryRegOtpExpiries.remove(normalizedEmail);
+                    return;
+                }
+            }
+            throw new BadRequestException("Invalid or expired verification code.");
         }
     }
 

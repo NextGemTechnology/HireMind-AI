@@ -45,4 +45,9 @@ public class RegisterRequest {
     private String companyWebsite;
     private String industry;
     private String companySize;
+
+    // Email Verification OTP
+    @NotBlank(message = "4-digit email verification code is required")
+    @Pattern(regexp = "^[0-9]{4}$", message = "Verification OTP must be 4 digits")
+    private String otp;
 }

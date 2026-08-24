@@ -4,7 +4,8 @@ import { apiClient } from '../api/client';
 import {
   User, Mail, MapPin, Briefcase, GraduationCap, FolderGit2,
   ExternalLink, ArrowLeft, MessageSquare,
-  Sparkles, CheckCircle2, Globe, Code2
+  Sparkles, CheckCircle2, Globe, Code2,
+  Building2, Calendar, Award, BookOpen
 } from 'lucide-react';
 import '../css/candidate-profile.css';
 
@@ -40,8 +41,13 @@ interface EducationItem {
   institution: string;
   degree: string;
   fieldOfStudy?: string;
+  gpa?: number | string;
+  startDate?: string;
+  endDate?: string;
   startYear?: number;
   endYear?: number;
+  current?: boolean;
+  description?: string;
 }
 
 interface CandidateData {
@@ -86,75 +92,14 @@ export const CandidateProfile: React.FC = () => {
         } catch {
           res = await apiClient.get(`/candidates/${id}`);
         }
-        if (res.data?.data) {
+        if (res?.data?.data) {
           setCandidate(res.data.data);
+        } else {
+          setCandidate(null);
         }
       } catch (err) {
-        console.warn('Using profile data fallback', err);
-        // Fallback realistic candidate info
-        setCandidate({
-          id: Number(id) || 1,
-          userId: Number(id) || 1,
-          firstName: 'Candidate',
-          lastName: 'Profile',
-          email: 'candidate@talentiq.ai',
-          headline: 'Full Stack Engineer & AI Enthusiast',
-          bio: 'Passionate software developer experienced in building scalable enterprise web applications, real-time distributed messaging systems, and AI-driven platforms.',
-          location: 'Bangalore, India',
-          yearsExperience: 4,
-          currentTitle: 'Senior Software Engineer',
-          currentCompany: 'Tech Innovations Ltd',
-          openToWork: true,
-          profileCompletion: 92,
-          skills: [
-            { name: 'Java', proficiency: 'EXPERT', yearsExperience: 4 },
-            { name: 'Spring Boot', proficiency: 'EXPERT', yearsExperience: 4 },
-            { name: 'React.js', proficiency: 'ADVANCED', yearsExperience: 3 },
-            { name: 'TypeScript', proficiency: 'ADVANCED', yearsExperience: 3 },
-            { name: 'MySQL / Redis', proficiency: 'INTERMEDIATE', yearsExperience: 3 },
-            { name: 'WebSocket / STOMP', proficiency: 'ADVANCED', yearsExperience: 2 },
-            { name: 'Docker & Kubernetes', proficiency: 'INTERMEDIATE', yearsExperience: 2 }
-          ],
-          experiences: [
-            {
-              companyName: 'Tech Innovations Ltd',
-              jobTitle: 'Senior Software Engineer',
-              description: 'Architected real-time WebSocket messaging and microservices backend with 99.9% uptime.',
-              startDate: '2022-06',
-              current: true
-            },
-            {
-              companyName: 'NextGen Solutions',
-              jobTitle: 'Software Developer',
-              description: 'Developed responsive user interfaces and RESTful APIs using React and Spring Boot.',
-              startDate: '2020-08',
-              endDate: '2022-05'
-            }
-          ],
-          educations: [
-            {
-              institution: 'National Institute of Technology',
-              degree: 'Bachelor of Technology',
-              fieldOfStudy: 'Computer Science and Engineering',
-              startYear: 2016,
-              endYear: 2020
-            }
-          ],
-          projects: [
-            {
-              title: 'HireMind AI Platform',
-              description: 'AI-driven job matching and real-time recruitment platform featuring automated screening and WebRTC communication.',
-              technologies: ['React', 'TypeScript', 'Spring Boot', 'MySQL', 'STOMP'],
-              githubUrl: 'https://github.com'
-            },
-            {
-              title: 'Interactive 3D Portfolio',
-              description: 'Three.js interactive developer portfolio showcasing interactive 3D elements and project showcases.',
-              technologies: ['Three.js', 'React', 'TailwindCSS'],
-              githubUrl: 'https://github.com'
-            }
-          ]
-        });
+        console.warn('Candidate profile lookup error:', err);
+        setCandidate(null);
       } finally {
         setLoading(false);
       }
@@ -197,16 +142,16 @@ export const CandidateProfile: React.FC = () => {
             <ArrowLeft size={16} /> Back
           </button>
           <button
-            onClick={() => navigate('/hr-messages')}
+            onClick={() => navigate(`/messages?recipientId=${candidate.userId || candidate.id}&recruiterName=${encodeURIComponent(fullName)}`)}
             className="cp-message-btn"
           >
-            <MessageSquare size={16} /> Chat in HR Portal
+            <MessageSquare size={16} /> Message Candidate
           </button>
         </div>
 
-        {/* Header Hero Card */}
+        {/* Hero Card */}
         <div className="cp-hero-card">
-          <div className="cp-hero-avatar">
+          <div className="cp-avatar-box">
             {candidate.avatarUrl ? (
               <img src={candidate.avatarUrl} alt={fullName} />
             ) : (
@@ -224,7 +169,7 @@ export const CandidateProfile: React.FC = () => {
               )}
             </div>
 
-            <p className="cp-headline">{candidate.headline || candidate.currentTitle || 'TalentIQ Candidate'}</p>
+            <p className="cp-headline">{candidate.headline || candidate.currentTitle || 'HireMind Candidate'}</p>
 
             <div className="cp-meta-row">
               {candidate.location && (
@@ -290,24 +235,86 @@ export const CandidateProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Projects Section */}
-        {candidate.projects && candidate.projects.length > 0 && (
+        {/* 🎓 Academic Qualifications & Education */}
+        {candidate.educations && candidate.educations.length > 0 && (
           <div className="cp-section-card">
-            <h2 className="cp-section-title"><FolderGit2 size={18} /> Projects & Portfolio</h2>
-            <div className="cp-projects-grid">
-              {candidate.projects.map((proj, idx) => (
-                <div key={idx} className="cp-project-card">
-                  <h3 className="cp-project-title">{proj.title}</h3>
-                  <p className="cp-project-desc">{proj.description}</p>
-                  {proj.technologies && (
-                    <div className="cp-tech-chips">
-                      {proj.technologies.map((tech, tIdx) => (
-                        <span key={tIdx} className="cp-tech-chip">{tech}</span>
-                      ))}
+            <h2 className="cp-section-title">
+              <GraduationCap size={20} style={{ color: '#10B981' }} /> Academic Qualifications &amp; Education
+            </h2>
+            <div className="cp-timeline">
+              {candidate.educations.map((edu, idx) => {
+                const getLevelInfo = (deg: string, field?: string) => {
+                  const d = (deg || '').toLowerCase();
+                  const f = (field || '').toLowerCase();
+                  if (d.includes('master') || d.includes('m.') || d.includes('mtech') || d.includes('mba') || d.includes('msc') || d.includes('mca')) {
+                    return { label: "Master's Degree", icon: '🎓' };
+                  }
+                  if (d.includes('bachelor') || d.includes('b.') || d.includes('btech') || d.includes('be') || d.includes('bsc') || d.includes('bca') || d.includes('bba')) {
+                    return { label: "Bachelor's Degree", icon: '🏛️' };
+                  }
+                  if (d.includes('12') || d.includes('twelfth') || d.includes('senior secondary') || d.includes('intermediate') || d.includes('hsc') || f.includes('pcm') || f.includes('pcb')) {
+                    return { label: 'Class 12th (Senior Secondary)', icon: '🏫' };
+                  }
+                  if (d.includes('10') || d.includes('tenth') || d.includes('secondary') || d.includes('matriculation') || d.includes('ssc')) {
+                    return { label: 'Class 10th (Secondary School)', icon: '🎒' };
+                  }
+                  return { label: 'Academic Qualification', icon: '📜' };
+                };
+
+                const info = getLevelInfo(edu.degree, edu.fieldOfStudy);
+                const formatYearRange = () => {
+                  if (edu.startDate && edu.endDate) {
+                    const s = edu.startDate.slice(0, 4);
+                    const e = edu.current ? 'Present' : edu.endDate.slice(0, 4);
+                    return `${s} – ${e}`;
+                  }
+                  if (edu.startYear && edu.endYear) {
+                    return `${edu.startYear} – ${edu.endYear}`;
+                  }
+                  if (edu.endDate) return `Completed ${edu.endDate.slice(0, 4)}`;
+                  if (edu.endYear) return `Completed ${edu.endYear}`;
+                  if (edu.current) return 'Currently Pursuing';
+                  return 'Completed';
+                };
+
+                return (
+                  <div key={idx} className="cp-edu-timeline-item">
+                    <div className="cp-edu-icon-box">{info.icon}</div>
+                    <div style={{ flex: 1 }}>
+                      <div className="cp-edu-header-row">
+                        <h3 className="cp-edu-degree-title">{edu.degree}</h3>
+                        <span className="cp-edu-badge level">{info.label}</span>
+                      </div>
+
+                      <div className="cp-edu-inst-name">
+                        <Building2 size={14} /> {edu.institution}
+                      </div>
+
+                      <div className="cp-edu-meta-badges">
+                        {edu.fieldOfStudy && (
+                          <span className="cp-edu-badge stream">
+                            <BookOpen size={12} /> {edu.fieldOfStudy}
+                          </span>
+                        )}
+                        <span className="cp-edu-badge year">
+                          <Calendar size={12} /> {formatYearRange()}
+                        </span>
+                        {edu.gpa && (
+                          <span className="cp-edu-badge grade">
+                            <Award size={12} /> {edu.gpa.toString().includes('%') || edu.gpa.toString().toLowerCase().includes('cgpa') ? edu.gpa : `${edu.gpa} CGPA / Score`}
+                          </span>
+                        )}
+                      </div>
+
+                      {edu.description && (
+                        <p className="cp-timeline-desc" style={{ marginTop: 6 }}>
+                          {edu.description}
+                        </p>
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -334,20 +341,22 @@ export const CandidateProfile: React.FC = () => {
           </div>
         )}
 
-        {/* Education */}
-        {candidate.educations && candidate.educations.length > 0 && (
+        {/* Projects Section */}
+        {candidate.projects && candidate.projects.length > 0 && (
           <div className="cp-section-card">
-            <h2 className="cp-section-title"><GraduationCap size={18} /> Education</h2>
-            <div className="cp-timeline">
-              {candidate.educations.map((edu, idx) => (
-                <div key={idx} className="cp-timeline-item">
-                  <div className="cp-timeline-dot" />
-                  <div className="cp-timeline-content">
-                    <h3 className="cp-role-title">{edu.degree}</h3>
-                    <div className="cp-company-name">{edu.institution}</div>
-                    {edu.fieldOfStudy && <div className="cp-field-study">{edu.fieldOfStudy}</div>}
-                    <div className="cp-date-range">{edu.startYear} – {edu.endYear}</div>
-                  </div>
+            <h2 className="cp-section-title"><FolderGit2 size={18} /> Projects &amp; Portfolio</h2>
+            <div className="cp-projects-grid">
+              {candidate.projects.map((proj, idx) => (
+                <div key={idx} className="cp-project-card">
+                  <h3 className="cp-project-title">{proj.title}</h3>
+                  <p className="cp-project-desc">{proj.description}</p>
+                  {proj.technologies && (
+                    <div className="cp-tech-chips">
+                      {proj.technologies.map((tech, tIdx) => (
+                        <span key={tIdx} className="cp-tech-chip">{tech}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

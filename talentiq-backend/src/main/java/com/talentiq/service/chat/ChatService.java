@@ -53,4 +53,20 @@ public interface ChatService {
      * Delete entire conversation between two users.
      */
     void deleteConversation(Long currentUserId, Long otherUserId);
+
+    /**
+     * Flag or unflag a candidate contact (by HR).
+     * Returns the updated flag status (true if flagged, false if unflagged).
+     */
+    boolean toggleFlagCandidate(Long hrUserId, Long candidateUserId);
+
+    /**
+     * Get the list of candidate user IDs flagged by the current user (HR).
+     */
+    List<Long> getFlaggedCandidateIds(Long hrUserId);
+
+    /**
+     * Check if a candidate is flagged by a specific HR user.
+     */
+    boolean isCandidateFlagged(Long hrUserId, Long candidateUserId);
 }

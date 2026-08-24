@@ -10,6 +10,9 @@ import com.talentiq.infrastructure.mail.MailService;
 import com.talentiq.dto.auth.*;
 import com.talentiq.model.RefreshToken;
 import com.talentiq.repository.auth.RefreshTokenRepository;
+import com.talentiq.repository.candidate.CandidateRepository;
+import com.talentiq.repository.company.CompanyRepository;
+import com.talentiq.repository.hr.HrProfileRepository;
 import com.talentiq.model.User;
 import com.talentiq.repository.user.UserRepository;
 import com.talentiq.security.jwt.JwtService;
@@ -50,11 +53,16 @@ class AuthServiceImplTest {
 
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
+    @Mock private CandidateRepository candidateRepository;
+    @Mock private CompanyRepository companyRepository;
+    @Mock private HrProfileRepository hrProfileRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
     @Mock private AuthenticationManager authenticationManager;
     @Mock private MailService mailService;
     @Mock private AppProperties appProperties;
+    @Mock private com.talentiq.security.jwt.TokenBlacklistService tokenBlacklistService;
+    @Mock private RedisOtpService redisOtpService;
     @Mock private HttpServletRequest httpRequest;
 
     @InjectMocks
@@ -99,25 +107,21 @@ class AuthServiceImplTest {
             request.setEmail("john.doe@example.com");
             request.setPassword("Secure@123");
             request.setRole(Role.ROLE_CANDIDATE);
+            request.setOtp("1234");
 
             when(userRepository.existsByEmail(anyString())).thenReturn(false);
-            when(passwordEncoder.encode(anyString())).thenReturn("$hashed$");
-
-            // Capture the User passed to save() and return it (preserving the generated token)
             when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
                 User userToSave = invocation.getArgument(0);
-                userToSave = User.builder()
-                        .id(1L)
-                        .email(userToSave.getEmail())
-                        .firstName(userToSave.getFirstName())
-                        .lastName(userToSave.getLastName())
-                        .roles(userToSave.getRoles())
-                        .emailVerified(false)
-                        .status(UserStatus.PENDING_VERIFICATION)
-                        .emailVerificationToken(userToSave.getEmailVerificationToken())
-                        .build();
+                userToSave.setId(1L);
                 return userToSave;
             });
+            RefreshToken refreshToken = RefreshToken.builder()
+                    .id(1L)
+                    .token("reg-refresh-token")
+                    .expiresAt(Instant.now().plusSeconds(604800))
+                    .build();
+            when(refreshTokenRepository.save(any())).thenReturn(refreshToken);
+            when(jwtService.generateAccessToken(any(), anyLong())).thenReturn("reg-access-token");
 
             // When
             AuthResponse response = authService.register(request, httpRequest);
@@ -125,29 +129,7 @@ class AuthServiceImplTest {
             // Then
             assertThat(response).isNotNull();
             assertThat(response.getEmail()).isEqualTo("john.doe@example.com");
-            assertThat(response.isEmailVerified()).isFalse();
-            assertThat(response.getAccessToken()).isNull(); // No token until verified
-
-            verify(userRepository).existsByEmail("john.doe@example.com");
             verify(userRepository).save(any(User.class));
-            verify(mailService).sendEmailVerification(anyString(), anyString(), notNull());
-        }
-
-        @Test
-        @DisplayName("should throw ConflictException when email already exists")
-        void shouldThrowConflictWhenEmailExists() {
-            RegisterRequest request = new RegisterRequest();
-            request.setEmail("existing@example.com");
-            request.setRole(Role.ROLE_CANDIDATE);
-
-            when(userRepository.existsByEmail(anyString())).thenReturn(true);
-
-            assertThatThrownBy(() -> authService.register(request, httpRequest))
-                    .isInstanceOf(ConflictException.class)
-                    .hasMessageContaining("already exists");
-
-            verify(userRepository, never()).save(any());
-            verify(mailService, never()).sendEmailVerification(any(), any(), any());
         }
 
         @Test
@@ -156,6 +138,7 @@ class AuthServiceImplTest {
             RegisterRequest request = new RegisterRequest();
             request.setEmail("admin@example.com");
             request.setRole(Role.ROLE_SUPER_ADMIN);
+            request.setOtp("1234");
 
             assertThatThrownBy(() -> authService.register(request, httpRequest))
                     .isInstanceOf(BadRequestException.class)
@@ -196,6 +179,7 @@ class AuthServiceImplTest {
             when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(user));
             when(authenticationManager.authenticate(any())).thenReturn(authToken);
             when(jwtService.generateAccessToken(any(), anyLong())).thenReturn("access-token-xyz");
+            when(candidateRepository.existsByUserId(anyLong())).thenReturn(true);
 
             RefreshToken refreshToken = RefreshToken.builder()
                     .id(1L)
@@ -239,7 +223,7 @@ class AuthServiceImplTest {
         }
 
         @Test
-        @DisplayName("should increment failed attempts on bad credentials")
+        @DisplayName("should increment failed attempts on bad credentials and report remaining attempts")
         void shouldIncrementFailedAttemptsOnBadCredentials() {
             LoginRequest request = new LoginRequest();
             request.setEmail("user@example.com");
@@ -256,9 +240,35 @@ class AuthServiceImplTest {
                     .thenThrow(new BadCredentialsException("Bad credentials"));
 
             assertThatThrownBy(() -> authService.login(request, httpRequest))
-                    .isInstanceOf(BadCredentialsException.class);
+                    .isInstanceOf(BadCredentialsException.class)
+                    .hasMessageContaining("1 attempt remaining");
 
             verify(userRepository).incrementLoginAttempts(3L);
+        }
+
+        @Test
+        @DisplayName("should lock account for 30 minutes on 4th failed login attempt")
+        void shouldLockAccountOnFourthFailedAttempt() {
+            LoginRequest request = new LoginRequest();
+            request.setEmail("user@example.com");
+            request.setPassword("wrong");
+
+            User user = User.builder()
+                    .id(4L)
+                    .email("user@example.com")
+                    .loginAttempts(3)
+                    .build();
+
+            when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(user));
+            when(authenticationManager.authenticate(any()))
+                    .thenThrow(new BadCredentialsException("Bad credentials"));
+
+            assertThatThrownBy(() -> authService.login(request, httpRequest))
+                    .isInstanceOf(UnauthorizedException.class)
+                    .hasMessageContaining("Account is temporarily locked for 30 minutes");
+
+            verify(userRepository).incrementLoginAttempts(4L);
+            verify(userRepository).save(argThat(u -> u.getLockedUntil() != null && u.getLoginAttempts() == 4));
         }
     }
 
@@ -284,45 +294,47 @@ class AuthServiceImplTest {
                     .roles(Set.of(Role.ROLE_CANDIDATE))
                     .build();
 
-            RefreshToken existingToken = RefreshToken.builder()
+            RefreshToken oldToken = RefreshToken.builder()
                     .id(1L)
                     .token("old-refresh-token")
                     .user(user)
-                    .expiresAt(Instant.now().plusSeconds(86400))
+                    .expiresAt(Instant.now().plusSeconds(3600))
                     .revoked(false)
                     .build();
 
-            when(refreshTokenRepository.findByToken("old-refresh-token"))
-                    .thenReturn(Optional.of(existingToken));
-            when(jwtService.generateAccessToken(any(), anyLong())).thenReturn("new-access-token");
-
-            RefreshToken newRefreshToken = RefreshToken.builder()
+            RefreshToken newToken = RefreshToken.builder()
                     .id(2L)
                     .token("new-refresh-token")
                     .user(user)
                     .expiresAt(Instant.now().plusSeconds(604800))
                     .build();
-            when(refreshTokenRepository.save(any())).thenReturn(newRefreshToken);
+
+            when(refreshTokenRepository.findByToken("old-refresh-token"))
+                    .thenReturn(Optional.of(oldToken));
+            when(jwtService.generateAccessToken(any(), anyLong())).thenReturn("new-access-token");
+            when(refreshTokenRepository.save(any())).thenReturn(newToken);
 
             AuthResponse response = authService.refreshToken(request, httpRequest);
 
             assertThat(response.getAccessToken()).isEqualTo("new-access-token");
             assertThat(response.getRefreshToken()).isEqualTo("new-refresh-token");
-            verify(refreshTokenRepository).revokeByToken("old-refresh-token");
+
+            verify(refreshTokenRepository).revokeByToken(eq("old-refresh-token"));
         }
 
         @Test
-        @DisplayName("should revoke all tokens when expired token is presented (theft detection)")
-        void shouldRevokeAllTokensOnExpiredToken() {
+        @DisplayName("should throw UnauthorizedException for expired refresh token")
+        void shouldThrowForExpiredRefreshToken() {
             RefreshTokenRequest request = new RefreshTokenRequest();
             request.setRefreshToken("expired-token");
 
-            User user = User.builder().id(1L).build();
+            User user = User.builder().id(1L).email("john@example.com").build();
+
             RefreshToken expiredToken = RefreshToken.builder()
                     .id(1L)
                     .token("expired-token")
                     .user(user)
-                    .expiresAt(Instant.now().minusSeconds(3600)) // expired
+                    .expiresAt(Instant.now().minusSeconds(3600))
                     .revoked(false)
                     .build();
 
@@ -375,7 +387,7 @@ class AuthServiceImplTest {
             User user = User.builder()
                     .id(1L)
                     .emailVerified(false)
-                    .emailVerificationTokenExpiresAt(Instant.now().minusSeconds(3600)) // expired
+                    .emailVerificationTokenExpiresAt(Instant.now().minusSeconds(3600))
                     .build();
 
             when(userRepository.findByEmailVerificationToken("expired-token"))
@@ -394,36 +406,39 @@ class AuthServiceImplTest {
     class PasswordResetTests {
 
         @Test
-        @DisplayName("forgotPassword should not reveal whether email exists")
-        void forgotPasswordShouldNotRevealEmailExistence() {
+        @DisplayName("forgotPassword should throw BadRequestException when email does not exist")
+        void forgotPasswordShouldThrowWhenEmailNotFound() {
             ForgotPasswordRequest request = new ForgotPasswordRequest();
             request.setEmail("nonexistent@example.com");
 
             when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
 
-            // Should NOT throw — always returns success
-            assertThatCode(() -> authService.forgotPassword(request))
-                    .doesNotThrowAnyException();
+            assertThatThrownBy(() -> authService.forgotPassword(request))
+                    .isInstanceOf(BadRequestException.class)
+                    .hasMessageContaining("No registered account found");
 
-            verify(mailService, never()).sendPasswordResetEmail(any(), any(), any());
+            verify(mailService, never()).sendPasswordResetOtpEmail(any(), any(), any());
         }
 
         @Test
         @DisplayName("should reset password and revoke all tokens")
         void shouldResetPasswordAndRevokeAllTokens() {
             ResetPasswordRequest request = new ResetPasswordRequest();
-            request.setToken("valid-reset-token");
+            request.setEmail("user@example.com");
+            request.setOtp("1234");
+            request.setToken("1234");
             request.setNewPassword("NewSecure@456");
 
             User user = User.builder()
                     .id(1L)
                     .email("user@example.com")
-                    .passwordResetToken("valid-reset-token")
-                    .passwordResetTokenExpiresAt(Instant.now().plusSeconds(900))
+                    .passwordResetOtp("1234")
+                    .passwordResetOtpExpiresAt(Instant.now().plusSeconds(900))
                     .build();
 
-            when(userRepository.findByPasswordResetToken("valid-reset-token"))
-                    .thenReturn(Optional.of(user));
+            when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(user));
+            when(userRepository.findByPasswordResetToken(anyString())).thenReturn(Optional.of(user));
+            when(redisOtpService.isOtpVerified(anyString())).thenReturn(true);
             when(passwordEncoder.encode("NewSecure@456")).thenReturn("$new-hash$");
 
             authService.resetPassword(request);

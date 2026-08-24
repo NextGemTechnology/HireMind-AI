@@ -140,12 +140,16 @@
 /* ════════════════════════════════════════════════════════════════
    THEME 3: SOLAR LIGHT (Clean Executive Daylight)
    ════════════════════════════════════════════════════════════════ */
-.theme-light {
+.messages-page-wrapper.theme-light,
+.theme-light .messages-page-wrapper {
   background: #F8FAFC !important;
   color: #0F172A !important;
 }
 
-.theme-light h1, .theme-light h2, .theme-light h3, .theme-light h4 {
+.messages-page-wrapper.theme-light h1, 
+.messages-page-wrapper.theme-light h2, 
+.messages-page-wrapper.theme-light h3, 
+.messages-page-wrapper.theme-light h4 {
   color: #0F172A !important;
 }
 
@@ -749,6 +753,146 @@
   background: rgba(124, 58, 237, 0.45);
   color: #FFFFFF;
   border-color: #C084FC;
+}
+
+/* WhatsApp-Style Clickable Avatars */
+.whatsapp-sidebar-avatar {
+  cursor: pointer !important;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.whatsapp-sidebar-avatar:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.8) !important;
+}
+
+.whatsapp-profile-avatar {
+  cursor: pointer !important;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+}
+
+.whatsapp-profile-avatar:hover {
+  transform: scale(1.08) !important;
+  box-shadow: 0 0 18px rgba(124, 58, 237, 0.7), 0 0 10px rgba(56, 189, 248, 0.5) !important;
+}
+
+.msg-chat-header-user-text {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: opacity 0.15s ease;
+}
+
+.msg-chat-header-user-text:hover .msg-chat-candidate-title {
+  color: #38BDF8 !important;
+}
+
+.msg-chat-header-user-text:hover .msg-whatsapp-profile-link {
+  background: rgba(129, 140, 248, 0.25);
+  border-color: #818CF8;
+  color: #FFFFFF;
+}
+
+.msg-chat-header-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.msg-chat-candidate-title {
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: inherit;
+  transition: color 0.15s ease;
+}
+
+.msg-whatsapp-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #A5B4FC;
+  background: rgba(129, 140, 248, 0.15);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  padding: 1px 7px;
+  border-radius: 999px;
+  transition: all 0.2s ease;
+}
+
+/* 🚩 Flagging Styles & Badges */
+.msg-flag-btn {
+  color: #94A3B8;
+  transition: all 0.2s ease;
+}
+
+.msg-flag-btn:hover {
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #FBBF24;
+}
+
+.msg-flag-btn.flagged-active {
+  background: rgba(245, 158, 11, 0.2) !important;
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  color: #FBBF24 !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.35) !important;
+  font-weight: 700;
+}
+
+.msg-flagged-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #FBBF24;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+}
+
+.msg-flagged-pill.candidate-side {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.2) 100%);
+  border-color: rgba(245, 158, 11, 0.6);
+  color: #FEF3C7;
+  font-size: 11.5px;
+}
+
+.msg-flag-icon-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.is-flagged-contact {
+  background: rgba(245, 158, 11, 0.05) !important;
+  border-left: 3px solid #F59E0B !important;
+}
+
+.msg-candidate-flagged-banner {
+  background: linear-gradient(90deg, rgba(245, 158, 11, 0.22) 0%, rgba(217, 119, 6, 0.12) 100%);
+  border-bottom: 1px solid rgba(245, 158, 11, 0.4);
+  color: #FEF3C7;
+  padding: 8px 24px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 /* ════════════════════════════════════════════════════════════════

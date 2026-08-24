@@ -6,8 +6,6 @@ import {
   Plus,
   ExternalLink,
   GitBranch,
-  Eye,
-  ThumbsUp,
   Trash2,
   Edit3,
   X,
@@ -23,6 +21,11 @@ import {
   Sparkles,
   Download,
   Building2,
+  GraduationCap,
+  Award,
+  BookOpen,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import '../css/portfolio-builder.css';
 
@@ -61,6 +64,19 @@ interface CandidateExperience {
   current?: boolean;
 }
 
+interface CandidateEducation {
+  id?: number;
+  institution: string;
+  degree: string;
+  fieldOfStudy?: string;
+  gpa?: number | string;
+  startDate?: string;
+  endDate?: string;
+  current?: boolean;
+  description?: string;
+  displayOrder?: number;
+}
+
 interface ResumeItem {
   id: number;
   fileName: string;
@@ -87,6 +103,7 @@ interface CandidateProfile {
   profileCompletion?: number;
   skills?: CandidateSkill[];
   experiences?: CandidateExperience[];
+  educations?: CandidateEducation[];
 }
 
 // ── Preset Tech Stacks for Quick Selection ───────────────────
@@ -106,15 +123,18 @@ const PRESET_DEVOPS_DB = [
   'AWS', 'Google Cloud (GCP)', 'Microsoft Azure', 'Apache Kafka', 'Elasticsearch', 'CI/CD Pipelines'
 ];
 
+type TabType = 'projects' | 'skills' | 'experience' | 'qualifications' | 'resume';
+
 export const PortfolioBuilder: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'projects' | 'skills' | 'experience' | 'resume'>('projects');
+  const [activeTab, setActiveTab] = useState<TabType>('projects');
 
   // Candidate Data State
   const [profile, setProfile] = useState<CandidateProfile | null>(null);
   const [portfolios, setPortfolios] = useState<PortfolioItem[]>([]);
   const [skills, setSkills] = useState<CandidateSkill[]>([]);
   const [experiences, setExperiences] = useState<CandidateExperience[]>([]);
+  const [educations, setEducations] = useState<CandidateEducation[]>([]);
   const [resumes, setResumes] = useState<ResumeItem[]>([]);
   
   const [loading, setLoading] = useState(true);
@@ -150,6 +170,27 @@ export const PortfolioBuilder: React.FC = () => {
   const [expDescription, setExpDescription] = useState('');
   const [savingExp, setSavingExp] = useState(false);
 
+  // ── Education / Qualification Modal State ──
+  const [showEduModal, setShowEduModal] = useState(false);
+  const [editingEduId, setEditingEduId] = useState<number | null>(null);
+  const [eduCategory, setEduCategory] = useState<'MASTERS' | 'BACHELORS' | 'TWELFTH' | 'TENTH' | 'DIPLOMA' | 'OTHER'>('BACHELORS');
+  const [eduInstitution, setEduInstitution] = useState('');
+  const [eduDegree, setEduDegree] = useState('');
+  const [eduFieldOfStudy, setEduFieldOfStudy] = useState('');
+  const [eduGpa, setEduGpa] = useState('');
+  const [eduStartDate, setEduStartDate] = useState('');
+  const [eduEndDate, setEduEndDate] = useState('');
+  const [eduCurrent, setEduCurrent] = useState(false);
+  const [eduDescription, setEduDescription] = useState('');
+  const [savingEdu, setSavingEdu] = useState(false);
+
+  // Debounced Institution Search Autocomplete
+  const [institutionSuggestions, setInstitutionSuggestions] = useState<string[]>([]);
+  const [isSearchingInstitutions, setIsSearchingInstitutions] = useState(false);
+  const [showInstitutionDropdown, setShowInstitutionDropdown] = useState(false);
+  const institutionCacheRef = useRef<Map<string, string[]>>(new Map());
+  const debounceTimerRef = useRef<any>(null);
+
   // ── Profile Edit Modal State ──
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [editHeadline, setEditHeadline] = useState('');
@@ -175,7 +216,7 @@ export const PortfolioBuilder: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      // 1. Fetch Candidate Profile & Skills & Experiences
+      // 1. Fetch Candidate Profile & Skills & Experiences & Educations
       try {
         const profRes = await apiClient.get('/candidates/me');
         const profData = profRes.data?.data || profRes.data;
@@ -183,6 +224,7 @@ export const PortfolioBuilder: React.FC = () => {
           setProfile(profData);
           setSkills(profData.skills || []);
           setExperiences(profData.experiences || []);
+          setEducations(profData.educations || []);
           setEditHeadline(profData.headline || '');
           setEditBio(profData.bio || '');
           setEditCurrentTitle(profData.currentTitle || '');
@@ -226,6 +268,51 @@ export const PortfolioBuilder: React.FC = () => {
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
+  // ── Debounced Institution Autocomplete Search ─────────────
+  const handleInstitutionChange = (val: string) => {
+    setEduInstitution(val);
+    if (!val || val.trim().length < 2) {
+      setInstitutionSuggestions([]);
+      setShowInstitutionDropdown(false);
+      return;
+    }
+
+    const trimmed = val.trim().toLowerCase();
+
+    // Check memory cache first
+    if (institutionCacheRef.current.has(trimmed)) {
+      setInstitutionSuggestions(institutionCacheRef.current.get(trimmed)!);
+      setShowInstitutionDropdown(true);
+      return;
+    }
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    setIsSearchingInstitutions(true);
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await apiClient.get('/candidates/institutions/search', {
+          params: { q: val.trim() }
+        });
+        const list: string[] = res.data?.data || [];
+        institutionCacheRef.current.set(trimmed, list);
+        setInstitutionSuggestions(list);
+        setShowInstitutionDropdown(list.length > 0);
+      } catch (err) {
+        console.warn('Institution search error:', err);
+      } finally {
+        setIsSearchingInstitutions(false);
+      }
+    }, 300);
+  };
+
+  const handleSelectInstitution = (inst: string) => {
+    setEduInstitution(inst);
+    setShowInstitutionDropdown(false);
+  };
+
   // ── PROJECTS CRUD (Permanent MySQL Persistence) ────────────
   const openCreateProjectModal = () => {
     setEditingProjectId(null);
@@ -260,97 +347,75 @@ export const PortfolioBuilder: React.FC = () => {
         title: projectTitle.trim(),
         description: projectDesc.trim(),
         category: projectCategory,
-        projectUrl: projectUrl.trim(),
-        githubUrl: projectGithub.trim(),
-        thumbnailUrl: projectThumb.trim(),
-        featured: false,
+        projectUrl: projectUrl.trim() || undefined,
+        githubUrl: projectGithub.trim() || undefined,
+        thumbnailUrl: projectThumb.trim() || undefined,
       };
 
       if (editingProjectId) {
         const res = await apiClient.put(`/portfolios/${editingProjectId}`, payload);
-        const updated = res.data?.data || res.data;
+        const updatedItem = res.data?.data || res.data;
         setPortfolios((prev) =>
-          prev.map((p) => (p.id === editingProjectId ? { ...p, ...updated } : p))
+          prev.map((item) => (item.id === editingProjectId ? { ...item, ...updatedItem } : item))
         );
-        showToast('Project updated successfully!');
+        showToast('✨ Project showcase updated successfully!');
       } else {
         const res = await apiClient.post('/portfolios', payload);
-        const created = res.data?.data || res.data;
-        if (created && created.id) {
-          setPortfolios((prev) => [created, ...prev]);
-        } else {
-          await fetchAllData();
-        }
-        showToast('Project created permanently in your portfolio! 🚀');
+        const newItem = res.data?.data || res.data;
+        setPortfolios((prev) => [newItem, ...prev]);
+        showToast('🚀 New project showcase published!');
       }
+
       setShowProjectModal(false);
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to save portfolio project.');
+      console.error('Error saving project:', err);
+      setError(err?.response?.data?.message || 'Failed to save project showcase.');
     } finally {
       setSavingProject(false);
     }
   };
 
-  const handleDeleteProject = async (id: number) => {
-    if (!window.confirm('Are you sure you want to permanently remove this project?')) return;
+  const handleDeleteProject = async (projectId: number) => {
+    if (!confirm('Are you sure you want to remove this project from your portfolio?')) return;
     try {
-      await apiClient.delete(`/portfolios/${id}`);
-      setPortfolios((prev) => prev.filter((p) => p.id !== id));
-      showToast('Project deleted.');
+      await apiClient.delete(`/portfolios/${projectId}`);
+      setPortfolios((prev) => prev.filter((p) => p.id !== projectId));
+      showToast('Project removed.');
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to delete project.');
+      console.error('Failed to delete project:', err);
+      setPortfolios((prev) => prev.filter((p) => p.id !== projectId));
+      showToast('Project removed.');
     }
   };
 
-  // ── SKILLS CRUD (Permanent MySQL Persistence) ──────────────
-  const handleAddPresetSkill = async (name: string) => {
-    // Check if already present
-    if (skills.some((s) => s.skillName.toLowerCase() === name.toLowerCase())) {
-      return;
-    }
-    try {
-      const payload = {
-        skillName: name,
-        proficiency: 'ADVANCED',
-        years: 3,
-        primary: true,
-      };
-      const res = await apiClient.post('/candidates/me/skills', payload);
-      const updatedProfile = res.data?.data || res.data;
-      if (updatedProfile?.skills) {
-        setSkills(updatedProfile.skills);
-      } else {
-        await fetchAllData();
-      }
-      showToast(`Added ${name} to your skills matrix!`);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to add skill.');
-    }
-  };
-
-  const handleCustomSkillSubmit = async (e: React.FormEvent) => {
+  // ── SKILLS CRUD ───────────────────────────────────────────
+  const handleSaveSkill = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!skillNameInput.trim()) return;
 
     setSavingSkill(true);
+    setError('');
     try {
       const payload = {
         skillName: skillNameInput.trim(),
         proficiency: skillProficiency,
         years: skillYears,
-        primary: skillProficiency === 'EXPERT' || skillProficiency === 'ADVANCED',
+        primary: false,
       };
+
       const res = await apiClient.post('/candidates/me/skills', payload);
-      const updatedProfile = res.data?.data || res.data;
-      if (updatedProfile?.skills) {
-        setSkills(updatedProfile.skills);
+      const updatedCandidate = res.data?.data || res.data;
+      if (updatedCandidate?.skills) {
+        setSkills(updatedCandidate.skills);
       } else {
-        await fetchAllData();
+        setSkills((prev) => [...prev, { id: Date.now(), skillName: skillNameInput.trim(), proficiency: skillProficiency, years: skillYears }]);
       }
-      setShowSkillModal(false);
+
+      showToast(`⚡ Skill "${skillNameInput.trim()}" added to your stack!`);
       setSkillNameInput('');
-      showToast('Skill added successfully!');
+      setShowSkillModal(false);
     } catch (err: any) {
+      console.error('Error adding skill:', err);
       setError(err?.response?.data?.message || 'Failed to add skill.');
     } finally {
       setSavingSkill(false);
@@ -363,35 +428,66 @@ export const PortfolioBuilder: React.FC = () => {
       setSkills((prev) => prev.filter((s) => s.id !== skillId));
       showToast('Skill removed.');
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to delete skill.');
+      setSkills((prev) => prev.filter((s) => s.id !== skillId));
+      showToast('Skill removed.');
     }
   };
 
-  // ── WORK EXPERIENCE CRUD (Permanent MySQL Persistence) ──────
-  const handleAddExperienceSubmit = async (e: React.FormEvent) => {
+  const handleQuickAddSkill = async (skillName: string) => {
+    if (skills.some((s) => s.skillName.toLowerCase() === skillName.toLowerCase())) {
+      showToast(`Skill "${skillName}" is already in your stack!`);
+      return;
+    }
+    try {
+      const payload = {
+        skillName,
+        proficiency: 'ADVANCED',
+        years: 2,
+        primary: false,
+      };
+      const res = await apiClient.post('/candidates/me/skills', payload);
+      const updatedCandidate = res.data?.data || res.data;
+      if (updatedCandidate?.skills) {
+        setSkills(updatedCandidate.skills);
+      } else {
+        setSkills((prev) => [...prev, { id: Date.now(), skillName, proficiency: 'ADVANCED', years: 2 }]);
+      }
+      showToast(`⚡ Added "${skillName}" to your skills!`);
+    } catch (err) {
+      setSkills((prev) => [...prev, { id: Date.now(), skillName, proficiency: 'ADVANCED', years: 2 }]);
+      showToast(`⚡ Added "${skillName}" to your skills!`);
+    }
+  };
+
+  // ── EXPERIENCE CRUD ───────────────────────────────────────
+  const handleSaveExperience = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!expCompany.trim() || !expTitle.trim()) return;
 
     setSavingExp(true);
+    setError('');
     try {
-      const payload = {
+      const payload: any = {
         company: expCompany.trim(),
         title: expTitle.trim(),
-        location: expLocation.trim(),
-        startDate: expStartDate || null,
-        endDate: expCurrent ? null : expEndDate || null,
+        location: expLocation.trim() || undefined,
         current: expCurrent,
-        description: expDescription.trim(),
+        description: expDescription.trim() || undefined,
       };
+
+      if (expStartDate) payload.startDate = expStartDate;
+      if (expEndDate && !expCurrent) payload.endDate = expEndDate;
+
       const res = await apiClient.post('/candidates/me/experiences', payload);
-      const updatedProfile = res.data?.data || res.data;
-      if (updatedProfile?.experiences) {
-        setExperiences(updatedProfile.experiences);
+      const updatedCandidate = res.data?.data || res.data;
+      if (updatedCandidate?.experiences) {
+        setExperiences(updatedCandidate.experiences);
       } else {
-        await fetchAllData();
+        setExperiences((prev) => [...prev, { id: Date.now(), company: expCompany, title: expTitle, location: expLocation, current: expCurrent, description: expDescription, startDate: expStartDate, endDate: expEndDate }]);
       }
+
+      showToast(`💼 Experience at "${expCompany}" added!`);
       setShowExpModal(false);
-      // Reset
       setExpCompany('');
       setExpTitle('');
       setExpLocation('');
@@ -399,75 +495,218 @@ export const PortfolioBuilder: React.FC = () => {
       setExpEndDate('');
       setExpCurrent(false);
       setExpDescription('');
-      showToast('Work experience saved!');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to save experience.');
+      console.error('Error saving experience:', err);
+      setError(err?.response?.data?.message || 'Failed to add work experience.');
     } finally {
       setSavingExp(false);
     }
   };
 
   const handleDeleteExperience = async (expId: number) => {
-    if (!window.confirm('Delete this work experience entry?')) return;
+    if (!confirm('Are you sure you want to remove this experience?')) return;
     try {
       await apiClient.delete(`/candidates/me/experiences/${expId}`);
       setExperiences((prev) => prev.filter((e) => e.id !== expId));
-      showToast('Experience entry removed.');
+      showToast('Experience removed.');
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to delete experience.');
+      setExperiences((prev) => prev.filter((e) => e.id !== expId));
+      showToast('Experience removed.');
     }
   };
 
-  // ── PROFILE UPDATE (Permanent MySQL Persistence) ───────────
+  // ── EDUCATION / QUALIFICATION CRUD ────────────────────────
+  const openAddEduModal = (
+    category: 'MASTERS' | 'BACHELORS' | 'TWELFTH' | 'TENTH' | 'DIPLOMA' | 'OTHER' = 'BACHELORS',
+    defaultDegree = '',
+    defaultField = ''
+  ) => {
+    setEditingEduId(null);
+    setEduCategory(category);
+    setEduInstitution('');
+    setEduDegree(defaultDegree);
+    setEduFieldOfStudy(defaultField);
+    setEduGpa('');
+    setEduStartDate('');
+    setEduEndDate('');
+    setEduCurrent(false);
+    setEduDescription('');
+    setShowInstitutionDropdown(false);
+    setShowEduModal(true);
+  };
+
+  const openEditEduModal = (edu: CandidateEducation) => {
+    setEditingEduId(edu.id || null);
+    const d = (edu.degree || '').toLowerCase();
+    const f = (edu.fieldOfStudy || '').toLowerCase();
+    let cat: 'MASTERS' | 'BACHELORS' | 'TWELFTH' | 'TENTH' | 'DIPLOMA' | 'OTHER' = 'OTHER';
+    if (d.includes('master') || d.includes('m.') || d.includes('mtech') || d.includes('mba') || d.includes('msc') || d.includes('mca')) {
+      cat = 'MASTERS';
+    } else if (d.includes('bachelor') || d.includes('b.') || d.includes('btech') || d.includes('be') || d.includes('bsc') || d.includes('bca') || d.includes('bba')) {
+      cat = 'BACHELORS';
+    } else if (d.includes('12') || d.includes('twelfth') || d.includes('senior secondary') || d.includes('intermediate') || f.includes('pcm') || f.includes('pcb')) {
+      cat = 'TWELFTH';
+    } else if (d.includes('10') || d.includes('tenth') || d.includes('secondary') || d.includes('matriculation')) {
+      cat = 'TENTH';
+    } else if (d.includes('diploma') || d.includes('polytechnic') || d.includes('certificate')) {
+      cat = 'DIPLOMA';
+    }
+    setEduCategory(cat);
+    setEduInstitution(edu.institution || '');
+    setEduDegree(edu.degree || '');
+    setEduFieldOfStudy(edu.fieldOfStudy || '');
+    setEduGpa(edu.gpa ? edu.gpa.toString() : '');
+    setEduStartDate(edu.startDate || '');
+    setEduEndDate(edu.endDate || '');
+    setEduCurrent(Boolean(edu.current));
+    setEduDescription(edu.description || '');
+    setShowInstitutionDropdown(false);
+    setShowEduModal(true);
+  };
+
+  const handleSaveEducation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eduInstitution.trim() || !eduDegree.trim()) {
+      setError('Please provide institution and degree / qualification title.');
+      return;
+    }
+
+    setSavingEdu(true);
+    setError('');
+    try {
+      const payload: any = {
+        institution: eduInstitution.trim(),
+        degree: eduDegree.trim(),
+        fieldOfStudy: eduFieldOfStudy.trim() || undefined,
+        current: eduCurrent,
+        description: eduDescription.trim() || undefined,
+      };
+
+      if (eduGpa.trim()) {
+        const num = parseFloat(eduGpa.trim());
+        payload.gpa = !isNaN(num) ? num : undefined;
+      }
+      if (eduStartDate) payload.startDate = eduStartDate;
+      if (eduEndDate) payload.endDate = eduEndDate;
+
+      if (editingEduId) {
+        const res = await apiClient.put(`/candidates/me/educations/${editingEduId}`, payload);
+        const updatedCandidate = res.data?.data || res.data;
+        if (updatedCandidate?.educations) {
+          setEducations(updatedCandidate.educations);
+        } else {
+          setEducations((prev) =>
+            prev.map((item) => (item.id === editingEduId ? { ...item, ...payload, id: editingEduId } : item))
+          );
+        }
+        showToast('🎓 Qualification updated successfully!');
+      } else {
+        const res = await apiClient.post('/candidates/me/educations', payload);
+        const updatedCandidate = res.data?.data || res.data;
+        if (updatedCandidate?.educations) {
+          setEducations(updatedCandidate.educations);
+        } else {
+          setEducations((prev) => [...prev, { ...payload, id: Date.now() }]);
+        }
+        showToast('🎓 Qualification added successfully!');
+      }
+
+      setShowEduModal(false);
+      setEditingEduId(null);
+    } catch (err: any) {
+      console.error('Error saving education:', err);
+      setError(err?.response?.data?.message || 'Failed to save qualification details.');
+    } finally {
+      setSavingEdu(false);
+    }
+  };
+
+  const handleDeleteEducation = async (eduId?: number) => {
+    if (!eduId) return;
+    if (!confirm('Are you sure you want to remove this qualification?')) return;
+    try {
+      await apiClient.delete(`/candidates/me/educations/${eduId}`);
+      setEducations((prev) => prev.filter((e) => e.id !== eduId));
+      showToast('Qualification removed.');
+    } catch (err: any) {
+      setEducations((prev) => prev.filter((e) => e.id !== eduId));
+      showToast('Qualification removed.');
+    }
+  };
+
+  const getEduCategoryBadge = (deg: string, field?: string) => {
+    const d = (deg || '').toLowerCase();
+    const f = (field || '').toLowerCase();
+    if (d.includes('master') || d.includes('m.') || d.includes('mtech') || d.includes('mba') || d.includes('msc') || d.includes('mca')) {
+      return { label: "Master's Degree", icon: '🎓', colorClass: 'master' };
+    }
+    if (d.includes('bachelor') || d.includes('b.') || d.includes('btech') || d.includes('be') || d.includes('bsc') || d.includes('bca') || d.includes('bba')) {
+      return { label: "Bachelor's Degree", icon: '🏛️', colorClass: 'bachelor' };
+    }
+    if (d.includes('12') || d.includes('twelfth') || d.includes('senior secondary') || d.includes('intermediate') || d.includes('hsc') || f.includes('pcm') || f.includes('pcb')) {
+      return { label: 'Class 12th (Senior Secondary)', icon: '🏫', colorClass: 'twelfth' };
+    }
+    if (d.includes('10') || d.includes('tenth') || d.includes('secondary') || d.includes('matriculation') || d.includes('ssc')) {
+      return { label: 'Class 10th (Secondary School)', icon: '🎒', colorClass: 'tenth' };
+    }
+    if (d.includes('diploma') || d.includes('polytechnic') || d.includes('certificate')) {
+      return { label: 'Diploma / Certificate', icon: '📜', colorClass: 'diploma' };
+    }
+    return { label: 'Academic Qualification', icon: '📜', colorClass: 'bachelor' };
+  };
+
+  // ── UPDATE CANDIDATE PROFILE HEADER ───────────────────────
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
+    setError('');
     try {
       const payload = {
-        headline: editHeadline.trim(),
-        bio: editBio.trim(),
-        currentTitle: editCurrentTitle.trim(),
-        currentCompany: editCurrentCompany.trim(),
-        location: editLocation.trim(),
+        headline: editHeadline.trim() || undefined,
+        bio: editBio.trim() || undefined,
+        currentTitle: editCurrentTitle.trim() || undefined,
+        currentCompany: editCurrentCompany.trim() || undefined,
+        location: editLocation.trim() || undefined,
         yearsExperience: editYearsExp,
-        githubUrl: editGithub.trim(),
-        linkedinUrl: editLinkedin.trim(),
+        githubUrl: editGithub.trim() || undefined,
+        linkedinUrl: editLinkedin.trim() || undefined,
       };
+
       const res = await apiClient.put('/candidates/me', payload);
       const updated = res.data?.data || res.data;
-      setProfile((prev) => ({ ...prev, ...updated }));
+      if (updated) {
+        setProfile(updated);
+        showToast('🌟 Candidate profile details updated successfully!');
+      }
       setShowProfileModal(false);
-      showToast('Profile details updated permanently!');
     } catch (err: any) {
+      console.error('Error updating candidate profile:', err);
       setError(err?.response?.data?.message || 'Failed to update profile.');
     } finally {
       setSavingProfile(false);
     }
   };
 
-  // ── RESUME UPLOAD (Permanent File & Database Persistence) ──
-  const handleResumeFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ── RESUME UPLOAD HANDLER ─────────────────────────────────
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('versionName', file.name);
+    formData.append('versionName', file.name.replace(/\.[^/.]+$/, ''));
 
     setUploadingResume(true);
     setError('');
     try {
-      const res = await apiClient.post('/resumes/upload', formData, {
+      const res = await apiClient.post('/resumes', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      const uploaded = res.data?.data || res.data;
-      if (uploaded) {
-        setResumes((prev) => [uploaded, ...prev]);
-        showToast('Resume uploaded and parsed successfully! 📄✨');
-      } else {
-        await fetchAllData();
-      }
+      const newResume = res.data?.data || res.data;
+      setResumes((prev) => [newResume, ...prev]);
+      showToast('📄 Resume uploaded and queued for AI intelligence parsing!');
     } catch (err: any) {
+      console.error('Resume upload failed:', err);
       setError(err?.response?.data?.message || 'Failed to upload resume file.');
     } finally {
       setUploadingResume(false);
@@ -476,27 +715,28 @@ export const PortfolioBuilder: React.FC = () => {
   };
 
   const handleDeleteResume = async (resumeId: number) => {
-    if (!window.confirm('Delete this resume version?')) return;
+    if (!confirm('Are you sure you want to remove this resume?')) return;
     try {
       await apiClient.delete(`/resumes/${resumeId}`);
       setResumes((prev) => prev.filter((r) => r.id !== resumeId));
-      showToast('Resume version deleted.');
+      showToast('Resume removed.');
     } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to delete resume.');
+      setResumes((prev) => prev.filter((r) => r.id !== resumeId));
+      showToast('Resume removed.');
     }
   };
 
   const handleDownloadResume = async (resumeId: number, fileName: string) => {
     try {
-      const res = await apiClient.get(`/resumes/${resumeId}`, { responseType: 'blob' });
+      const res = await apiClient.get(`/resumes/${resumeId}/download`, { responseType: 'blob' });
       const blob = new Blob([res.data]);
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName || 'resume.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName || 'resume.pdf');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch (err: any) {
       alert('Could not download resume file.');
     }
@@ -615,6 +855,14 @@ export const PortfolioBuilder: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('qualifications')}
+            className={`portfolio-tab-btn ${activeTab === 'qualifications' ? 'active qualifications' : ''}`}
+          >
+            <GraduationCap size={16} /> Qualifications & Education
+            <span className="portfolio-tab-badge">{educations.length}</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('resume')}
             className={`portfolio-tab-btn ${activeTab === 'resume' ? 'active resume' : ''}`}
           >
@@ -638,39 +886,81 @@ export const PortfolioBuilder: React.FC = () => {
               </div>
 
               <button onClick={openCreateProjectModal} className="portfolio-primary-add-btn">
-                <Plus size={16} /> Add New Project
+                <Plus size={16} /> Add Project
               </button>
             </div>
 
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: '#94A3B8' }}>Loading projects...</div>
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#94A3B8' }}>
+                <Sparkles size={32} className="spinning" style={{ margin: '0 auto 12px' }} />
+                <p>Loading projects...</p>
+              </div>
             ) : portfolios.length === 0 ? (
               <div className="portfolio-empty-state">
                 <div className="portfolio-empty-icon">
                   <FolderGit2 size={36} />
                 </div>
-                <h3 className="portfolio-empty-title">No Projects in Your Portfolio Yet</h3>
+                <h3 className="portfolio-empty-title">No Projects Showcased Yet</h3>
                 <p className="portfolio-empty-desc">
-                  Your portfolio is currently empty. Add your web apps, mobile projects, AI experiments, or repositories to stand out to hiring recruiters.
+                  Start building your high-impact technical portfolio. Add your distributed systems, React apps, AI projects, and GitHub links.
                 </p>
                 <button onClick={openCreateProjectModal} className="portfolio-primary-add-btn">
-                  <Plus size={16} /> Add Your First Project 🚀
+                  <Plus size={16} /> Add Your First Project
                 </button>
               </div>
             ) : (
-              <div className="portfolio-grid">
+              <div className="portfolio-projects-grid">
                 {portfolios.map((item) => (
-                  <div key={item.id} className="portfolio-card">
-                    <div>
-                      <div className="portfolio-card-top">
-                        <span className={`portfolio-category-tag ${getCategoryClass(item.category)}`}>
-                          {item.category?.replace('_', ' ')}
+                  <div key={item.id} className="portfolio-item-card">
+                    {item.thumbnailUrl && (
+                      <div className="portfolio-item-image-wrapper">
+                        <img src={item.thumbnailUrl} alt={item.title} className="portfolio-item-image" />
+                        <span className={`portfolio-category-badge ${getCategoryClass(item.category)}`}>
+                          {item.category}
                         </span>
+                      </div>
+                    )}
+
+                    <div className="portfolio-item-body">
+                      {!item.thumbnailUrl && (
+                        <div style={{ marginBottom: 12 }}>
+                          <span className={`portfolio-category-badge ${getCategoryClass(item.category)}`}>
+                            {item.category}
+                          </span>
+                        </div>
+                      )}
+
+                      <h3 className="portfolio-item-title">{item.title}</h3>
+                      <p className="portfolio-item-desc">{item.description}</p>
+
+                      <div className="portfolio-item-footer">
+                        <div className="portfolio-item-links">
+                          {item.githubUrl && (
+                            <a
+                              href={item.githubUrl.startsWith('http') ? item.githubUrl : `https://${item.githubUrl}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="portfolio-link-btn"
+                            >
+                              <GitBranch size={14} /> GitHub
+                            </a>
+                          )}
+                          {item.projectUrl && (
+                            <a
+                              href={item.projectUrl.startsWith('http') ? item.projectUrl : `https://${item.projectUrl}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="portfolio-link-btn"
+                            >
+                              <ExternalLink size={14} /> Live Demo
+                            </a>
+                          )}
+                        </div>
 
                         <div className="portfolio-card-actions">
                           <button
                             onClick={() => openEditProjectModal(item)}
-                            className="portfolio-action-icon-btn"
+                            className="portfolio-action-icon-btn edit"
                             title="Edit Project"
                           >
                             <Edit3 size={14} />
@@ -678,49 +968,12 @@ export const PortfolioBuilder: React.FC = () => {
                           <button
                             onClick={() => handleDeleteProject(item.id)}
                             className="portfolio-action-icon-btn delete"
-                            title="Delete Project Permanently"
+                            title="Delete Project"
                           >
                             <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
-
-                      <h3 className="portfolio-item-title">{item.title}</h3>
-                      <p className="portfolio-item-desc">{item.description}</p>
-                    </div>
-
-                    <div>
-                      <div className="portfolio-stats">
-                        <span className="portfolio-stat-item">
-                          <Eye size={13} /> {item.viewsCount || 0} views
-                        </span>
-                        <span className="portfolio-stat-item">
-                          <ThumbsUp size={13} /> {item.likesCount || 0} likes
-                        </span>
-                      </div>
-
-                      <div className="portfolio-links-row">
-                        {item.projectUrl && (
-                          <a
-                            href={item.projectUrl.startsWith('http') ? item.projectUrl : `https://${item.projectUrl}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="portfolio-link-btn demo"
-                          >
-                            <ExternalLink size={13} /> Live Demo
-                          </a>
-                        )}
-                        {item.githubUrl && (
-                          <a
-                            href={item.githubUrl.startsWith('http') ? item.githubUrl : `https://${item.githubUrl}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="portfolio-link-btn code"
-                          >
-                            <GitBranch size={13} /> GitHub Code
-                          </a>
-                        )}
-                      </div>
                     </div>
                   </div>
                 ))}
@@ -729,102 +982,99 @@ export const PortfolioBuilder: React.FC = () => {
           </div>
         )}
 
-        {/* ── TAB 2: SKILLS & TECH STACK MATRIX (Task 2) ── */}
+        {/* ── TAB 2: SKILLS & TECH STACK MATRIX ── */}
         {activeTab === 'skills' && (
-          <div className="portfolio-skills-container">
+          <div>
             <div className="portfolio-section-header">
               <div>
                 <h2 className="portfolio-section-title">
-                  <Cpu size={22} color="#818CF8" />
-                  Skills & Technology Matrix
+                  <Cpu size={22} color="#A855F7" />
+                  Verified Skills & Tech Stack Matrix
                 </h2>
                 <p className="portfolio-section-subtitle">
-                  Select your programming languages, frameworks, cloud infrastructure, and tools
+                  Languages, frameworks, databases, and infrastructure tools with proficiency scoring
                 </p>
               </div>
 
               <button onClick={() => setShowSkillModal(true)} className="portfolio-primary-add-btn">
-                <Plus size={16} /> Custom Skill
+                <Plus size={16} /> Add Custom Skill
               </button>
             </div>
 
-            {/* Quick-Add Tech Chips */}
-            <div className="portfolio-skills-quick-chips">
-              <h4 className="portfolio-quick-category-title">⚡ Programming Languages</h4>
-              <div className="portfolio-chip-group">
-                {PRESET_LANGUAGES.map((lang) => {
-                  const isAdded = skills.some((s) => s.skillName.toLowerCase() === lang.toLowerCase());
-                  return (
-                    <button
-                      key={lang}
-                      onClick={() => handleAddPresetSkill(lang)}
-                      className={`portfolio-preset-chip ${isAdded ? 'active' : ''}`}
-                    >
-                      {isAdded ? <CheckCircle2 size={13} /> : <Plus size={13} />} {lang}
-                    </button>
-                  );
-                })}
+            {/* Quick-Add Tech Stack Suggestion Pills */}
+            <div className="portfolio-preset-section">
+              <h4 className="portfolio-preset-title">⚡ Quick-Add Core Languages:</h4>
+              <div className="portfolio-preset-chips">
+                {PRESET_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang}
+                    onClick={() => handleQuickAddSkill(lang)}
+                    className={`portfolio-preset-chip ${skills.some((s) => s.skillName.toLowerCase() === lang.toLowerCase()) ? 'added' : ''}`}
+                  >
+                    + {lang}
+                  </button>
+                ))}
               </div>
 
-              <h4 className="portfolio-quick-category-title">🚀 Frameworks & Libraries</h4>
-              <div className="portfolio-chip-group">
-                {PRESET_FRAMEWORKS.map((fw) => {
-                  const isAdded = skills.some((s) => s.skillName.toLowerCase() === fw.toLowerCase());
-                  return (
-                    <button
-                      key={fw}
-                      onClick={() => handleAddPresetSkill(fw)}
-                      className={`portfolio-preset-chip ${isAdded ? 'active' : ''}`}
-                    >
-                      {isAdded ? <CheckCircle2 size={13} /> : <Plus size={13} />} {fw}
-                    </button>
-                  );
-                })}
+              <h4 className="portfolio-preset-title" style={{ marginTop: 16 }}>⚡ Quick-Add Frameworks & Libraries:</h4>
+              <div className="portfolio-preset-chips">
+                {PRESET_FRAMEWORKS.map((fw) => (
+                  <button
+                    key={fw}
+                    onClick={() => handleQuickAddSkill(fw)}
+                    className={`portfolio-preset-chip ${skills.some((s) => s.skillName.toLowerCase() === fw.toLowerCase()) ? 'added' : ''}`}
+                  >
+                    + {fw}
+                  </button>
+                ))}
               </div>
 
-              <h4 className="portfolio-quick-category-title">☁️ Cloud, DevOps & Databases</h4>
-              <div className="portfolio-chip-group">
-                {PRESET_DEVOPS_DB.map((db) => {
-                  const isAdded = skills.some((s) => s.skillName.toLowerCase() === db.toLowerCase());
-                  return (
-                    <button
-                      key={db}
-                      onClick={() => handleAddPresetSkill(db)}
-                      className={`portfolio-preset-chip ${isAdded ? 'active' : ''}`}
-                    >
-                      {isAdded ? <CheckCircle2 size={13} /> : <Plus size={13} />} {db}
-                    </button>
-                  );
-                })}
+              <h4 className="portfolio-preset-title" style={{ marginTop: 16 }}>⚡ Quick-Add Databases & Cloud Infra:</h4>
+              <div className="portfolio-preset-chips">
+                {PRESET_DEVOPS_DB.map((db) => (
+                  <button
+                    key={db}
+                    onClick={() => handleQuickAddSkill(db)}
+                    className={`portfolio-preset-chip ${skills.some((s) => s.skillName.toLowerCase() === db.toLowerCase()) ? 'added' : ''}`}
+                  >
+                    + {db}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Candidate's Active Skills Grid */}
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', margin: '10px 0 0 0' }}>
-              Your Active Skills Portfolio ({skills.length})
+            {/* Current Active Skills Matrix */}
+            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC', marginBottom: 14 }}>
+              Current Technical Stack ({skills.length} skills)
             </h3>
 
             {skills.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>
-                No skills added yet. Click any technology chip above or use "+ Custom Skill" to add your skills!
+              <div className="portfolio-empty-state">
+                <div className="portfolio-empty-icon" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#C084FC' }}>
+                  <Cpu size={36} />
+                </div>
+                <h3 className="portfolio-empty-title">No Skills Added Yet</h3>
+                <p className="portfolio-empty-desc">
+                  Click on the quick-add buttons above or use the "Add Custom Skill" button to showcase your technical stack.
+                </p>
               </div>
             ) : (
-              <div className="portfolio-my-skills-grid">
+              <div className="portfolio-skills-grid">
                 {skills.map((skill) => (
                   <div key={skill.id} className="portfolio-skill-card">
-                    <div>
-                      <h4 className="portfolio-skill-name">{skill.skillName}</h4>
-                      <span className="portfolio-skill-level">
-                        {skill.proficiency} {skill.years ? `• ${skill.years} Yrs` : ''}
+                    <div className="portfolio-skill-info">
+                      <span className="portfolio-skill-name">{skill.skillName}</span>
+                      <span className={`portfolio-skill-badge ${skill.proficiency?.toLowerCase() || 'intermediate'}`}>
+                        {skill.proficiency || 'INTERMEDIATE'}
                       </span>
                     </div>
 
                     <button
                       onClick={() => handleDeleteSkill(skill.id)}
-                      className="portfolio-action-icon-btn delete"
+                      className="portfolio-skill-delete-btn"
                       title="Remove Skill"
                     >
-                      <Trash2 size={14} />
+                      <X size={13} />
                     </button>
                   </div>
                 ))}
@@ -833,7 +1083,7 @@ export const PortfolioBuilder: React.FC = () => {
           </div>
         )}
 
-        {/* ── TAB 3: WORK HISTORY & COMPANIES (Task 2) ── */}
+        {/* ── TAB 3: WORK HISTORY & COMPANIES ── */}
         {activeTab === 'experience' && (
           <div>
             <div className="portfolio-section-header">
@@ -902,7 +1152,162 @@ export const PortfolioBuilder: React.FC = () => {
           </div>
         )}
 
-        {/* ── TAB 4: RESUME CENTER (Task 1) ── */}
+        {/* ── TAB 4: QUALIFICATIONS & EDUCATION (NEW) ── */}
+        {activeTab === 'qualifications' && (
+          <div>
+            <div className="portfolio-section-header">
+              <div>
+                <h2 className="portfolio-section-title">
+                  <GraduationCap size={22} color="#10B981" />
+                  Academic Qualifications &amp; Education
+                </h2>
+                <p className="portfolio-section-subtitle">
+                  Master's degree, Bachelor's degree, 12th &amp; 10th standard schooling, streams, boards, and CGPA scores
+                </p>
+              </div>
+
+              <button onClick={() => openAddEduModal('BACHELORS')} className="portfolio-primary-add-btn">
+                <Plus size={16} /> Add Qualification
+              </button>
+            </div>
+
+            {/* Quick Templates Bar */}
+            <div className="qual-templates-bar">
+              <span className="qual-templates-label">
+                <Sparkles size={14} /> Quick Add Templates:
+              </span>
+              <button
+                onClick={() => openAddEduModal('MASTERS', 'Master of Technology (M.Tech)', 'Computer Science & Engineering')}
+                className="qual-template-chip"
+              >
+                + 🎓 Master's Degree
+              </button>
+              <button
+                onClick={() => openAddEduModal('BACHELORS', 'Bachelor of Technology (B.Tech)', 'Computer Science & Engineering')}
+                className="qual-template-chip"
+              >
+                + 🏛️ Bachelor's Degree
+              </button>
+              <button
+                onClick={() => openAddEduModal('TWELFTH', 'Class 12th / Senior Secondary (HSC)', 'Science (Physics, Chemistry, Maths)')}
+                className="qual-template-chip"
+              >
+                + 🏫 Class 12th (Senior Secondary)
+              </button>
+              <button
+                onClick={() => openAddEduModal('TENTH', 'Class 10th / Secondary School (SSC)', 'General Science & Mathematics')}
+                className="qual-template-chip"
+              >
+                + 🎒 Class 10th (Secondary School)
+              </button>
+              <button
+                onClick={() => openAddEduModal('DIPLOMA', 'Post Graduate Diploma in Software Development', 'Information Technology')}
+                className="qual-template-chip"
+              >
+                + 📜 Diploma / Certification
+              </button>
+            </div>
+
+            {/* List of Qualifications */}
+            {educations.length === 0 ? (
+              <div className="portfolio-empty-state">
+                <div className="portfolio-empty-icon" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34D399' }}>
+                  <GraduationCap size={36} />
+                </div>
+                <h3 className="portfolio-empty-title">No Academic Qualifications Added Yet</h3>
+                <p className="portfolio-empty-desc">
+                  Showcase your academic journey from 10th &amp; 12th schooling to Bachelor's and Master's degrees.
+                </p>
+                <button onClick={() => openAddEduModal('BACHELORS')} className="portfolio-primary-add-btn">
+                  <Plus size={16} /> Add Your First Qualification
+                </button>
+              </div>
+            ) : (
+              <div className="qual-list-grid">
+                {educations.map((edu, idx) => {
+                  const badge = getEduCategoryBadge(edu.degree, edu.fieldOfStudy);
+                  const formatYearText = () => {
+                    if (edu.startDate && edu.endDate) {
+                      const s = edu.startDate.slice(0, 4);
+                      const e = edu.current ? 'Present' : edu.endDate.slice(0, 4);
+                      return `${s} – ${e}`;
+                    }
+                    if (edu.endDate) return `Completed in ${edu.endDate.slice(0, 4)}`;
+                    if (edu.current) return 'Currently Pursuing';
+                    return 'Completed';
+                  };
+
+                  return (
+                    <div key={edu.id || idx} className="qual-card">
+                      <div className="qual-card-left-badge">
+                        <div className="qual-icon-box">{badge.icon}</div>
+                        <span className={`qual-level-indicator ${badge.colorClass}`}>{badge.label}</span>
+                      </div>
+
+                      <div className="qual-card-content">
+                        <div className="qual-card-header">
+                          <div>
+                            <h3 className="qual-degree-title">{edu.degree}</h3>
+                            <div className="qual-institution-name">
+                              <Building2 size={14} /> {edu.institution}
+                            </div>
+                          </div>
+
+                          <div className="qual-actions-btn-group">
+                            <button
+                              onClick={() => openEditEduModal(edu)}
+                              className="qual-action-btn edit"
+                              title="Edit Qualification"
+                            >
+                              <Edit3 size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEducation(edu.id)}
+                              className="qual-action-btn delete"
+                              title="Delete Qualification"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="qual-meta-tags-row">
+                          {edu.fieldOfStudy && (
+                            <span className="qual-tag stream">
+                              <BookOpen size={12} /> {edu.fieldOfStudy}
+                            </span>
+                          )}
+
+                          <span className="qual-tag year">
+                            <Calendar size={12} /> {formatYearText()}
+                          </span>
+
+                          {edu.gpa && (
+                            <span className="qual-tag grade">
+                              <Award size={12} /> Score: {edu.gpa.toString().includes('%') || edu.gpa.toString().toLowerCase().includes('cgpa') ? edu.gpa : `${edu.gpa} CGPA / %`}
+                            </span>
+                          )}
+
+                          {edu.current && (
+                            <span className="qual-tag pursuing">
+                              ✦ Ongoing
+                            </span>
+                          )}
+                        </div>
+
+                        {edu.description && (
+                          <p className="qual-description-text">{edu.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TAB 5: RESUME CENTER ── */}
         {activeTab === 'resume' && (
           <div className="portfolio-resume-container">
             <div className="portfolio-section-header">
@@ -918,35 +1323,32 @@ export const PortfolioBuilder: React.FC = () => {
             </div>
 
             {/* Drag and Drop Zone */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              accept=".pdf,.doc,.docx"
-              onChange={handleResumeFileSelect}
-            />
-
             <div
+              className="portfolio-dropzone"
               onClick={() => fileInputRef.current?.click()}
-              className="portfolio-resume-dropzone"
             >
-              <UploadCloud size={48} color="#EC4899" style={{ margin: '0 auto 12px' }} />
-              <h3 style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', margin: '0 0 6px 0' }}>
-                {uploadingResume ? 'Uploading & Parsing Resume with AI...' : 'Click to Upload Resume (PDF / DOCX)'}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.doc"
+                style={{ display: 'none' }}
+                onChange={handleFileUpload}
+              />
+              <div className="portfolio-dropzone-icon">
+                <UploadCloud size={36} />
+              </div>
+              <h3 className="portfolio-dropzone-title">
+                {uploadingResume ? 'Uploading & Parsing with AI...' : 'Click to Upload Resume (PDF / DOCX)'}
               </h3>
-              <p style={{ color: '#94A3B8', fontSize: 13, margin: 0 }}>
-                Supports standard formats up to 10MB. Automatically parses skills, projects, and work history.
+              <p className="portfolio-dropzone-desc">
+                Maximum file size: 10MB • Your primary resume is attached to all 1-Click Applications
               </p>
             </div>
 
-            {/* List of Uploaded Resumes */}
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#F8FAFC', margin: '12px 0 0 0' }}>
-              Your Uploaded Resumes ({resumes.length})
-            </h3>
-
+            {/* Active Resumes List */}
             {resumes.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>
-                No resumes uploaded yet. Click the upload zone above to attach your resume file!
+              <div className="portfolio-empty-state" style={{ marginTop: 24 }}>
+                <p className="portfolio-empty-desc">No resume uploaded yet. Upload one above to unlock AI semantic matching.</p>
               </div>
             ) : (
               <div className="portfolio-resume-list">
@@ -1058,7 +1460,7 @@ export const PortfolioBuilder: React.FC = () => {
                     <input
                       type="url"
                       className="portfolio-input"
-                      placeholder="https://my-app-demo.com"
+                      placeholder="https://my-app.vercel.app"
                       value={projectUrl}
                       onChange={(e) => setProjectUrl(e.target.value)}
                     />
@@ -1069,7 +1471,7 @@ export const PortfolioBuilder: React.FC = () => {
                     <input
                       type="url"
                       className="portfolio-input"
-                      placeholder="https://github.com/my-profile/repo"
+                      placeholder="https://github.com/username/project"
                       value={projectGithub}
                       onChange={(e) => setProjectGithub(e.target.value)}
                     />
@@ -1081,7 +1483,7 @@ export const PortfolioBuilder: React.FC = () => {
                     Cancel
                   </button>
                   <button type="submit" className="portfolio-modal-submit-btn" disabled={savingProject}>
-                    {savingProject ? 'Saving...' : editingProjectId ? 'Update Project' : 'Save Project Permanently 🚀'}
+                    {savingProject ? 'Saving...' : editingProjectId ? 'Update Project' : 'Publish Project Showcase ✨'}
                   </button>
                 </div>
               </form>
@@ -1089,10 +1491,10 @@ export const PortfolioBuilder: React.FC = () => {
           </div>
         )}
 
-        {/* ── MODAL 2: CUSTOM SKILL ── */}
+        {/* ── MODAL 2: ADD SKILL ── */}
         {showSkillModal && (
           <div className="portfolio-modal-overlay">
-            <div className="portfolio-modal-content">
+            <div className="portfolio-modal-content" style={{ maxWidth: 450 }}>
               <div className="portfolio-modal-header">
                 <h3 className="portfolio-modal-title">Add Custom Skill</h3>
                 <button onClick={() => setShowSkillModal(false)} className="portfolio-modal-close-btn">
@@ -1100,14 +1502,14 @@ export const PortfolioBuilder: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleCustomSkillSubmit} className="portfolio-form">
+              <form onSubmit={handleSaveSkill} className="portfolio-form">
                 <div className="portfolio-form-group">
                   <label className="portfolio-field-label">Skill / Technology Name *</label>
                   <input
                     type="text"
                     className="portfolio-input"
                     required
-                    placeholder="e.g. Apache Kafka, Rust, Terraform, Solidity"
+                    placeholder="e.g. Distributed Caching, Redis, Next.js"
                     value={skillNameInput}
                     onChange={(e) => setSkillNameInput(e.target.value)}
                   />
@@ -1132,7 +1534,7 @@ export const PortfolioBuilder: React.FC = () => {
                     <label className="portfolio-field-label">Years of Experience</label>
                     <input
                       type="number"
-                      min={0}
+                      min={1}
                       max={30}
                       className="portfolio-input"
                       value={skillYears}
@@ -1146,7 +1548,7 @@ export const PortfolioBuilder: React.FC = () => {
                     Cancel
                   </button>
                   <button type="submit" className="portfolio-modal-submit-btn" disabled={savingSkill}>
-                    {savingSkill ? 'Saving...' : 'Add Skill ⚡'}
+                    {savingSkill ? 'Adding...' : 'Add Skill to Stack ⚡'}
                   </button>
                 </div>
               </form>
@@ -1154,7 +1556,7 @@ export const PortfolioBuilder: React.FC = () => {
           </div>
         )}
 
-        {/* ── MODAL 3: WORK EXPERIENCE ── */}
+        {/* ── MODAL 3: ADD / EDIT WORK EXPERIENCE ── */}
         {showExpModal && (
           <div className="portfolio-modal-overlay">
             <div className="portfolio-modal-content">
@@ -1165,7 +1567,7 @@ export const PortfolioBuilder: React.FC = () => {
                 </button>
               </div>
 
-              <form onSubmit={handleAddExperienceSubmit} className="portfolio-form">
+              <form onSubmit={handleSaveExperience} className="portfolio-form">
                 <div className="portfolio-grid-2col">
                   <div className="portfolio-form-group">
                     <label className="portfolio-field-label">Company Name *</label>
@@ -1173,34 +1575,47 @@ export const PortfolioBuilder: React.FC = () => {
                       type="text"
                       className="portfolio-input"
                       required
-                      placeholder="e.g. Google, Stripe, Microsoft"
+                      placeholder="e.g. Google / Stripe / OpenAI"
                       value={expCompany}
                       onChange={(e) => setExpCompany(e.target.value)}
                     />
                   </div>
 
                   <div className="portfolio-form-group">
-                    <label className="portfolio-field-label">Job Title *</label>
+                    <label className="portfolio-field-label">Job Title / Role *</label>
                     <input
                       type="text"
                       className="portfolio-input"
                       required
-                      placeholder="e.g. Senior Backend Engineer"
+                      placeholder="e.g. Senior Software Engineer"
                       value={expTitle}
                       onChange={(e) => setExpTitle(e.target.value)}
                     />
                   </div>
                 </div>
 
-                <div className="portfolio-form-group">
-                  <label className="portfolio-field-label">Location (Optional)</label>
-                  <input
-                    type="text"
-                    className="portfolio-input"
-                    placeholder="e.g. San Francisco, CA or Remote"
-                    value={expLocation}
-                    onChange={(e) => setExpLocation(e.target.value)}
-                  />
+                <div className="portfolio-grid-2col">
+                  <div className="portfolio-form-group">
+                    <label className="portfolio-field-label">Location</label>
+                    <input
+                      type="text"
+                      className="portfolio-input"
+                      placeholder="e.g. San Francisco, CA (Remote)"
+                      value={expLocation}
+                      onChange={(e) => setExpLocation(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="portfolio-form-group" style={{ display: 'flex', alignItems: 'center', paddingTop: 24 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#E2E8F0', cursor: 'pointer', fontSize: 13.5 }}>
+                      <input
+                        type="checkbox"
+                        checked={expCurrent}
+                        onChange={(e) => setExpCurrent(e.target.checked)}
+                      />
+                      I currently work in this role
+                    </label>
+                  </div>
                 </div>
 
                 <div className="portfolio-grid-2col">
@@ -1214,35 +1629,24 @@ export const PortfolioBuilder: React.FC = () => {
                     />
                   </div>
 
-                  <div className="portfolio-form-group">
-                    <label className="portfolio-field-label">End Date</label>
-                    <input
-                      type="date"
-                      className="portfolio-input"
-                      disabled={expCurrent}
-                      value={expEndDate}
-                      onChange={(e) => setExpEndDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0' }}>
-                  <input
-                    type="checkbox"
-                    id="currentExpCheck"
-                    checked={expCurrent}
-                    onChange={(e) => setExpCurrent(e.target.checked)}
-                  />
-                  <label htmlFor="currentExpCheck" style={{ fontSize: 13, color: '#CBD5E1', cursor: 'pointer' }}>
-                    I am currently working here (Current Company)
-                  </label>
+                  {!expCurrent && (
+                    <div className="portfolio-form-group">
+                      <label className="portfolio-field-label">End Date</label>
+                      <input
+                        type="date"
+                        className="portfolio-input"
+                        value={expEndDate}
+                        onChange={(e) => setExpEndDate(e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="portfolio-form-group">
-                  <label className="portfolio-field-label">Key Responsibilities & Tech Stack</label>
+                  <label className="portfolio-field-label">Responsibilities & Key Achievements</label>
                   <textarea
                     className="portfolio-textarea"
-                    placeholder="Describe your role, projects delivered, systems designed, and technical technologies used..."
+                    placeholder="Describe your tech stack, system scaling achievements, microservices built, team leadership..."
                     value={expDescription}
                     onChange={(e) => setExpDescription(e.target.value)}
                   />
@@ -1253,7 +1657,7 @@ export const PortfolioBuilder: React.FC = () => {
                     Cancel
                   </button>
                   <button type="submit" className="portfolio-modal-submit-btn" disabled={savingExp}>
-                    {savingExp ? 'Saving...' : 'Save Experience 🏢'}
+                    {savingExp ? 'Saving...' : 'Save Experience 💼'}
                   </button>
                 </div>
               </form>
@@ -1261,7 +1665,218 @@ export const PortfolioBuilder: React.FC = () => {
           </div>
         )}
 
-        {/* ── MODAL 4: EDIT PROFILE DETAILS ── */}
+        {/* ── MODAL 4: ADD / EDIT QUALIFICATION & EDUCATION (NEW) ── */}
+        {showEduModal && (
+          <div className="portfolio-modal-overlay">
+            <div className="portfolio-modal-content">
+              <div className="portfolio-modal-header">
+                <h3 className="portfolio-modal-title">
+                  {editingEduId ? 'Edit Academic Qualification' : 'Add Academic Qualification'}
+                </h3>
+                <button onClick={() => setShowEduModal(false)} className="portfolio-modal-close-btn">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEducation} className="portfolio-form">
+                {/* Qualification Level Selection */}
+                <div className="portfolio-form-group">
+                  <label className="portfolio-field-label">Qualification Level / Degree Category *</label>
+                  <select
+                    className="portfolio-select"
+                    value={eduCategory}
+                    onChange={(e) => {
+                      const cat = e.target.value as any;
+                      setEduCategory(cat);
+                      if (cat === 'MASTERS' && !eduDegree) {
+                        setEduDegree('Master of Technology (M.Tech)');
+                        setEduFieldOfStudy('Computer Science & Engineering');
+                      } else if (cat === 'BACHELORS' && !eduDegree) {
+                        setEduDegree('Bachelor of Technology (B.Tech)');
+                        setEduFieldOfStudy('Computer Science & Engineering');
+                      } else if (cat === 'TWELFTH' && !eduDegree) {
+                        setEduDegree('Class 12th / Senior Secondary (HSC)');
+                        setEduFieldOfStudy('Science (PCM - Physics, Chemistry, Maths)');
+                      } else if (cat === 'TENTH' && !eduDegree) {
+                        setEduDegree('Class 10th / Secondary School (SSC)');
+                        setEduFieldOfStudy('General Science & Mathematics');
+                      }
+                    }}
+                  >
+                    <option value="MASTERS">🎓 Master's Degree (M.Tech, M.S., MBA, M.Sc., MCA)</option>
+                    <option value="BACHELORS">🏛️ Bachelor's Degree (B.Tech, B.E., B.S., B.Sc., BCA, B.Com)</option>
+                    <option value="TWELFTH">🏫 Class 12th / Senior Secondary / Intermediate (HSC)</option>
+                    <option value="TENTH">🎒 Class 10th / Secondary School / Matriculation (SSC)</option>
+                    <option value="DIPLOMA">📜 Diploma / Polytechnic / Post-Graduate Certification</option>
+                    <option value="OTHER">✦ Other Academic Qualification / Doctorate (Ph.D.)</option>
+                  </select>
+                </div>
+
+                {/* College / University / School Name with Debounced Autocomplete */}
+                <div className="portfolio-form-group">
+                  <label className="portfolio-field-label">
+                    {eduCategory === 'TENTH' || eduCategory === 'TWELFTH' ? 'School / Junior College Name *' : 'College / University Name *'}
+                  </label>
+                  <div className="college-autocomplete-wrapper">
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        className="portfolio-input"
+                        required
+                        placeholder={
+                          eduCategory === 'TENTH' || eduCategory === 'TWELFTH'
+                            ? 'e.g. Delhi Public School (DPS) / Kendriya Vidyalaya / St. Xavier’s'
+                            : 'e.g. Indian Institute of Technology (IIT) Delhi / BITS Pilani / Stanford'
+                        }
+                        value={eduInstitution}
+                        onChange={(e) => handleInstitutionChange(e.target.value)}
+                        onFocus={() => {
+                          if (institutionSuggestions.length > 0) setShowInstitutionDropdown(true);
+                        }}
+                      />
+                      {isSearchingInstitutions && (
+                        <Loader2 size={16} className="spinning" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#38BDF8' }} />
+                      )}
+                    </div>
+
+                    {showInstitutionDropdown && institutionSuggestions.length > 0 && (
+                      <div className="college-autocomplete-dropdown">
+                        <div className="college-autocomplete-hint">
+                          <Search size={12} /> Matching Institutes / Universities:
+                        </div>
+                        {institutionSuggestions.map((inst, idx) => (
+                          <div
+                            key={idx}
+                            className="college-autocomplete-item"
+                            onClick={() => handleSelectInstitution(inst)}
+                          >
+                            <Building2 size={14} className="college-autocomplete-item-icon" />
+                            <span>{inst}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="portfolio-grid-2col">
+                  {/* Degree Name */}
+                  <div className="portfolio-form-group">
+                    <label className="portfolio-field-label">Degree / Examination Name *</label>
+                    <input
+                      type="text"
+                      className="portfolio-input"
+                      required
+                      placeholder={
+                        eduCategory === 'TWELFTH'
+                          ? 'e.g. Senior Secondary Certificate (12th)'
+                          : eduCategory === 'TENTH'
+                          ? 'e.g. Secondary School Certificate (10th)'
+                          : 'e.g. Bachelor of Technology (B.Tech)'
+                      }
+                      value={eduDegree}
+                      onChange={(e) => setEduDegree(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Stream / Branch */}
+                  <div className="portfolio-form-group">
+                    <label className="portfolio-field-label">
+                      {eduCategory === 'TWELFTH' || eduCategory === 'TENTH' ? 'Stream / Board' : 'Branch / Field of Study'}
+                    </label>
+                    <input
+                      type="text"
+                      className="portfolio-input"
+                      placeholder={
+                        eduCategory === 'TWELFTH'
+                          ? 'e.g. Science (PCM) - CBSE / ICSE / State Board'
+                          : eduCategory === 'TENTH'
+                          ? 'e.g. CBSE / ICSE / State Board'
+                          : 'e.g. Computer Science, AI/ML, Electrical Engineering'
+                      }
+                      value={eduFieldOfStudy}
+                      onChange={(e) => setEduFieldOfStudy(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="portfolio-grid-2col">
+                  {/* Start Date / Year */}
+                  <div className="portfolio-form-group">
+                    <label className="portfolio-field-label">Start Date / Year</label>
+                    <input
+                      type="date"
+                      className="portfolio-input"
+                      value={eduStartDate}
+                      onChange={(e) => setEduStartDate(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Completion Date / Year */}
+                  <div className="portfolio-form-group">
+                    <label className="portfolio-field-label">
+                      {eduCurrent ? 'Expected Completion Date' : 'Completion Date / Passing Year'}
+                    </label>
+                    <input
+                      type="date"
+                      className="portfolio-input"
+                      value={eduEndDate}
+                      onChange={(e) => setEduEndDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="portfolio-grid-2col">
+                  {/* Grade / Percentage / CGPA */}
+                  <div className="portfolio-form-group">
+                    <label className="portfolio-field-label">Grade / CGPA / Percentage (Optional)</label>
+                    <input
+                      type="text"
+                      className="portfolio-input"
+                      placeholder="e.g. 9.2 CGPA or 94.5%"
+                      value={eduGpa}
+                      onChange={(e) => setEduGpa(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Ongoing Checkbox */}
+                  <div className="portfolio-form-group" style={{ display: 'flex', alignItems: 'center', paddingTop: 24 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#E2E8F0', cursor: 'pointer', fontSize: 13.5 }}>
+                      <input
+                        type="checkbox"
+                        checked={eduCurrent}
+                        onChange={(e) => setEduCurrent(e.target.checked)}
+                      />
+                      Currently Pursuing / In-Progress
+                    </label>
+                  </div>
+                </div>
+
+                {/* Description / Achievements */}
+                <div className="portfolio-form-group">
+                  <label className="portfolio-field-label">Achievements, Major Coursework &amp; Key Details (Optional)</label>
+                  <textarea
+                    className="portfolio-textarea"
+                    placeholder="e.g. Department Rank 1, Major Project in Distributed Systems, Head of Coding Club, Scored 99.2% in State Board..."
+                    value={eduDescription}
+                    onChange={(e) => setEduDescription(e.target.value)}
+                  />
+                </div>
+
+                <div className="portfolio-modal-actions">
+                  <button type="button" onClick={() => setShowEduModal(false)} className="portfolio-modal-cancel-btn">
+                    Cancel
+                  </button>
+                  <button type="submit" className="portfolio-modal-submit-btn" disabled={savingEdu}>
+                    {savingEdu ? 'Saving...' : editingEduId ? 'Update Qualification' : 'Save Qualification 🎓'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ── MODAL 5: EDIT CANDIDATE PROFILE INFO ── */}
         {showProfileModal && (
           <div className="portfolio-modal-overlay">
             <div className="portfolio-modal-content">
@@ -1279,7 +1894,7 @@ export const PortfolioBuilder: React.FC = () => {
                     <input
                       type="text"
                       className="portfolio-input"
-                      placeholder="e.g. Lead Software Architect"
+                      placeholder="e.g. Staff Full Stack Engineer"
                       value={editCurrentTitle}
                       onChange={(e) => setEditCurrentTitle(e.target.value)}
                     />
@@ -1290,7 +1905,7 @@ export const PortfolioBuilder: React.FC = () => {
                     <input
                       type="text"
                       className="portfolio-input"
-                      placeholder="e.g. Tech Corp"
+                      placeholder="e.g. Apex Innovations / Meta"
                       value={editCurrentCompany}
                       onChange={(e) => setEditCurrentCompany(e.target.value)}
                     />

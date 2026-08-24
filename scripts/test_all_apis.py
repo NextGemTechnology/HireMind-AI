@@ -101,7 +101,7 @@ def run_suite():
     # ─────────────────────────────────────────────────────────────
     print(f"\n{YELLOW}{BOLD}1. Auth Controller & RBAC Portal Tests{RESET}")
     
-    # Register Candidate
+    # Candidate Registration: 1. Direct registration without OTP MUST FAIL (400)
     code, res = request("/v1/auth/register", "POST", {
         "firstName": "Alex",
         "lastName": "Rivera",
@@ -111,11 +111,63 @@ def run_suite():
         "desiredRole": "Full Stack Engineer",
         "yearsExperience": 3
     })
-    log_test("Auth", "/v1/auth/register (Candidate)", "POST", code, 201)
+    log_test("Auth", "/v1/auth/register (Direct register without OTP rejected - 400)", "POST", code, 400)
+
+    # Candidate Registration: 2. Dispatch 4-digit OTP
+    code, res = request("/v1/auth/register/send-otp", "POST", {
+        "email": cand_email,
+        "firstName": "Alex",
+        "role": "ROLE_CANDIDATE"
+    })
+    log_test("Auth", "/v1/auth/register/send-otp (Candidate dispatch 4-digit OTP)", "POST", code, 200)
+
+    # Fetch Candidate OTP from Redis
+    cand_otp = subprocess.check_output(
+        ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"otp:reg:{cand_email}"]
+    ).decode().strip().strip('"')
+
+    # Candidate Registration: 3. Wrong OTP MUST FAIL (400)
+    code, res = request("/v1/auth/register", "POST", {
+        "firstName": "Alex",
+        "lastName": "Rivera",
+        "email": cand_email,
+        "password": "Password123!",
+        "role": "ROLE_CANDIDATE",
+        "desiredRole": "Full Stack Engineer",
+        "yearsExperience": 3,
+        "otp": "9999" if cand_otp != "9999" else "8888"
+    })
+    log_test("Auth", "/v1/auth/register (Invalid OTP rejected - 400)", "POST", code, 400)
+
+    # Candidate Registration: 4. Valid OTP MUST SUCCEED (201)
+    code, res = request("/v1/auth/register", "POST", {
+        "firstName": "Alex",
+        "lastName": "Rivera",
+        "email": cand_email,
+        "password": "Password123!",
+        "role": "ROLE_CANDIDATE",
+        "desiredRole": "Full Stack Engineer",
+        "yearsExperience": 3,
+        "otp": cand_otp
+    })
+    log_test("Auth", f"/v1/auth/register (Candidate verified with OTP {cand_otp} -> 201)", "POST", code, 201)
     cand_token = res.get("data", {}).get("accessToken")
     cand_id = res.get("data", {}).get("userId")
 
-    # Register HR
+    # HR Registration: 1. Dispatch 4-digit OTP
+    code, res = request("/v1/auth/register/send-otp", "POST", {
+        "email": hr_email,
+        "firstName": "Megha",
+        "role": "ROLE_HR"
+    })
+    log_test("Auth", "/v1/auth/register/send-otp (HR dispatch 4-digit OTP)", "POST", code, 200)
+
+    # Fetch HR OTP from Redis
+    hr_otp = subprocess.check_output(
+        ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"otp:reg:{hr_email}"]
+    ).decode().strip().strip('"')
+
+    # HR Registration: 2. Valid OTP MUST SUCCEED (201)
     code, res = request("/v1/auth/register", "POST", {
         "firstName": "Megha",
         "lastName": "Gupta",
@@ -123,9 +175,10 @@ def run_suite():
         "password": "Password123!",
         "role": "ROLE_HR",
         "companyName": f"Apex Innovations {timestamp}",
-        "jobTitle": "Lead Talent Partner"
+        "jobTitle": "Lead Talent Partner",
+        "otp": hr_otp
     })
-    log_test("Auth", "/v1/auth/register (HR)", "POST", code, 201)
+    log_test("Auth", f"/v1/auth/register (HR verified with OTP {hr_otp} -> 201)", "POST", code, 201)
     hr_token = res.get("data", {}).get("accessToken")
     hr_id = res.get("data", {}).get("userId")
 
@@ -426,6 +479,21 @@ def run_suite():
     # Use revoked token -> MUST RETURN 401 UNAUTHORIZED
     code, res = request("/v1/users/me", "GET", token=cand_token)
     log_test("Auth", "/v1/users/me (Rejected with Blacklisted Token)", "GET", code, 401)
+
+    # ─────────────────────────────────────────────────────────────
+    # 14. TEST DATA TEARDOWN & CLEANUP
+    # ─────────────────────────────────────────────────────────────
+    print(f"\n{YELLOW}{BOLD}14. Cleaning Up Ephemeral Test Data...{RESET}")
+    try:
+        if hr_token and job_id:
+            request(f"/v1/jobs/{job_id}", "DELETE", token=hr_token)
+        subprocess.run([
+            "docker", "exec", "talentiq-mysql", "mysql", "-utalentiq_user", "-pHireMeAiProject@2529", "HireMeAI", "-e",
+            f"SET FOREIGN_KEY_CHECKS=0; DELETE FROM jobs WHERE id = {job_id if 'job_id' in locals() else 0}; DELETE FROM users WHERE email IN ('{cand_email}', '{hr_email}'); SET FOREIGN_KEY_CHECKS=1;"
+        ], capture_output=True)
+        print(f"{GREEN}✓ Ephemeral test records removed cleanly.{RESET}")
+    except Exception as e:
+        print(f"{YELLOW}Teardown notice: {e}{RESET}")
 
     # ─────────────────────────────────────────────────────────────
     # SUMMARY

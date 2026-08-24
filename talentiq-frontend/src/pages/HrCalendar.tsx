@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   Calendar, ChevronLeft, ChevronRight, Clock, Mail,
@@ -58,19 +59,7 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
 export const HrCalendar: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-
-  // Theme State
-  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
-    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'light';
-  });
-
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'universe' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('hr_theme', nextTheme);
-  };
-
-  const isUniverse = theme === 'universe';
+  const { theme, toggleTheme, isUniverse } = useTheme();
 
   const [slots, setSlots] = useState<InterviewSlot[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);

@@ -13,14 +13,13 @@ import com.talentiq.repository.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.talentiq.common.enums.SkillProficiency;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +34,56 @@ public class CandidateServiceImpl implements CandidateService {
     private final CandidateProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+
+    private static final List<String> CURATED_INSTITUTIONS = List.of(
+            "Indian Institute of Technology (IIT) Bombay",
+            "Indian Institute of Technology (IIT) Delhi",
+            "Indian Institute of Technology (IIT) Madras",
+            "Indian Institute of Technology (IIT) Kharagpur",
+            "Indian Institute of Technology (IIT) Kanpur",
+            "Indian Institute of Technology (IIT) Roorkee",
+            "Indian Institute of Technology (IIT) Guwahati",
+            "BITS Pilani (Birla Institute of Technology and Science)",
+            "International Institute of Information Technology (IIIT) Hyderabad",
+            "International Institute of Information Technology (IIIT) Bangalore",
+            "National Institute of Technology (NIT) Trichy",
+            "National Institute of Technology (NIT) Karnataka, Surathkal",
+            "National Institute of Technology (NIT) Warangal",
+            "Delhi Technological University (DTU)",
+            "Netaji Subhas University of Technology (NSUT)",
+            "Vellore Institute of Technology (VIT)",
+            "Manipal Institute of Technology (MIT)",
+            "Thapar Institute of Engineering and Technology",
+            "SRM Institute of Science and Technology",
+            "Amity University",
+            "Delhi University (DU)",
+            "Jawaharlal Nehru University (JNU)",
+            "Banaras Hindu University (BHU)",
+            "Anna University, Chennai",
+            "Jadavpur University, Kolkata",
+            "Pune University (Savitribai Phule Pune University)",
+            "Mumbai University",
+            "Massachusetts Institute of Technology (MIT), USA",
+            "Stanford University, USA",
+            "Harvard University, USA",
+            "University of California, Berkeley (UC Berkeley)",
+            "Carnegie Mellon University (CMU)",
+            "University of Cambridge, UK",
+            "University of Oxford, UK",
+            "National University of Singapore (NUS)",
+            "Nanyang Technological University (NTU), Singapore",
+            "ETH Zurich, Switzerland",
+            "University of Toronto, Canada",
+            "University of Waterloo, Canada",
+            "Central Board of Secondary Education (CBSE)",
+            "Indian Certificate of Secondary Education (ICSE / ISC)",
+            "Delhi Public School (DPS)",
+            "Kendriya Vidyalaya (KV)",
+            "DAV Public School",
+            "St. Xavier's High School",
+            "Army Public School",
+            "State Board of Secondary & Higher Secondary Education"
+    );
 
     @Override
     @Transactional(readOnly = true)
@@ -77,36 +126,29 @@ public class CandidateServiceImpl implements CandidateService {
     @Override
     public CandidateDto.Response addSkill(Long userId, CandidateDto.SkillRequest request) {
         Candidate candidate = getOrCreateCandidate(userId);
-        String skillName = request.getSkillName().trim();
-        SkillProficiency proficiency = request.getProficiency() != null ? request.getProficiency() : SkillProficiency.INTERMEDIATE;
-        int years = request.getYears() != null ? request.getYears() : 0;
-        boolean isPrimary = Boolean.TRUE.equals(request.getPrimary());
-        int displayOrder = request.getDisplayOrder() != null ? request.getDisplayOrder() : 0;
 
-        CandidateSkill existing = candidate.getSkills().stream()
-                .filter(s -> s.getSkillName().equalsIgnoreCase(skillName))
-                .findFirst()
-                .orElse(null);
-
-        if (existing != null) {
-            existing.setProficiency(proficiency);
-            existing.setYears(years);
-            existing.setPrimary(isPrimary);
-            existing.setDisplayOrder(displayOrder);
-            skillRepository.save(existing);
-        } else {
-            CandidateSkill skill = CandidateSkill.builder()
-                    .candidate(candidate)
-                    .skillName(skillName)
-                    .proficiency(proficiency)
-                    .years(years)
-                    .primary(isPrimary)
-                    .displayOrder(displayOrder)
-                    .build();
-            skill = skillRepository.save(skill);
-            candidate.getSkills().add(skill);
+        // Check if skill already exists
+        boolean exists = candidate.getSkills().stream()
+                .anyMatch(s -> s.getSkillName().equalsIgnoreCase(request.getSkillName()));
+        if (exists) {
+            return mapToResponse(candidate);
         }
 
+        SkillProficiency proficiency = request.getProficiency() != null
+                ? request.getProficiency()
+                : SkillProficiency.INTERMEDIATE;
+
+        CandidateSkill skill = CandidateSkill.builder()
+                .candidate(candidate)
+                .skillName(request.getSkillName().trim())
+                .proficiency(proficiency)
+                .years(request.getYears() != null ? request.getYears() : 1)
+                .primary(Boolean.TRUE.equals(request.getPrimary()))
+                .displayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 0)
+                .build();
+
+        skill = skillRepository.save(skill);
+        candidate.getSkills().add(skill);
         candidate.calculateProfileCompletion();
         Candidate updated = candidateRepository.save(candidate);
         return mapToResponse(updated);
@@ -131,8 +173,8 @@ public class CandidateServiceImpl implements CandidateService {
 
         CandidateExperience exp = CandidateExperience.builder()
                 .candidate(candidate)
-                .company(request.getCompany().trim())
-                .title(request.getTitle().trim())
+                .company(request.getCompany())
+                .title(request.getTitle())
                 .description(request.getDescription())
                 .location(request.getLocation())
                 .employmentType(request.getEmploymentType())
@@ -187,6 +229,35 @@ public class CandidateServiceImpl implements CandidateService {
     }
 
     @Override
+    public CandidateDto.Response updateEducation(Long userId, Long educationId, CandidateDto.EducationRequest request) {
+        Candidate candidate = getOrCreateCandidate(userId);
+        CandidateEducation edu = educationRepository.findById(educationId)
+                .orElseThrow(() -> new ResourceNotFoundException("CandidateEducation", "id", educationId));
+
+        if (!edu.getCandidate().getId().equals(candidate.getId())) {
+            throw new RuntimeException("Unauthorized to modify this education record");
+        }
+
+        LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : LocalDate.now();
+        edu.setInstitution(request.getInstitution());
+        edu.setDegree(request.getDegree());
+        edu.setFieldOfStudy(request.getFieldOfStudy());
+        edu.setGpa(request.getGpa());
+        edu.setStartDate(startDate);
+        edu.setEndDate(request.getEndDate());
+        edu.setCurrent(Boolean.TRUE.equals(request.getCurrent()));
+        edu.setDescription(request.getDescription());
+        if (request.getDisplayOrder() != null) {
+            edu.setDisplayOrder(request.getDisplayOrder());
+        }
+
+        educationRepository.save(edu);
+        candidate.calculateProfileCompletion();
+        Candidate updated = candidateRepository.save(candidate);
+        return mapToResponse(updated);
+    }
+
+    @Override
     public void deleteEducation(Long userId, Long educationId) {
         Candidate candidate = getOrCreateCandidate(userId);
         candidate.getEducations().removeIf(e -> e.getId() != null && e.getId().equals(educationId));
@@ -195,6 +266,32 @@ public class CandidateServiceImpl implements CandidateService {
         } catch (Exception ignored) {}
         candidate.calculateProfileCompletion();
         candidateRepository.save(candidate);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> searchInstitutions(String query) {
+        if (query == null || query.trim().length() < 2) {
+            return CURATED_INSTITUTIONS.stream().limit(15).toList();
+        }
+        String q = query.trim().toLowerCase();
+        Set<String> results = new LinkedHashSet<>();
+
+        // 1. Search database
+        try {
+            List<String> dbMatches = educationRepository.searchInstitutions(q, PageRequest.of(0, 10));
+            results.addAll(dbMatches);
+        } catch (Exception e) {
+            log.warn("Database institution search error: {}", e.getMessage());
+        }
+
+        // 2. Search curated catalog
+        CURATED_INSTITUTIONS.stream()
+                .filter(inst -> inst.toLowerCase().contains(q))
+                .limit(15)
+                .forEach(results::add);
+
+        return new ArrayList<>(results);
     }
 
     @Override

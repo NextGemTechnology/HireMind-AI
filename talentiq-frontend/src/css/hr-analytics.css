@@ -12,31 +12,18 @@
 
 /* ── Light Theme ─────────────────────────────────────────── */
 .analytics-page-wrapper.theme-light,
-.theme-light {
-  background: #F8FAFC !important;
-  color: #0F172A !important;
+.theme-light .analytics-page-wrapper {
+  background: var(--bg-dark) !important;
+  color: var(--text-main) !important;
 }
 
-.theme-light h1,
-.theme-light h2,
-.theme-light h3,
-.theme-light h4,
-.theme-light h5,
-.theme-light h6,
 .analytics-page-wrapper.theme-light h1,
 .analytics-page-wrapper.theme-light h2,
 .analytics-page-wrapper.theme-light h3,
 .analytics-page-wrapper.theme-light h4,
 .analytics-page-wrapper.theme-light h5,
 .analytics-page-wrapper.theme-light h6 {
-  color: #0F172A !important;
-}
-
-.theme-light p,
-.theme-light span,
-.theme-light label,
-.theme-light div {
-  color: inherit;
+  color: var(--heading-color) !important;
 }
 
 .analytics-page-wrapper.theme-light .an-sidebar {

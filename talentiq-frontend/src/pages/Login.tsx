@@ -3,7 +3,6 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import {
-  Sparkles,
   User,
   Building2,
   ShieldCheck,
@@ -21,6 +20,7 @@ import {
 } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
+import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/login.css';
 
 type LoginRoleMode = 'CANDIDATE' | 'HR' | 'ADMIN';
@@ -68,6 +68,16 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const [regDesiredRole, setRegDesiredRole] = useState('');
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
+  const [regStep, setRegStep] = useState<1 | 2>(1);
+  const [regOtpDigits, setRegOtpDigits] = useState<string[]>(['', '', '', '']);
+  const [regResendCountdown, setRegResendCountdown] = useState(0);
+
+  const regOtpRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null)
+  ];
 
   // Forgot Password Multi-Step State
   const [forgotStep, setForgotStep] = useState<1 | 2 | 3 | 4>(1);
@@ -95,6 +105,14 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     }
     return () => clearTimeout(timer);
   }, [resendCountdown]);
+
+  useEffect(() => {
+    let timer: any;
+    if (regResendCountdown > 0) {
+      timer = setTimeout(() => setRegResendCountdown((c) => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [regResendCountdown]);
 
   const handleOtpChange = (index: number, val: string) => {
     const char = val.replace(/\D/g, '').slice(-1);
@@ -234,7 +252,41 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     }
   };
 
-  // ── Handle Quick Registration on Back Face ──
+  const handleRegOtpChange = (index: number, val: string) => {
+    const char = val.replace(/\D/g, '').slice(-1);
+    const newDigits = [...regOtpDigits];
+    newDigits[index] = char;
+    setRegOtpDigits(newDigits);
+    setRegError('');
+    if (char && index < 3) {
+      regOtpRefs[index + 1].current?.focus();
+    }
+  };
+
+  const handleRegOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !regOtpDigits[index] && index > 0) {
+      regOtpRefs[index - 1].current?.focus();
+    }
+  };
+
+  const handleRegOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    if (pasted.length > 0) {
+      const newDigits = ['', '', '', ''];
+      for (let i = 0; i < pasted.length; i++) {
+        newDigits[i] = pasted[i];
+      }
+      setRegOtpDigits(newDigits);
+      if (pasted.length === 4) {
+        regOtpRefs[3].current?.focus();
+      } else {
+        regOtpRefs[pasted.length].current?.focus();
+      }
+    }
+  };
+
+  // ── Step 1: Send Registration OTP ──
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
@@ -243,37 +295,88 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       setRegError('Please enter a valid email address.');
       return;
     }
+    if (!regFirstName.trim() || !regLastName.trim()) {
+      setRegError('Please enter both your first and last name.');
+      return;
+    }
     if (!regPassword || regPassword.length < 8) {
       setRegError('Password must be at least 8 characters.');
       return;
     }
     setRegLoading(true);
     try {
+      await apiClient.post('/auth/register/send-otp', {
+        email: trimmedEmail,
+        firstName: regFirstName.trim(),
+        role: selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'
+      });
+      setRegStep(2);
+      setRegResendCountdown(60);
+      setTimeout(() => regOtpRefs[0].current?.focus(), 200);
+    } catch (err: any) {
+      setRegError(err?.response?.data?.message || err?.message || 'Failed to dispatch verification code. Please check your email.');
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  const handleResendRegOtp = async () => {
+    if (regResendCountdown > 0 || regLoading) return;
+    setRegError('');
+    setRegLoading(true);
+    try {
+      await apiClient.post('/auth/register/send-otp', {
+        email: regEmail.trim().toLowerCase(),
+        firstName: regFirstName.trim(),
+        role: selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'
+      });
+      setRegResendCountdown(60);
+    } catch (err: any) {
+      setRegError(err?.response?.data?.message || err?.message || 'Failed to resend code');
+    } finally {
+      setRegLoading(false);
+    }
+  };
+
+  // ── Step 2: Final Verify & Create Account ──
+  const handleRegVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const otpCode = regOtpDigits.join('');
+    if (otpCode.length !== 4) {
+      setRegError('Please enter the full 4-digit code.');
+      return;
+    }
+    setRegError('');
+    setRegLoading(true);
+    try {
+      const trimmedEmail = regEmail.trim().toLowerCase();
       if (selectedRole === 'HR') {
         await register({
-          firstName: regFirstName,
-          lastName: regLastName,
+          firstName: regFirstName.trim(),
+          lastName: regLastName.trim(),
           email: trimmedEmail,
           password: regPassword,
           role: 'ROLE_HR',
           companyName: regCompany || 'Enterprise Talent Corp',
           jobTitle: 'Recruitment Lead',
+          otp: otpCode
         });
         navigate('/hr-analytics');
       } else {
         await register({
-          firstName: regFirstName,
-          lastName: regLastName,
+          firstName: regFirstName.trim(),
+          lastName: regLastName.trim(),
           email: trimmedEmail,
           password: regPassword,
           role: 'ROLE_CANDIDATE',
           desiredRole: regDesiredRole || 'Software Engineer',
           yearsExperience: 2,
+          otp: otpCode
         });
         navigate('/jobs');
       }
     } catch (err: any) {
-      setRegError(err?.response?.data?.message || err?.message || 'Registration failed. Please try again.');
+      setRegError(err?.response?.data?.message || err?.message || 'Registration failed. Please check OTP code and retry.');
     } finally {
       setRegLoading(false);
     }
@@ -622,11 +725,11 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
               <>
                 {/* Header */}
                 <div className="login-header">
-                  <div className="login-icon-badge">
-                    <Sparkles size={28} color="#FFF" />
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                    <HireMindLogo variant="navbar" size="lg" showTagline={true} />
                   </div>
-                  <h2 className="login-title">Sign In to TalentIQ</h2>
-                  <p className="login-subtitle">Milky Way Cosmic Portal — Select account type to sign in</p>
+                  <h2 className="login-title">Sign In to HireMind-AI</h2>
+                  <p className="login-subtitle">Select account type to sign in</p>
                 </div>
 
                 {/* Explicit Role Selector Tabs (Triggers 3D Super Motion Flip) */}
@@ -635,7 +738,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                     type="button"
                     onClick={() => handleRoleSelect('CANDIDATE')}
                     className={`login-role-tab ${selectedRole === 'CANDIDATE' ? 'active-candidate' : ''}`}
-                    title="Switch to Candidate Portal with 3D Flip"
+                    title="Switch to Candidate"
                   >
                     <User size={18} color={selectedRole === 'CANDIDATE' ? '#FFF' : '#38bdf8'} />
                     <span>Candidate</span>
@@ -645,7 +748,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                     type="button"
                     onClick={() => handleRoleSelect('HR')}
                     className={`login-role-tab ${selectedRole === 'HR' ? 'active-hr' : ''}`}
-                    title="Switch to HR Recruiter Portal with 3D Flip"
+                    title="Switch to HR Recruiter Portal"
                   >
                     <Building2 size={18} color={selectedRole === 'HR' ? '#FFF' : '#818cf8'} />
                     <span>HR Recruiter</span>
@@ -655,7 +758,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                     type="button"
                     onClick={() => handleRoleSelect('ADMIN')}
                     className={`login-role-tab ${selectedRole === 'ADMIN' ? 'active-admin' : ''}`}
-                    title="Switch to Super Admin Portal with 3D Flip"
+                    title="Switch to Super Admin Portal"
                   >
                     <ShieldCheck size={18} color={selectedRole === 'ADMIN' ? '#FFF' : '#fb7185'} />
                     <span>Admin</span>
@@ -676,8 +779,37 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                 </div>
 
                 {error && (
-                  <div className="login-error-alert">
-                    ⚠️ {error}
+                  <div className={`login-error-alert ${error.toLowerCase().includes('locked') ? 'locked-alert' : ''}`}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span style={{ fontSize: 16 }}>{error.toLowerCase().includes('locked') ? '🔒' : '⚠️'}</span>
+                      <div style={{ flex: 1 }}>
+                        <div>{error}</div>
+                        {error.toLowerCase().includes('locked') && (
+                          <div style={{ marginTop: 8 }}>
+                            <button
+                              type="button"
+                              onClick={openForgotPassword}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.2)',
+                                border: '1px solid rgba(239, 68, 68, 0.4)',
+                                borderRadius: '6px',
+                                color: '#FECACA',
+                                padding: '5px 10px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <KeyRound size={13} /> Unlock via Password Retrieval / OTP
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -687,7 +819,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label className="login-label">Email Address</label>
                       <span style={{ fontSize: '11px', color: '#38BDF8' }}>
-                        {selectedRole === 'ADMIN' ? 'Must end with @gmail.com or @talentiq.ai' : 'Must end with @gmail.com'}
+                        {selectedRole === 'ADMIN' ? 'Must end with @gmail.com or @hiremind.ai' : 'Must end with @gmail.com'}
                       </span>
                     </div>
                     <input
@@ -697,7 +829,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                         selectedRole === 'HR'
                           ? 'recruiter.hr@gmail.com'
                           : selectedRole === 'ADMIN'
-                          ? 'admin.talentiq@gmail.com'
+                          ? 'admin.hiremind@gmail.com'
                           : 'candidate.alex@gmail.com'
                       }
                       value={email}
@@ -798,7 +930,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                     className="login-flip-toggle-btn"
                   >
                     <RefreshCw size={14} className="flip-icon-spin" />
-                    Don't have an account? <strong>3D Flip to Register</strong> ↺
+                    Don't have an account? <strong>Create New Ac</strong> ↺
                   </button>
                 </div>
               </>
@@ -816,7 +948,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
               </div>
               <h2 className="login-title">Create Account</h2>
               <p className="login-subtitle">
-                3D Fast Onboarding for {selectedRole === 'HR' ? 'HR Recruiters' : 'Candidates'}
+                Fast Onboarding for {selectedRole === 'HR' ? 'HR Recruiters' : 'Candidates'}
               </p>
             </div>
 
@@ -847,97 +979,192 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
               </div>
             )}
 
-            {/* Quick Register Form */}
-            <form onSubmit={handleRegisterSubmit} className="login-form">
-              <div className="login-grid-2col">
+            {/* Quick Register Form (Step 1: Info -> Step 2: OTP) */}
+            {regStep === 1 ? (
+              <form onSubmit={handleRegisterSubmit} className="login-form">
+                <div className="login-grid-2col">
+                  <div className="login-form-group">
+                    <label className="login-label">First Name *</label>
+                    <input
+                      type="text"
+                      className="login-input"
+                      placeholder="Jane"
+                      value={regFirstName}
+                      onChange={(e) => setRegFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="login-form-group">
+                    <label className="login-label">Last Name *</label>
+                    <input
+                      type="text"
+                      className="login-input"
+                      placeholder="Doe"
+                      value={regLastName}
+                      onChange={(e) => setRegLastName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
                 <div className="login-form-group">
-                  <label className="login-label">First Name *</label>
+                  <label className="login-label">Email Address *</label>
                   <input
-                    type="text"
+                    type="email"
                     className="login-input"
-                    placeholder="Jane"
-                    value={regFirstName}
-                    onChange={(e) => setRegFirstName(e.target.value)}
+                    placeholder={selectedRole === 'HR' ? 'recruiter@company.com' : 'candidate@example.com'}
+                    value={regEmail}
+                    onChange={(e) => setRegEmail(e.target.value)}
                     required
                   />
                 </div>
-                <div className="login-form-group">
-                  <label className="login-label">Last Name *</label>
-                  <input
-                    type="text"
-                    className="login-input"
-                    placeholder="Doe"
-                    value={regLastName}
-                    onChange={(e) => setRegLastName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="login-form-group">
-                <label className="login-label">Email Address *</label>
-                <input
-                  type="email"
-                  className="login-input"
-                  placeholder={selectedRole === 'HR' ? 'recruiter@company.com' : 'candidate@example.com'}
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  required
-                />
-              </div>
-
-              {selectedRole === 'HR' ? (
-                <div className="login-form-group">
-                  <label className="login-label">Company Name *</label>
-                  <input
-                    type="text"
-                    className="login-input"
-                    placeholder="TechCorp Innovations"
-                    value={regCompany}
-                    onChange={(e) => setRegCompany(e.target.value)}
-                    required
-                  />
-                </div>
-              ) : (
-                <div className="login-form-group">
-                  <label className="login-label">Desired Job Title *</label>
-                  <input
-                    type="text"
-                    className="login-input"
-                    placeholder="Full Stack Engineer / AI Specialist"
-                    value={regDesiredRole}
-                    onChange={(e) => setRegDesiredRole(e.target.value)}
-                    required
-                  />
-                </div>
-              )}
-
-              <div className="login-form-group">
-                <label className="login-label">Password * (min 8 chars)</label>
-                <input
-                  type="password"
-                  className="login-input"
-                  placeholder="••••••••"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                className={`login-submit-btn ${selectedRole.toLowerCase()}`}
-                disabled={regLoading}
-              >
-                {regLoading ? (
-                  'Creating Account...'
+                {selectedRole === 'HR' ? (
+                  <div className="login-form-group">
+                    <label className="login-label">Company Name *</label>
+                    <input
+                      type="text"
+                      className="login-input"
+                      placeholder="TechCorp Innovations"
+                      value={regCompany}
+                      onChange={(e) => setRegCompany(e.target.value)}
+                      required
+                    />
+                  </div>
                 ) : (
-                  <span className="login-btn-content">
-                    <UserPlus size={17} /> Create {selectedRole === 'HR' ? 'HR Recruiter' : 'Candidate'} Account 🚀
-                  </span>
+                  <div className="login-form-group">
+                    <label className="login-label">Desired Job Title *</label>
+                    <input
+                      type="text"
+                      className="login-input"
+                      placeholder="Full Stack Engineer / AI Specialist"
+                      value={regDesiredRole}
+                      onChange={(e) => setRegDesiredRole(e.target.value)}
+                      required
+                    />
+                  </div>
                 )}
-              </button>
-            </form>
+
+                <div className="login-form-group">
+                  <label className="login-label">Password * (min 8 chars)</label>
+                  <input
+                    type="password"
+                    className="login-input"
+                    placeholder="••••••••"
+                    value={regPassword}
+                    onChange={(e) => setRegPassword(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className={`login-submit-btn ${selectedRole.toLowerCase()}`}
+                  disabled={regLoading}
+                >
+                  {regLoading ? (
+                    'Sending Code...'
+                  ) : (
+                    <span className="login-btn-content">
+                      <UserPlus size={17} /> Verify Email & Create Account →
+                    </span>
+                  )}
+                </button>
+              </form>
+            ) : (
+              /* ── Step 2: 4-Digit Email OTP Verification ── */
+              <form onSubmit={handleRegVerifySubmit} className="login-form">
+                <div style={{ textAlign: 'center', padding: '6px 0 12px' }}>
+                  <div style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: '50%',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid #38BDF8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 10px'
+                  }}>
+                    <ShieldCheck size={26} color="#38BDF8" />
+                  </div>
+                  <p style={{ color: '#94A3B8', fontSize: '13px', margin: '0 0 4px', lineHeight: 1.4 }}>
+                    Enter the 4-digit code sent to
+                  </p>
+                  <strong style={{ color: '#F8FAFC', fontSize: '14px' }}>{regEmail}</strong>
+
+                  {/* 4-Digit OTP Inputs */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', margin: '16px 0' }}>
+                    {regOtpDigits.map((digit, idx) => (
+                      <input
+                        key={idx}
+                        ref={regOtpRefs[idx]}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleRegOtpChange(idx, e.target.value)}
+                        onKeyDown={(e) => handleRegOtpKeyDown(idx, e)}
+                        onPaste={handleRegOtpPaste}
+                        style={{
+                          width: '46px',
+                          height: '54px',
+                          fontSize: '24px',
+                          fontWeight: '800',
+                          textAlign: 'center',
+                          borderRadius: '10px',
+                          background: 'rgba(15, 23, 42, 0.75)',
+                          border: digit ? '2px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.2)',
+                          color: '#F8FAFC',
+                          outline: 'none',
+                          boxShadow: digit ? '0 0 12px rgba(56, 189, 248, 0.35)' : 'none'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  <div style={{ margin: '8px 0', fontSize: '12px', color: '#94A3B8' }}>
+                    {regResendCountdown > 0 ? (
+                      <span>⏱️ Resend in <strong style={{ color: '#38BDF8' }}>{regResendCountdown}s</strong></span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendRegOtp}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#38BDF8',
+                          cursor: 'pointer',
+                          fontWeight: 600,
+                          fontSize: '12px'
+                        }}
+                      >
+                        Resend 4-digit code
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setRegStep(1)}
+                    className="login-submit-btn"
+                    style={{ background: 'rgba(255,255,255,0.08)', color: '#94A3B8', flex: 1 }}
+                  >
+                    ← Back
+                  </button>
+                  <button
+                    type="submit"
+                    className={`login-submit-btn ${selectedRole.toLowerCase()}`}
+                    disabled={regLoading || regOtpDigits.join('').length !== 4}
+                    style={{ flex: 2 }}
+                  >
+                    {regLoading ? 'Activating...' : `Activate Account 🚀`}
+                  </button>
+                </div>
+              </form>
+            )}
 
             {/* Flip Back to Login Button */}
             <div className="login-flip-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -947,7 +1174,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                 className="login-flip-toggle-btn"
               >
                 <RefreshCw size={14} className="flip-icon-spin" />
-                <strong>3D Flip back to Sign In</strong> ↻
+                <strong>Sign In</strong> ↻
               </button>
 
               <Link

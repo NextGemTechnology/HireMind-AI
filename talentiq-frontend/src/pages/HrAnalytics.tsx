@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   LayoutDashboard, MessageSquare, Calendar, Briefcase,
@@ -158,19 +159,7 @@ const BarChartComponent: React.FC<{ data: Array<{ month: string; apps: number; s
 export const HrAnalytics: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-
-  // Theme State: 'light' or 'universe'
-  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
-    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'light';
-  });
-
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'universe' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('hr_theme', nextTheme);
-  };
-
-  const isUniverse = theme === 'universe';
+  const { theme, toggleTheme, isUniverse } = useTheme();
 
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);

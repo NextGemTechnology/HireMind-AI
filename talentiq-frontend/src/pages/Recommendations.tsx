@@ -144,7 +144,7 @@ export const Recommendations: React.FC = () => {
     {
       id: 'welcome-msg',
       sender: 'agent',
-      text: '👋 Hello! I am your **TalentIQ AI Career Advisor**. I can instantly analyze recent HR job postings, match your resume for 85%+ opportunities, or find specific roles. How can I help your career today?',
+      text: '👋 Hello! I am your **HireMind-AI Career Advisor**. I can instantly analyze recent HR job postings, match your resume for 85%+ opportunities, or find specific roles. How can I help your career today?',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
   ]);
@@ -206,10 +206,10 @@ export const Recommendations: React.FC = () => {
       setTotalPages(totalP);
       setTotalElements(totalEl);
     } catch (e) {
-      console.warn('Recommendations fetch error, using smart fallback:', e);
-      setRecommendations(getMockRecommendations(selectedFilter));
+      console.warn('Recommendations fetch error:', e);
+      setRecommendations([]);
       setTotalPages(1);
-      setTotalElements(2);
+      setTotalElements(0);
     } finally {
       setLoading(false);
       setRecalculating(false);
@@ -373,92 +373,6 @@ export const Recommendations: React.FC = () => {
     navigate(`/messages?recipientId=${recipientId}&jobId=${job.id}&jobTitle=${jobTitle}`);
   };
 
-  const getMockRecommendations = (filter: string): RecommendationItem[] => {
-    const mockList: RecommendationItem[] = [
-      {
-        id: 101,
-        overallScore: 94.5,
-        skillScore: 96.0,
-        experienceScore: 92.0,
-        locationScore: 100.0,
-        job: {
-          id: 1,
-          title: 'Senior Full Stack & AI Solutions Architect',
-          company: { name: 'NeuroScale Technologies', logoUrl: '' },
-          location: 'San Francisco, CA (Remote)',
-          remote: true,
-          hybrid: false,
-          jobType: 'FULL_TIME',
-          experienceLevel: 'SENIOR',
-          salaryMin: 145000,
-          salaryMax: 185000,
-          salaryCurrency: 'USD',
-          salaryPeriod: 'YEARLY',
-          description: 'Architect and scale high-throughput cloud microservices with embedded LLM reasoning pipelines.',
-          requiredSkills: [
-            { skillName: 'React', required: true },
-            { skillName: 'TypeScript', required: true },
-            { skillName: 'Spring Boot', required: true },
-            { skillName: 'Docker', required: true },
-            { skillName: 'Redis', required: false }
-          ]
-        },
-        matchingSkills: ['React', 'TypeScript', 'Spring Boot', 'Docker', 'Redis', 'Java', 'SQL'],
-        missingSkills: ['LangChain4j'],
-        strengths: [
-          'Direct match on 95% of required engineering stack',
-          'Meets senior-level architecture experience expectations',
-          '100% Remote flexibility aligns with candidate preferences'
-        ],
-        improvementSuggestions: [
-          'Add a sample project demonstrating asynchronous Kafka or LangChain pipelines'
-        ]
-      },
-      {
-        id: 102,
-        overallScore: 88.0,
-        skillScore: 90.0,
-        experienceScore: 85.0,
-        locationScore: 88.0,
-        job: {
-          id: 2,
-          title: 'Principal Backend Platform Engineer',
-          company: { name: 'Aether Cloud Systems', logoUrl: '' },
-          location: 'Austin, TX',
-          remote: true,
-          hybrid: false,
-          jobType: 'FULL_TIME',
-          experienceLevel: 'LEAD',
-          salaryMin: 160000,
-          salaryMax: 210000,
-          salaryCurrency: 'USD',
-          salaryPeriod: 'YEARLY',
-          description: 'Design distributed storage engines, caching hierarchies, and resilient microservice fabrics.',
-          requiredSkills: [
-            { skillName: 'Java', required: true },
-            { skillName: 'Spring Boot', required: true },
-            { skillName: 'Kubernetes', required: true },
-            { skillName: 'MySQL', required: true }
-          ]
-        },
-        matchingSkills: ['Java', 'Spring Boot', 'MySQL', 'REST APIs', 'Docker'],
-        missingSkills: ['Kubernetes', 'gRPC'],
-        strengths: [
-          'Superb backend database and API architecture alignment',
-          'Proven track record in high-concurrency systems'
-        ],
-        improvementSuggestions: [
-          'Complete a brief certification or portfolio item for Kubernetes container orchestration'
-        ]
-      }
-    ];
-
-    if (filter === '90_PLUS') {
-      return mockList.filter(m => m.overallScore >= 90);
-    }
-    return mockList;
-  };
-
   return (
     <div className="recs-page-wrapper">
       {/* ── FULL-SCREEN 3D MOON UNIVERSE CANVAS BACKGROUND ── */}
@@ -521,7 +435,7 @@ export const Recommendations: React.FC = () => {
             </div>
             <div>
               <div className="recs-agent-title-row">
-                <h3 className="recs-agent-name">TalentIQ AI Career Advisor</h3>
+                <h3 className="recs-agent-name">HireMind-AI Career Advisor</h3>
                 <span className="recs-agent-online-pill">
                   <span className="recs-pulse-dot" /> Neural Agent Active
                 </span>

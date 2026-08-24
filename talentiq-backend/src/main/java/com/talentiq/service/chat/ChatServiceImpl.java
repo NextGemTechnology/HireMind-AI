@@ -21,10 +21,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.data.redis.core.RedisTemplate;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,6 +43,7 @@ public class ChatServiceImpl implements ChatService {
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
     private final FileStorageService fileStorageService;
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Override
     public ChatMessageDto.MessageResponse sendMessage(Long senderId, ChatMessageDto.SendRequest request) {
@@ -189,6 +193,23 @@ public class ChatServiceImpl implements ChatService {
     public List<ChatMessageDto.ContactResponse> getContacts(Long currentUserId) {
         List<Long> contactIds = chatMessageRepository.findContactIds(currentUserId);
 
+        String hrFlagKey = "hr:flagged:" + currentUserId;
+        String candFlagKey = "candidate:flagged_by:" + currentUserId;
+        Set<Object> hrFlagged = null;
+        Set<Object> candFlagged = null;
+        try {
+            hrFlagged = redisTemplate.opsForSet().members(hrFlagKey);
+            candFlagged = redisTemplate.opsForSet().members(candFlagKey);
+        } catch (Exception e) {
+            log.warn("Redis unavailable for flag lookup: {}", e.getMessage());
+        }
+        final Set<String> hrFlaggedStrs = hrFlagged != null
+                ? hrFlagged.stream().map(Object::toString).collect(Collectors.toSet())
+                : Set.of();
+        final Set<String> candFlaggedStrs = candFlagged != null
+                ? candFlagged.stream().map(Object::toString).collect(Collectors.toSet())
+                : Set.of();
+
         return contactIds.stream().map(contactId -> {
             User contact = userRepository.findById(contactId).orElse(null);
             if (contact == null) return null;
@@ -225,6 +246,9 @@ public class ChatServiceImpl implements ChatService {
                 }
             }
 
+            boolean isFlagged = hrFlaggedStrs.contains(String.valueOf(contactId))
+                    || candFlaggedStrs.contains(String.valueOf(contactId));
+
             return ChatMessageDto.ContactResponse.builder()
                     .userId(contactId)
                     .name(contact.getFullName())
@@ -235,6 +259,7 @@ public class ChatServiceImpl implements ChatService {
                     .unreadCount(unread)
                     .lastMessage(lastMsg.length() > 60 ? lastMsg.substring(0, 60) + "..." : lastMsg)
                     .lastMessageAt(lastMsgAt)
+                    .flagged(isFlagged)
                     .build();
         }).filter(c -> c != null).collect(Collectors.toList());
     }
@@ -285,6 +310,75 @@ public class ChatServiceImpl implements ChatService {
         messagingTemplate.convertAndSendToUser(String.valueOf(otherUserId), "/queue/chat.delete", deleteEvent);
         messagingTemplate.convertAndSendToUser(String.valueOf(currentUserId), "/queue/chat.delete", deleteEvent);
         log.info("Cleared {} messages between userId={} and otherUserId={}", count, currentUserId, otherUserId);
+    }
+
+    @Override
+    public boolean toggleFlagCandidate(Long hrUserId, Long candidateUserId) {
+        String hrKey = "hr:flagged:" + hrUserId;
+        String candKey = "candidate:flagged_by:" + candidateUserId;
+        String candIdStr = String.valueOf(candidateUserId);
+        String hrIdStr = String.valueOf(hrUserId);
+
+        boolean nowFlagged = false;
+        try {
+            Boolean isMember = redisTemplate.opsForSet().isMember(hrKey, candIdStr);
+            if (Boolean.TRUE.equals(isMember)) {
+                redisTemplate.opsForSet().remove(hrKey, candIdStr);
+                redisTemplate.opsForSet().remove(candKey, hrIdStr);
+                nowFlagged = false;
+            } else {
+                redisTemplate.opsForSet().add(hrKey, candIdStr);
+                redisTemplate.opsForSet().add(candKey, hrIdStr);
+                nowFlagged = true;
+            }
+        } catch (Exception e) {
+            log.error("Failed to toggle flag in Redis: {}", e.getMessage());
+        }
+
+        // Push real-time flag event to candidate and HR via WebSocket
+        try {
+            Map<String, Object> flagEvent = Map.of(
+                    "action", "FLAG_STATUS_CHANGE",
+                    "hrUserId", hrUserId,
+                    "candidateUserId", candidateUserId,
+                    "flagged", nowFlagged
+            );
+            messagingTemplate.convertAndSendToUser(String.valueOf(candidateUserId), "/queue/chat", flagEvent);
+            messagingTemplate.convertAndSendToUser(String.valueOf(hrUserId), "/queue/chat", flagEvent);
+        } catch (Exception e) {
+            log.warn("Failed to dispatch real-time flag event: {}", e.getMessage());
+        }
+
+        log.info("HR userId={} {} candidate userId={}", hrUserId, nowFlagged ? "flagged" : "unflagged", candidateUserId);
+        return nowFlagged;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Long> getFlaggedCandidateIds(Long hrUserId) {
+        try {
+            Set<Object> members = redisTemplate.opsForSet().members("hr:flagged:" + hrUserId);
+            if (members != null) {
+                return members.stream()
+                        .map(m -> Long.parseLong(m.toString()))
+                        .collect(Collectors.toList());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get flagged candidates from Redis: {}", e.getMessage());
+        }
+        return List.of();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isCandidateFlagged(Long hrUserId, Long candidateUserId) {
+        try {
+            Boolean member = redisTemplate.opsForSet().isMember("hr:flagged:" + hrUserId, String.valueOf(candidateUserId));
+            return Boolean.TRUE.equals(member);
+        } catch (Exception e) {
+            log.warn("Failed to check flag status in Redis: {}", e.getMessage());
+            return false;
+        }
     }
 
     private ChatMessageDto.MessageResponse toResponse(ChatMessage msg) {

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Sparkles, User, Building2, CheckCircle2, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { apiClient } from '../api/client';
+import { User, Building2, CheckCircle2, ArrowRight, Eye, EyeOff, ShieldCheck, RefreshCw } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
+import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/register.css';
 
 type RegisterMode = 'CANDIDATE' | 'HR';
@@ -40,10 +42,30 @@ export const Register: React.FC = () => {
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<RegisterMode>('CANDIDATE');
-  const [step, setStep] = useState<1 | 2>(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // 4-Digit OTP State
+  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '']);
+  const [resendCountdown, setResendCountdown] = useState(0);
+
+  const otpRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null)
+  ];
+
+  useEffect(() => {
+    let timer: any;
+    if (resendCountdown > 0) {
+      timer = setTimeout(() => setResendCountdown(c => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
 
   const [form, setForm] = useState<FormData>({
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
@@ -52,6 +74,40 @@ export const Register: React.FC = () => {
   });
 
   const update = (field: keyof FormData, value: string) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleOtpChange = (index: number, val: string) => {
+    const char = val.replace(/\D/g, '').slice(-1);
+    const newDigits = [...otpDigits];
+    newDigits[index] = char;
+    setOtpDigits(newDigits);
+
+    if (char && index < 3) {
+      otpRefs[index + 1].current?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      otpRefs[index - 1].current?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    if (pasted.length > 0) {
+      const newDigits = ['', '', '', ''];
+      for (let i = 0; i < pasted.length; i++) {
+        newDigits[i] = pasted[i];
+      }
+      setOtpDigits(newDigits);
+      if (pasted.length === 4) {
+        otpRefs[3].current?.focus();
+      } else {
+        otpRefs[pasted.length].current?.focus();
+      }
+    }
+  };
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,35 +127,85 @@ export const Register: React.FC = () => {
     setStep(2);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      await apiClient.post('/auth/register/send-otp', {
+        email: form.email.trim().toLowerCase(),
+        firstName: form.firstName.trim(),
+        role: mode === 'CANDIDATE' ? 'ROLE_CANDIDATE' : 'ROLE_HR'
+      });
+
+      setSuccessMsg(`A 4-digit verification code has been dispatched to ${form.email}`);
+      setResendCountdown(60);
+      setStep(3);
+      setTimeout(() => otpRefs[0].current?.focus(), 200);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to send verification code. Please check your email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCountdown > 0 || loading) return;
+    setError('');
+    setLoading(true);
+    try {
+      await apiClient.post('/auth/register/send-otp', {
+        email: form.email.trim().toLowerCase(),
+        firstName: form.firstName.trim(),
+        role: mode === 'CANDIDATE' ? 'ROLE_CANDIDATE' : 'ROLE_HR'
+      });
+      setSuccessMsg(`New 4-digit code dispatched to ${form.email}`);
+      setResendCountdown(60);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to resend code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFinalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const otpCode = otpDigits.join('');
+    if (otpCode.length !== 4) {
+      setError('Please enter the complete 4-digit verification code.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
       if (mode === 'CANDIDATE') {
         await register({
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email: form.email,
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim().toLowerCase(),
           password: form.password,
           role: 'ROLE_CANDIDATE',
           phone: form.phone,
           location: form.location,
           desiredRole: form.desiredRole,
-          yearsExperience: Number(form.yearsExperience) || 0
+          yearsExperience: Number(form.yearsExperience) || 0,
+          otp: otpCode
         });
       } else {
         await register({
-          firstName: form.firstName,
-          lastName: form.lastName,
-          email: form.email,
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim().toLowerCase(),
           password: form.password,
           role: 'ROLE_HR',
           companyName: form.companyName,
           jobTitle: form.jobTitle,
           companyWebsite: form.companyWebsite,
           industry: form.industry,
-          companySize: form.companySize
+          companySize: form.companySize,
+          otp: otpCode
         });
       }
       if (mode === 'HR') {
@@ -108,7 +214,7 @@ export const Register: React.FC = () => {
         navigate('/jobs');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || 'Registration failed. Please try again.');
+      setError(err?.response?.data?.message || err?.message || 'Registration failed. Please verify your OTP and try again.');
     } finally {
       setLoading(false);
     }
@@ -124,39 +230,43 @@ export const Register: React.FC = () => {
         <div className="register-card">
           {/* Header */}
           <div className="register-header">
-            <div className="register-icon-badge">
-              <Sparkles size={28} color="#FFF" />
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <HireMindLogo variant="navbar" size="lg" showTagline={true} />
             </div>
-            <h1 className="register-title">Create Your TalentIQ Account</h1>
+            <h1 className="register-title">Create Your HireMind-AI Account</h1>
             <p className="register-subtitle">
               Already have an account? <Link to="/login" className="register-login-link">Sign in here →</Link>
             </p>
           </div>
 
-          {/* Mode Toggle */}
-          <div className="register-mode-toggle">
-            <button
-              onClick={() => { setMode('CANDIDATE'); setStep(1); setError(''); }}
-              className={`register-mode-btn ${mode === 'CANDIDATE' ? 'active-candidate' : ''}`}
-            >
-              <User size={18} /> I'm a Candidate
-            </button>
-            <button
-              onClick={() => { setMode('HR'); setStep(1); setError(''); }}
-              className={`register-mode-btn ${mode === 'HR' ? 'active-hr' : ''}`}
-            >
-              <Building2 size={18} /> I'm an HR Recruiter
-            </button>
-          </div>
+          {/* Mode Toggle (only allowed in step 1 & 2) */}
+          {step !== 3 && (
+            <div className="register-mode-toggle">
+              <button
+                onClick={() => { setMode('CANDIDATE'); setStep(1); setError(''); }}
+                className={`register-mode-btn ${mode === 'CANDIDATE' ? 'active-candidate' : ''}`}
+              >
+                <User size={18} /> I'm a Candidate
+              </button>
+              <button
+                onClick={() => { setMode('HR'); setStep(1); setError(''); }}
+                className={`register-mode-btn ${mode === 'HR' ? 'active-hr' : ''}`}
+              >
+                <Building2 size={18} /> I'm an HR Recruiter
+              </button>
+            </div>
+          )}
 
           {/* Role description banner */}
-          <div className={`register-role-banner ${mode.toLowerCase()}`}>
-            {mode === 'CANDIDATE' ? (
-              <>🎯 <strong>Candidate Account</strong> — Upload your resume for AI analysis, browse AI-matched job recommendations, track applications, and build your portfolio showcase.</>
-            ) : (
-              <>🏢 <strong>HR Recruiter Account</strong> — Post jobs, screen candidates with AI match scoring, use the AI Copilot for interviews, and access hiring funnel analytics.</>
-            )}
-          </div>
+          {step !== 3 && (
+            <div className={`register-role-banner ${mode.toLowerCase()}`}>
+              {mode === 'CANDIDATE' ? (
+                <>🎯 <strong>Candidate Account</strong> — Upload your resume for AI analysis, browse AI-matched job recommendations, track applications, and build your portfolio showcase.</>
+              ) : (
+                <>🏢 <strong>HR Recruiter Account</strong> — Post jobs, screen candidates with AI match scoring, use the AI Copilot for interviews, and access hiring funnel analytics.</>
+              )}
+            </div>
+          )}
 
           {/* Step Progress */}
           <div className="register-step-progress">
@@ -164,16 +274,23 @@ export const Register: React.FC = () => {
               <div className={`register-step-bubble ${step >= 1 ? 'active' : ''}`}>
                 {step > 1 ? <CheckCircle2 size={16} /> : '1'}
               </div>
-              <span className="register-step-label">Account Basics</span>
+              <span className="register-step-label">Basics</span>
             </div>
-            <div className={`register-step-line ${step === 2 ? 'active' : ''}`} />
+            <div className={`register-step-line ${step >= 2 ? 'active' : ''}`} />
             <div className="register-step-item">
               <div className={`register-step-bubble ${step >= 2 ? 'active' : ''}`}>
-                2
+                {step > 2 ? <CheckCircle2 size={16} /> : '2'}
               </div>
               <span className="register-step-label">
-                {mode === 'CANDIDATE' ? 'Career Details' : 'Company Details'}
+                {mode === 'CANDIDATE' ? 'Career' : 'Company'}
               </span>
+            </div>
+            <div className={`register-step-line ${step === 3 ? 'active' : ''}`} />
+            <div className="register-step-item">
+              <div className={`register-step-bubble ${step === 3 ? 'active' : ''}`}>
+                <ShieldCheck size={16} />
+              </div>
+              <span className="register-step-label">Email OTP</span>
             </div>
           </div>
 
@@ -249,7 +366,7 @@ export const Register: React.FC = () => {
 
           {/* ── STEP 2: Role-specific Details ── */}
           {step === 2 && (
-            <form onSubmit={handleSubmit} className="register-form">
+            <form onSubmit={handleSendOtp} className="register-form">
               {mode === 'CANDIDATE' ? (
                 // ── CANDIDATE STEP 2 ──
                 <>
@@ -338,7 +455,101 @@ export const Register: React.FC = () => {
                   className={`register-btn-submit ${mode.toLowerCase()}`}
                   disabled={loading}
                 >
-                  {loading ? 'Creating Account...' : `Create ${mode === 'CANDIDATE' ? 'Candidate' : 'HR Recruiter'} Account 🚀`}
+                  {loading ? 'Sending Code...' : `Verify Email & Continue →`}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ── STEP 3: Mandatory Email Verification OTP ── */}
+          {step === 3 && (
+            <form onSubmit={handleFinalSubmit} className="register-form">
+              {successMsg && (
+                <div style={{
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  color: '#38BDF8',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                  marginBottom: '16px'
+                }}>
+                  ✨ {successMsg}
+                </div>
+              )}
+
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <p style={{ color: '#94A3B8', fontSize: '14px', margin: '0 0 16px' }}>
+                  Please enter the 4-digit numeric verification code sent to <br />
+                  <strong style={{ color: '#F8FAFC', fontSize: '15px' }}>{form.email}</strong>
+                </p>
+
+                {/* 4-Digit Inputs */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', margin: '20px 0' }}>
+                  {otpDigits.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      ref={otpRefs[idx]}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={digit}
+                      onChange={e => handleOtpChange(idx, e.target.value)}
+                      onKeyDown={e => handleOtpKeyDown(idx, e)}
+                      onPaste={handleOtpPaste}
+                      style={{
+                        width: '56px',
+                        height: '64px',
+                        fontSize: '28px',
+                        fontWeight: '800',
+                        textAlign: 'center',
+                        borderRadius: '12px',
+                        background: 'rgba(15, 23, 42, 0.75)',
+                        border: digit ? '2px solid #38BDF8' : '1px solid rgba(255, 255, 255, 0.2)',
+                        color: '#F8FAFC',
+                        outline: 'none',
+                        transition: 'all 0.2s ease',
+                        boxShadow: digit ? '0 0 16px rgba(56, 189, 248, 0.35)' : 'none'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div style={{ margin: '14px 0 6px', fontSize: '13px', color: '#94A3B8' }}>
+                  {resendCountdown > 0 ? (
+                    <span>⏱️ Resend code in <strong style={{ color: '#38BDF8' }}>{resendCountdown}s</strong></span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#38BDF8',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <RefreshCw size={14} /> Resend 4-digit code
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="register-actions">
+                <button type="button" onClick={() => setStep(2)} className="register-btn-back">
+                  ← Back
+                </button>
+                <button
+                  type="submit"
+                  className={`register-btn-submit ${mode.toLowerCase()}`}
+                  disabled={loading || otpDigits.join('').length !== 4}
+                >
+                  {loading ? 'Activating Account...' : `Verify & Create ${mode === 'CANDIDATE' ? 'Candidate' : 'HR'} Account 🚀`}
                 </button>
               </div>
             </form>

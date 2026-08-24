@@ -10,6 +10,7 @@ import {
   Sun, Moon, Paperclip, X, Clock,
   ChevronDown, CheckCircle2, Trash2, Copy, Building2, User
 } from 'lucide-react';
+import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/hr-messages.css';
 
 /* ─── Types ─── */
@@ -25,6 +26,7 @@ interface Contact {
   lastMessageAt?: string;
   jobTitle?: string;
   companyName?: string;
+  flagged?: boolean;
 }
 
 interface Message {
@@ -204,7 +206,19 @@ export const UserMessages: React.FC = () => {
         // Chat message subscription
         client.subscribe('/user/queue/chat', frame => {
           try {
-            const incoming: Message = JSON.parse(frame.body);
+            const rawBody = JSON.parse(frame.body);
+
+            // Handle real-time flag updates from HR
+            if (rawBody.action === 'FLAG_STATUS_CHANGE') {
+              const { hrUserId, flagged } = rawBody;
+              setContacts(prev => prev.map(c => c.userId === hrUserId ? { ...c, flagged } : c));
+              if (selectedContact?.userId === hrUserId) {
+                setSelectedContact(prev => prev ? { ...prev, flagged } : null);
+              }
+              return;
+            }
+
+            const incoming: Message = rawBody;
             const myId = getEffectiveUserId();
 
             setMessages(prev => {
@@ -516,10 +530,7 @@ export const UserMessages: React.FC = () => {
       {/* ── Left Navigation Sidebar ── */}
       <aside className="msg-sidebar">
         <div className="msg-sidebar-brand" onClick={() => navigate('/')}>
-          <div className="msg-brand-icon msg-avatar-brand">
-            <span style={{ fontSize: 16 }}>🌌</span>
-          </div>
-          <span className="msg-brand-name">TalentIQ Chat</span>
+          <HireMindLogo variant="navbar" size="sm" />
         </div>
 
         <nav className="msg-nav-list">
@@ -536,7 +547,7 @@ export const UserMessages: React.FC = () => {
             <FileText size={17} /> Applications
           </button>
           <button onClick={() => navigate('/portfolio')} className="msg-nav-item">
-            <FolderGit2 size={17} /> 3D Portfolio
+            <FolderGit2 size={17} /> Portfolio
           </button>
           <div className="msg-nav-divider" />
           <button onClick={() => { logout(); navigate('/login'); }} className="msg-nav-item sign-out">
@@ -648,14 +659,21 @@ export const UserMessages: React.FC = () => {
                 <div
                   key={c.userId}
                   onClick={() => setSelectedContact(c)}
-                  className={`msg-contact-item ${isSelected ? 'selected' : ''}`}
+                  className={`msg-contact-item ${isSelected ? 'selected' : ''} ${c.flagged ? 'is-flagged-contact' : ''}`}
                 >
                   <div className="msg-avatar-contact">
                     {c.name.charAt(0)}
                   </div>
                   <div className="msg-contact-info">
                     <div className="msg-contact-name-row">
-                      <span className="msg-contact-name">{c.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                        <span className="msg-contact-name">{c.name}</span>
+                        {c.flagged && (
+                          <span className="msg-flag-icon-badge" title="Flagged / Shortlisted by this Recruiter">
+                            🚩 Shortlisted
+                          </span>
+                        )}
+                      </div>
                       {c.lastMessageAt && (
                         <span className="msg-contact-time">
                           {new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -692,7 +710,14 @@ export const UserMessages: React.FC = () => {
                   {selectedContact.name.charAt(0)}
                 </div>
                 <div>
-                  <h3 className="msg-chat-contact-name">{selectedContact.name}</h3>
+                  <div className="msg-chat-header-name">
+                    <span className="msg-chat-candidate-title">{selectedContact.name}</span>
+                    {selectedContact.flagged && (
+                      <span className="msg-flagged-pill candidate-side" title="You have been shortlisted and flagged by this HR Recruiter!">
+                        🚩 Shortlisted by Recruiter
+                      </span>
+                    )}
+                  </div>
                   <div className="msg-chat-status-line">
                     <span className="msg-status-dot" />
                     <span>{otherTyping ? 'Typing...' : 'HR Recruiter Online'}</span>
@@ -722,6 +747,16 @@ export const UserMessages: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Flagged Alert Banner for Candidate */}
+            {selectedContact.flagged && (
+              <div className="msg-candidate-flagged-banner">
+                <span style={{ fontSize: '15px' }}>🚩</span>
+                <div>
+                  <strong>Priority Candidate:</strong> You have been marked as a <em>Flagged / Priority Candidate</em> by this Recruiter!
+                </div>
+              </div>
+            )}
 
             {/* Quick Inquiries Strip */}
             <div className="msg-quick-inquiries-bar">

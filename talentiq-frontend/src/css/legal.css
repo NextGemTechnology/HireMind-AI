@@ -1,0 +1,127 @@
+/* ============================================================
+   TalentIQ / NextGem-Technology — Legal Pages Styles
+   (Terms & Conditions, Privacy Policy)
+   ============================================================ */
+
+.legal-container {
+  min-height: calc(100vh - 70px);
+  padding: 40px 20px 80px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-dark);
+  color: var(--text-main);
+}
+
+.legal-content-wrapper {
+  max-width: 850px;
+  width: 100%;
+}
+
+.legal-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #8B5CF6;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 24px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.legal-back-link:hover {
+  color: #06B6D4;
+  transform: translateX(-3px);
+}
+
+.legal-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 36px;
+  box-shadow: var(--shadow-lg);
+}
+
+.legal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.legal-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.legal-icon-box.purple {
+  background: rgba(99, 102, 241, 0.15);
+  color: #8B5CF6;
+}
+
+.legal-icon-box.cyan {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06B6D4;
+}
+
+.legal-header h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  line-height: 1.2;
+}
+
+.legal-header p {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  margin: 0;
+}
+
+.legal-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  font-size: 0.96rem;
+}
+
+.legal-section h3 {
+  color: var(--text-main);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.legal-section p {
+  margin: 0;
+}
+
+.legal-section a {
+  color: #8B5CF6;
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.legal-section a:hover {
+  text-decoration: underline;
+}
+
+.legal-footer {
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+  text-align: center;
+  font-size: 0.88rem;
+  color: var(--text-dim);
+}

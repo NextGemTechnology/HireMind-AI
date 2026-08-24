@@ -126,9 +126,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
+        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank() && !ex.getMessage().equalsIgnoreCase("Bad credentials"))
+                ? ex.getMessage()
+                : "Invalid email or password";
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Invalid email or password", "INVALID_CREDENTIALS"));
+                .body(ApiResponse.error(msg, "INVALID_CREDENTIALS"));
     }
 
     @ExceptionHandler(DisabledException.class)
@@ -140,9 +143,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(LockedException.class)
     public ResponseEntity<ApiResponse<Void>> handleLocked(LockedException ex) {
+        String msg = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : "Account is temporarily locked due to too many failed login attempts.";
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error("Account is locked.", "ACCOUNT_LOCKED"));
+                .body(ApiResponse.error(msg, "ACCOUNT_LOCKED"));
     }
 
     @ExceptionHandler(AuthenticationException.class)

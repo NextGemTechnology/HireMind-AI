@@ -266,7 +266,7 @@ export const CosmicQuotePopup: React.FC = () => {
         </div>
 
         {/* Fact Title */}
-        <h4 className="cosmic-popup-title" style={{ color: '#FFFFFF' }}>
+        <h4 className="cosmic-popup-title" style={{ color: 'var(--heading-color)' }}>
           {currentFact.title}
         </h4>
 

@@ -39,14 +39,27 @@ public class AuthController {
 
     private final AuthService authService;
 
-    // ── Register ──────────────────────────────────────────────────────────────
+    // ── Register OTP & Creation ───────────────────────────────────────────────
+
+    @PostMapping("/register/send-otp")
+    @SecurityRequirements
+    @Operation(
+            summary = "Send Registration Verification OTP",
+            description = "Sends a 4-digit verification code to the specified email address prior to account creation."
+    )
+    public ResponseEntity<ApiResponse<Void>> sendRegistrationOtp(
+            @Valid @RequestBody SendRegistrationOtpRequest request,
+            HttpServletRequest httpRequest) {
+        authService.sendRegistrationOtp(request, httpRequest);
+        return ResponseEntity.ok(ApiResponse.success(
+                "A 4-digit verification code has been dispatched to " + request.getEmail() + ". Please enter the code to complete registration."));
+    }
 
     @PostMapping("/register")
     @SecurityRequirements  // No auth required
     @Operation(
             summary = "Register a new user",
-            description = "Creates a new CANDIDATE or HR account. Sends email verification. " +
-                    "Tokens are NOT returned until email is verified."
+            description = "Creates a new CANDIDATE or HR account with mandatory 4-digit email verification OTP."
     )
     public ResponseEntity<ApiResponse<AuthResponse>> register(
             @Valid @RequestBody RegisterRequest request,
@@ -56,7 +69,7 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.success(
-                        "Registration successful. Please check your email to verify your account.",
+                        "Registration successful. Your account has been verified and created!",
                         response));
     }
 

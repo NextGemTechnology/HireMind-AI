@@ -9,4 +9,6 @@ public interface AnalyticsService {
     AnalyticsDto.HrDashboardResponse getHrAnalyticsDashboard(Long hrUserId);
 
     AnalyticsDto.PlatformOverviewResponse getPlatformOverview(Long adminUserId);
+
+    AnalyticsDto.PublicPlatformStatsResponse getPublicPlatformStats();
 }

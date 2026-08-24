@@ -16,6 +16,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/v1/candidates")
 @RequiredArgsConstructor
@@ -85,15 +87,26 @@ public class CandidateController {
         return ResponseEntity.ok(ApiResponse.success("Experience deleted"));
     }
 
-    // ── Educations ────────────────────────────────────────────────────────────
+    // ── Educations / Qualifications ───────────────────────────────────────────
     @PostMapping("/me/educations")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Add education entry")
+    @Operation(summary = "Add education/qualification entry")
     public ResponseEntity<ApiResponse<CandidateDto.Response>> addEducation(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CandidateDto.EducationRequest request) {
         CandidateDto.Response updated = candidateService.addEducation(principal.getId(), request);
-        return ResponseEntity.ok(ApiResponse.success("Education added", updated));
+        return ResponseEntity.ok(ApiResponse.success("Education added successfully", updated));
+    }
+
+    @PutMapping("/me/educations/{educationId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Update an existing education/qualification entry")
+    public ResponseEntity<ApiResponse<CandidateDto.Response>> updateEducation(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long educationId,
+            @Valid @RequestBody CandidateDto.EducationRequest request) {
+        CandidateDto.Response updated = candidateService.updateEducation(principal.getId(), educationId, request);
+        return ResponseEntity.ok(ApiResponse.success("Education updated successfully", updated));
     }
 
     @DeleteMapping("/me/educations/{educationId}")
@@ -104,6 +117,14 @@ public class CandidateController {
             @PathVariable Long educationId) {
         candidateService.deleteEducation(principal.getId(), educationId);
         return ResponseEntity.ok(ApiResponse.success("Education deleted"));
+    }
+
+    @GetMapping("/institutions/search")
+    @Operation(summary = "Search colleges, universities, and schools with debouncing")
+    public ResponseEntity<ApiResponse<List<String>>> searchInstitutions(
+            @RequestParam(required = false, defaultValue = "") String q) {
+        List<String> institutions = candidateService.searchInstitutions(q);
+        return ResponseEntity.ok(ApiResponse.success(institutions));
     }
 
     // ── Projects ──────────────────────────────────────────────────────────────

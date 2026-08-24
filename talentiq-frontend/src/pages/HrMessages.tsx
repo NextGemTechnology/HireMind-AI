@@ -10,9 +10,10 @@ import {
   MessageSquare, Users, Briefcase, Settings, LogOut,
   Circle, Sun, Moon, Trash2, Copy, Paperclip, Image as ImageIcon,
   Check, CheckCheck, Clock, ChevronDown, CheckCircle2, Sparkles, X,
-  ExternalLink, UserCheck, ShieldCheck, User as UserIcon
+  UserCheck, ShieldCheck, User as UserIcon, Flag
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
+import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/hr-messages.css';
 
 /* ─── Types ─── */
@@ -28,6 +29,7 @@ interface Contact {
   lastMessageAt?: string;
   companyName?: string;
   jobTitle?: string;
+  flagged?: boolean;
 }
 
 interface Message {
@@ -95,6 +97,9 @@ export const HrMessages: React.FC = () => {
   const [activePopup, setActivePopup] = useState<any | null>(null);
   const popupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Flagged Candidate User IDs Set
+  const [flaggedUserIds, setFlaggedUserIds] = useState<Set<number>>(new Set());
+
   // WebRTC state
   const [callState, setCallState] = useState<'idle' | 'calling' | 'in-call'>('idle');
   const [isMuted, setIsMuted] = useState(false);
@@ -142,6 +147,10 @@ export const HrMessages: React.FC = () => {
       const list: Contact[] = res.data?.data || [];
       setContacts(list);
 
+      // Populate flagged set
+      const flaggedSet = new Set(list.filter(c => c.flagged).map(c => c.userId));
+      setFlaggedUserIds(flaggedSet);
+
       const savedContactId = sessionStorage.getItem('active_hr_chat_contact_id');
 
       // If URL has direct contact ID (e.g. from notification click), select that contact
@@ -171,6 +180,50 @@ export const HrMessages: React.FC = () => {
       setContactsLoading(false);
     }
   }, [directContactId]);
+
+  /* ─── Toggle Flag on Candidate ─── */
+  const handleToggleFlag = async (candidateUserId: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const willBeFlagged = !flaggedUserIds.has(candidateUserId);
+
+    // Optimistic state update
+    setFlaggedUserIds(prev => {
+      const next = new Set(prev);
+      if (willBeFlagged) next.add(candidateUserId);
+      else next.delete(candidateUserId);
+      return next;
+    });
+
+    setContacts(prev => prev.map(c => c.userId === candidateUserId ? { ...c, flagged: willBeFlagged } : c));
+    if (selectedContact?.userId === candidateUserId) {
+      setSelectedContact(prev => prev ? { ...prev, flagged: willBeFlagged } : null);
+    }
+
+    try {
+      const res = await apiClient.post(`/chat/flag/${candidateUserId}`);
+      const isNowFlagged = res.data?.data?.flagged ?? willBeFlagged;
+
+      setActivePopup({
+        title: isNowFlagged ? 'Candidate Flagged 🚩' : 'Candidate Unflagged',
+        message: isNowFlagged
+          ? 'Candidate marked as Priority / Shortlisted'
+          : 'Candidate priority flag removed',
+        senderId: candidateUserId
+      });
+      if (popupTimerRef.current) clearTimeout(popupTimerRef.current);
+      popupTimerRef.current = setTimeout(() => setActivePopup(null), 2000);
+    } catch (err) {
+      console.error('Failed to toggle flag', err);
+      // Revert optimistic update
+      setFlaggedUserIds(prev => {
+        const next = new Set(prev);
+        if (willBeFlagged) next.delete(candidateUserId);
+        else next.add(candidateUserId);
+        return next;
+      });
+      setContacts(prev => prev.map(c => c.userId === candidateUserId ? { ...c, flagged: !willBeFlagged } : c));
+    }
+  };
 
   useEffect(() => {
     fetchContacts();
@@ -318,7 +371,22 @@ export const HrMessages: React.FC = () => {
         // Chat messages queue
         client.subscribe('/user/queue/chat', (frame) => {
           try {
-            const incoming: Message = JSON.parse(frame.body);
+            const rawBody = JSON.parse(frame.body);
+
+            // Handle real-time flag updates
+            if (rawBody.action === 'FLAG_STATUS_CHANGE') {
+              const { candidateUserId, flagged } = rawBody;
+              setFlaggedUserIds(prev => {
+                const next = new Set(prev);
+                if (flagged) next.add(candidateUserId);
+                else next.delete(candidateUserId);
+                return next;
+              });
+              setContacts(prev => prev.map(c => c.userId === candidateUserId ? { ...c, flagged } : c));
+              return;
+            }
+
+            const incoming: Message = rawBody;
             const myId = getEffectiveUserId();
 
             setMessages(prev => {
@@ -607,12 +675,18 @@ export const HrMessages: React.FC = () => {
     );
   };
 
-  const filteredContacts = contacts.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.jobTitle?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredContacts = contacts
+    .filter(c =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.lastMessage?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.jobTitle?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aFlagged = flaggedUserIds.has(a.userId) || a.flagged ? 1 : 0;
+      const bFlagged = flaggedUserIds.has(b.userId) || b.flagged ? 1 : 0;
+      return bFlagged - aFlagged;
+    });
 
   const formatMsgTime = (sentAt: string) => {
     try {
@@ -702,10 +776,7 @@ export const HrMessages: React.FC = () => {
       {/* ── Left Sidebar (High Contrast & High Opacity) ── */}
       <aside className="msg-sidebar">
         <div className="msg-sidebar-brand" onClick={() => navigate('/hr-dashboard')}>
-          <div className="msg-brand-icon msg-avatar-brand">
-            <span style={{ fontSize: 18 }}>⚡</span>
-          </div>
-          <span className="msg-brand-name">TalentIQ HR</span>
+          <HireMindLogo variant="navbar" size="sm" />
         </div>
 
         <nav className="msg-nav-list">
@@ -843,19 +914,36 @@ export const HrMessages: React.FC = () => {
             filteredContacts.map(contact => {
               const isSelected = selectedContact?.userId === contact.userId;
               const hasUnread = contact.unreadCount > 0;
+              const isFlagged = flaggedUserIds.has(contact.userId) || !!contact.flagged;
               return (
                 <div
                   key={contact.userId}
                   onClick={() => setSelectedContact(contact)}
-                  className={`msg-contact-item ${isSelected ? 'selected' : ''}`}
+                  className={`msg-contact-item ${isSelected ? 'selected' : ''} ${isFlagged ? 'is-flagged-contact' : ''}`}
                 >
-                  <div className="msg-avatar-contact msg-avatar-brand">
+                  {/* WhatsApp-Style Clickable Avatar */}
+                  <div
+                    className="msg-avatar-contact msg-avatar-brand whatsapp-sidebar-avatar"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/candidate-profile/${contact.userId}`);
+                    }}
+                    title="Click avatar to view candidate profile (WhatsApp style)"
+                  >
                     {contact.name.charAt(0).toUpperCase()}
                   </div>
 
                   <div className="msg-contact-info">
                     <div className="msg-contact-name-row">
-                      <span className="msg-contact-name">{contact.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                        <span className="msg-contact-name">{contact.name}</span>
+                        {isFlagged && (
+                          <span className="msg-flag-icon-badge" title="Flagged / Priority Candidate by HR">
+                            🚩
+                          </span>
+                        )}
+                      </div>
+
                       {/* Unread Status: Glowing Blue Dot & Number Badge */}
                       {hasUnread ? (
                         <span className="msg-unread-pill" title={`${contact.unreadCount} unread message(s)`}>
@@ -892,43 +980,51 @@ export const HrMessages: React.FC = () => {
       <div className="msg-chat-panel">
         {selectedContact ? (
           <>
-            {/* Top Chat Header */}
+            {/* Top Chat Header — WhatsApp-Style Clickable Profile & Flagging */}
             <div className="msg-chat-header">
               <div className="msg-chat-header-user">
-                <div className="msg-avatar-contact active-avatar">
+                <div
+                  className="msg-avatar-contact active-avatar whatsapp-profile-avatar"
+                  onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
+                  title="Click avatar to view Candidate Profile (WhatsApp style)"
+                >
                   {selectedContact.name.charAt(0).toUpperCase()}
                 </div>
-                <div>
+                <div
+                  className="msg-chat-header-user-text"
+                  onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
+                  title="Click name to view Candidate Profile (WhatsApp style)"
+                >
                   <div className="msg-chat-header-name">
-                    <span>{selectedContact.name}</span>
-                    <button
-                      className="msg-view-profile-btn"
-                      onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
-                      title="View Candidate Verified Portfolio & Resume"
-                    >
-                      <UserCheck size={13} style={{ marginRight: '4px' }} />
-                      View Candidate Profile 📄
-                    </button>
+                    <span className="msg-chat-candidate-title">{selectedContact.name}</span>
+                    {(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) && (
+                      <span className="msg-flagged-pill" title="This candidate is flagged/shortlisted by you">
+                        🚩 Flagged
+                      </span>
+                    )}
+                    
                   </div>
                   <div className="msg-chat-status-line">
                     <span className="msg-status-dot" />
                     <span>{otherTyping ? 'Candidate is typing...' : 'Candidate Online'}</span>
-                    <span className="msg-company-tag">• {selectedContact.email}</span>
-                    {selectedContact.jobTitle && (
-                      <span className="msg-job-tag">• {selectedContact.jobTitle}</span>
-                    )}
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="msg-chat-header-actions">
+                {/* 🚩 HR Flag / Pin Toggle Button */}
                 <button
-                  onClick={() => setShowClearModal(true)}
-                  className="msg-header-btn msg-btn-danger"
-                  title="Clear Conversation"
+                  onClick={() => handleToggleFlag(selectedContact.userId)}
+                  className={`msg-header-btn msg-flag-btn ${(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? 'flagged-active' : ''}`}
+                  title={(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? 'Candidate is Flagged / Priority (Click to Unflag)' : 'Flag this Candidate as Priority'}
                 >
-                  <Trash2 size={13} /> Clear Chat
+                  <Flag
+                    size={13}
+                    fill={(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? '#F59E0B' : 'none'}
+                    color={(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? '#F59E0B' : 'currentColor'}
+                  />
+                  <span>{(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? 'Flagged' : 'Flag Candidate'}</span>
                 </button>
 
                 <button
@@ -936,7 +1032,15 @@ export const HrMessages: React.FC = () => {
                   className="msg-header-btn"
                   title="Open Full Candidate Profile"
                 >
-                  <ExternalLink size={13} /> Full Profile
+                  <UserCheck size={13} /> Full Profile
+                </button>
+
+                <button
+                  onClick={() => setShowClearModal(true)}
+                  className="msg-header-btn msg-btn-danger"
+                  title="Clear Conversation"
+                >
+                  <Trash2 size={13} /> Clear Chat
                 </button>
 
                 {callState === 'idle' && (

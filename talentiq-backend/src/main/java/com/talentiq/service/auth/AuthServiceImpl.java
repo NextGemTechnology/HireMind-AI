@@ -40,6 +40,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * AuthService implementation.
@@ -58,8 +59,8 @@ import java.util.UUID;
 @Transactional
 public class AuthServiceImpl implements AuthService {
 
-    private static final int MAX_LOGIN_ATTEMPTS = 5;
-    private static final int LOCKOUT_MINUTES = 15;
+    private static final int MAX_LOGIN_ATTEMPTS = 4;
+    private static final int LOCKOUT_MINUTES = 30;
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -83,24 +84,66 @@ public class AuthServiceImpl implements AuthService {
 
     // ── Register ──────────────────────────────────────────────────────────────
 
+    // ── Registration OTP Flow ──────────────────────────────────────────────────
+
     @Override
-    public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
+    public void sendRegistrationOtp(SendRegistrationOtpRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
         validateEmailFormat(email);
 
-        // Validate only CANDIDATE and HR roles are allowed for public registration
+        // Check if email already registered
+        if (userRepository.existsByEmail(email)) {
+            throw new ConflictException("An account with this email address already exists. Please login instead.");
+        }
+
+        // Validate role
         if (request.getRole() == null
                 || (!request.getRole().equals(Role.ROLE_CANDIDATE)
                 && !request.getRole().equals(Role.ROLE_HR))) {
             throw new BadRequestException("Only CANDIDATE and HR roles can self-register");
         }
 
-        // Email uniqueness check
+        // Enforce Redis sliding-window rate limit
+        String clientIp = getClientIpAddress(httpRequest);
+        redisOtpService.enforceRateLimit(email, clientIp);
+
+        // Generate 4-digit numeric OTP
+        String otp = String.format("%04d", ThreadLocalRandom.current().nextInt(0, 10000));
+
+        // Store in Redis with 10-minute TTL
+        redisOtpService.storeRegistrationOtp(email, otp, 10);
+
+        // Dispatch verification code via Email
+        String firstName = StringUtils.hasText(request.getFirstName()) ? request.getFirstName().trim() : "Future Leader";
+        mailService.sendRegistrationOtpEmail(email, firstName, otp);
+
+        log.info("4-Digit Registration OTP generated and dispatched to: {} [OTP: {}]", email, otp);
+    }
+
+    @Override
+    public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email);
+
+        // 1. Mandatory Email OTP Verification
+        if (!StringUtils.hasText(request.getOtp())) {
+            throw new BadRequestException("4-digit email verification code is required.");
+        }
+        redisOtpService.verifyRegistrationOtp(email, request.getOtp());
+
+        // 2. Validate only CANDIDATE and HR roles are allowed for public registration
+        if (request.getRole() == null
+                || (!request.getRole().equals(Role.ROLE_CANDIDATE)
+                && !request.getRole().equals(Role.ROLE_HR))) {
+            throw new BadRequestException("Only CANDIDATE and HR roles can self-register");
+        }
+
+        // 3. Email uniqueness check
         if (userRepository.existsByEmail(email)) {
             throw new ConflictException("An account with this email already exists");
         }
 
-        // Build user entity — ACTIVE status for instant usability
+        // 4. Build user entity — ACTIVE & verified status
         User user = User.builder()
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
@@ -190,9 +233,19 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
         // Check if locked out
-        if (user.isLocked()) {
-            throw new UnauthorizedException(
-                    "Account temporarily locked due to too many failed attempts. Try again later.");
+        if (user.getLockedUntil() != null) {
+            if (Instant.now().isBefore(user.getLockedUntil())) {
+                long remainingMinutes = ChronoUnit.MINUTES.between(Instant.now(), user.getLockedUntil()) + 1;
+                if (remainingMinutes < 1) remainingMinutes = 1;
+                throw new UnauthorizedException(
+                        String.format("Account is temporarily locked due to %d consecutive failed password attempts. Please try again after %d minute%s or reset your password.",
+                                MAX_LOGIN_ATTEMPTS, remainingMinutes, remainingMinutes == 1 ? "" : "s"));
+            } else {
+                // Lockout has expired! Reset automatically
+                user.setLoginAttempts(0);
+                user.setLockedUntil(null);
+                userRepository.save(user);
+            }
         }
 
         try {
@@ -248,18 +301,12 @@ public class AuthServiceImpl implements AuthService {
             String accessToken = jwtService.generateAccessToken(principal, authenticatedUser.getId());
             RefreshToken refreshToken = createRefreshToken(authenticatedUser, httpRequest);
 
-            // Dispatch Login Alert email notification
-            String clientIp = getClientIpAddress(httpRequest);
-            String userAgent = getClientUserAgent(httpRequest);
-            mailService.sendLoginAlertEmail(authenticatedUser.getEmail(), authenticatedUser.getFirstName(), clientIp, userAgent);
-
             log.info("User logged in successfully: {} [{}]", email, authenticatedUser.getRoles());
 
             return buildAuthResponse(authenticatedUser, accessToken, refreshToken.getToken());
 
         } catch (BadCredentialsException e) {
-            handleFailedLogin(user);
-            throw e;
+            throw handleFailedLogin(user);
         } catch (DisabledException ex) {
             throw new UnauthorizedException("Please verify your email address before logging in");
         }
@@ -332,11 +379,6 @@ public class AuthServiceImpl implements AuthService {
         UserPrincipal principal = new UserPrincipal(user);
         String accessToken = jwtService.generateAccessToken(principal, user.getId());
         RefreshToken refreshToken = createRefreshToken(user, httpRequest);
-
-        // Dispatch Login Alert email notification
-        String clientIp = getClientIpAddress(httpRequest);
-        String userAgent = getClientUserAgent(httpRequest);
-        mailService.sendLoginAlertEmail(user.getEmail(), user.getFirstName(), clientIp, userAgent);
 
         log.info("Google OAuth login successful: {}", email);
         return buildAuthResponse(user, accessToken, refreshToken.getToken());
@@ -546,14 +588,26 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    private void handleFailedLogin(User user) {
+    private RuntimeException handleFailedLogin(User user) {
         int attempts = user.getLoginAttempts() + 1;
+        user.setLoginAttempts(attempts);
         userRepository.incrementLoginAttempts(user.getId());
 
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
             user.setLockedUntil(Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
             userRepository.save(user);
-            log.warn("Account locked due to {} failed login attempts: {}", attempts, user.getEmail());
+            log.warn("Account temporarily locked for {} minutes due to {} failed login attempts: {}", LOCKOUT_MINUTES, attempts, user.getEmail());
+            throw new UnauthorizedException(
+                    String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts. Please try again after %d minutes or reset your password.",
+                            LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES)
+            );
+        } else {
+            userRepository.save(user);
+            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            throw new BadCredentialsException(
+                    String.format("Invalid password. %d attempt%s remaining before account is temporarily locked for %d minutes.",
+                            remaining, remaining == 1 ? "" : "s", LOCKOUT_MINUTES)
+            );
         }
     }
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 interface MilkyWay3DCanvasProps {
@@ -13,8 +13,8 @@ export const MilkyWay3DCanvas: React.FC<MilkyWay3DCanvasProps> = ({
   orbitSpeedMultiplier = 1.0,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [speed, setSpeed] = useState(orbitSpeedMultiplier);
-  const [isPaused, setIsPaused] = useState(false);
+  const speed = orbitSpeedMultiplier;
+  const isPaused = false;
 
   useEffect(() => {
     const container = containerRef.current;
@@ -774,63 +774,7 @@ export const MilkyWay3DCanvas: React.FC<MilkyWay3DCanvasProps> = ({
         overflow: 'hidden',
         background: 'radial-gradient(ellipse at center, #0B0F29 0%, #030712 100%)',
       }}
-    >
-      {/* Subtle overlay controls in bottom left for 3D interactive manipulation */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: 20,
-          left: 20,
-          zIndex: 10,
-          display: 'flex',
-          gap: 8,
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(12px)',
-          padding: '6px 12px',
-          borderRadius: 20,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          color: '#94a3b8',
-          fontSize: 11,
-          alignItems: 'center',
-          userSelect: 'none',
-        }}
-      >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#e2e8f0', fontWeight: 600 }}>
-          🌌 Milky Way 3D
-        </span>
-        <span style={{ opacity: 0.4 }}>|</span>
-        <button
-          onClick={() => setSpeed((s) => (s === 1 ? 2.5 : s === 2.5 ? 0.5 : 1))}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#38bdf8',
-            cursor: 'pointer',
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '2px 4px',
-          }}
-          title="Adjust Orbit Speed"
-        >
-          {speed === 1 ? '1x Speed' : speed === 2.5 ? '2.5x Warp' : '0.5x Slow'}
-        </button>
-        <span style={{ opacity: 0.4 }}>|</span>
-        <button
-          onClick={() => setIsPaused((p) => !p)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: isPaused ? '#f59e0b' : '#34d399',
-            cursor: 'pointer',
-            fontSize: 11,
-            fontWeight: 600,
-            padding: '2px 4px',
-          }}
-        >
-          {isPaused ? '▶ Resume' : '⏸ Pause'}
-        </button>
-      </div>
-    </div>
+    />
   );
 };
 

@@ -1,0 +1,128 @@
+/* ============================================================
+   TalentIQ — HR Global Notification Toast Styles
+   ============================================================ */
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.hr-toast-container {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 99999;
+  border-radius: 14px;
+  padding: 12px 18px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  max-width: 380px;
+  animation: toastSlideIn 0.25s ease-out forwards;
+  font-family: 'Inter', sans-serif;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hr-toast-container.light {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  color: #0F172A;
+}
+
+.hr-toast-container.dark {
+  background: linear-gradient(135deg, rgba(15, 23, 50, 0.98) 0%, rgba(8, 12, 30, 0.98) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.6);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.35);
+  color: #FFFFFF;
+}
+
+.hr-toast-container:hover {
+  transform: translateY(-2px);
+}
+
+.hr-toast-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #0284C7 0%, #38BDF8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 15px;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+.hr-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.hr-toast-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hr-toast-sender {
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hr-toast-badge {
+  font-size: 10px;
+  color: #0284C7;
+  font-weight: 600;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.hr-toast-msg {
+  margin: 2px 0 0;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hr-toast-msg.light {
+  color: #475569;
+}
+
+.hr-toast-msg.dark {
+  color: #CBD5E1;
+}
+
+.hr-toast-close {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.hr-toast-close:hover {
+  color: #F43F5E;
+}

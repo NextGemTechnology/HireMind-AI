@@ -54,4 +54,22 @@ public class AnalyticsDto {
         private long totalApplicationsCount;
         private long totalResumesUploadedCount;
     }
+
+    @Data
+    @Builder
+    @lombok.NoArgsConstructor
+    @lombok.AllArgsConstructor
+    public static class PublicPlatformStatsResponse implements java.io.Serializable {
+        private long activeCandidates;
+        private String activeCandidatesFormatted;
+        private long companiesHiring;
+        private String companiesHiringFormatted;
+        private long jobsLiveNow;
+        private String jobsLiveNowFormatted;
+        private double successRate;
+        private String successRateFormatted;
+        private long totalApplications;
+        private long aiMatchesMade;
+        private String cacheSource;
+    }
 }

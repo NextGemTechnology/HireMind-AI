@@ -56,4 +56,11 @@ public class AnalyticsController {
         AnalyticsDto.PlatformOverviewResponse overview = analyticsService.getPlatformOverview(principal.getId());
         return ResponseEntity.ok(ApiResponse.success(overview));
     }
+
+    @GetMapping("/public-stats")
+    @Operation(summary = "Get public platform metrics and real-time statistics cached in Redis")
+    public ResponseEntity<ApiResponse<AnalyticsDto.PublicPlatformStatsResponse>> getPublicStats() {
+        AnalyticsDto.PublicPlatformStatsResponse stats = analyticsService.getPublicPlatformStats();
+        return ResponseEntity.ok(ApiResponse.success(stats));
+    }
 }

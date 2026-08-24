@@ -66,95 +66,13 @@ export const MyApplications: React.FC = () => {
     try {
       const res = await apiClient.get('/applications/my?page=0&size=50');
       const data = res.data?.content || res.data?.data?.content || res.data?.data || [];
-      if (Array.isArray(data) && data.length > 0) {
-        setApplications(data);
-      } else {
-        setApplications(getMockApplications());
-      }
+      setApplications(Array.isArray(data) ? data : []);
     } catch (e) {
-      setApplications(getMockApplications());
+      setApplications([]);
     } finally {
       setLoading(false);
     }
   };
-
-  const getMockApplications = (): ApplicationItem[] => [
-    {
-      id: 101,
-      job: {
-        id: 1,
-        title: 'Senior Full Stack & AI Solutions Architect',
-        company: { name: 'NeuroScale Technologies' },
-        location: 'San Francisco, CA (Remote)',
-        remote: true,
-        salaryMin: 145000,
-        salaryMax: 185000,
-        salaryCurrency: 'USD',
-        description: 'Architect scalable cloud services and integrate LangChain LLM cognitive pipelines.'
-      },
-      status: 'INTERVIEWING',
-      aiMatchScore: 94.5,
-      appliedAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-      interviewDate: new Date(Date.now() + 86400000 * 2).toISOString(),
-      notes: 'Passed technical resume screen. Next: System Architecture Deep Dive with Engineering Director.'
-    },
-    {
-      id: 102,
-      job: {
-        id: 2,
-        title: 'Principal Backend Platform Engineer',
-        company: { name: 'Aether Cloud Systems' },
-        location: 'Austin, TX (Hybrid)',
-        hybrid: true,
-        salaryMin: 160000,
-        salaryMax: 210000,
-        salaryCurrency: 'USD',
-        description: 'High-throughput microservices, Redis caching hierarchies, and distributed message queues.'
-      },
-      status: 'OFFERED',
-      aiMatchScore: 88.0,
-      appliedAt: new Date(Date.now() - 86400000 * 12).toISOString(),
-      offerAmount: 175000,
-      offerCurrency: 'USD',
-      notes: 'Official offer letter received. Includes equity package and comprehensive health coverage.'
-    },
-    {
-      id: 103,
-      job: {
-        id: 3,
-        title: 'Cloud Infrastructure & DevOps Lead',
-        company: { name: 'Vanguard Systems' },
-        location: 'Seattle, WA',
-        remote: true,
-        salaryMin: 135000,
-        salaryMax: 165000,
-        salaryCurrency: 'USD',
-        description: 'Kubernetes cluster orchestration, Terraform IaC, and zero-downtime CI/CD automation.'
-      },
-      status: 'SCREENED',
-      aiMatchScore: 86.2,
-      appliedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-      notes: 'Resume analyzed by AI. Recruiter screening completed.'
-    },
-    {
-      id: 104,
-      job: {
-        id: 4,
-        title: 'React & TypeScript Frontend Specialist',
-        company: { name: 'Hyperion Labs' },
-        location: 'New York, NY',
-        remote: false,
-        salaryMin: 120000,
-        salaryMax: 145000,
-        salaryCurrency: 'USD',
-        description: 'High-fidelity WebGL interactive dashboards, Next.js optimization, and component systems.'
-      },
-      status: 'APPLIED',
-      aiMatchScore: 82.0,
-      appliedAt: new Date(Date.now() - 86400000 * 6).toISOString(),
-      notes: 'Application submitted. Awaiting HR review queue processing.'
-    }
-  ];
 
   const filteredApplications = applications.filter(app => {
     if (selectedFilter === 'ALL') return true;

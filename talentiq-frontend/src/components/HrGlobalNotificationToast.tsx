@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { X } from 'lucide-react';
+import '../css/hr-notification-toast.css';
 
 interface ToastData {
   id: number;
@@ -15,6 +17,7 @@ interface ToastData {
 
 export const HrGlobalNotificationToast: React.FC = () => {
   const { user, isAuthenticated, isHr } = useAuth();
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [activeToast, setActiveToast] = useState<ToastData | null>(null);
@@ -87,57 +90,22 @@ export const HrGlobalNotificationToast: React.FC = () => {
         navigate(`/hr-messages?contactId=${activeToast.senderId}`);
         setActiveToast(null);
       }}
-      style={{
-        position: 'fixed',
-        top: '20px',
-        right: '24px',
-        zIndex: 99999,
-        background: 'linear-gradient(135deg, rgba(15, 23, 50, 0.98) 0%, rgba(8, 12, 30, 0.98) 100%)',
-        border: '1px solid rgba(56, 189, 248, 0.6)',
-        borderRadius: '14px',
-        padding: '12px 18px',
-        boxShadow: '0 12px 36px rgba(0, 0, 0, 0.85), 0 0 20px rgba(56, 189, 248, 0.35)',
-        backdropFilter: 'blur(20px)',
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        minWidth: '280px',
-        maxWidth: '380px',
-        animation: 'toastSlideIn 0.25s ease-out forwards',
-        color: '#FFFFFF',
-        fontFamily: "'Inter', sans-serif",
-      }}
+      className={`hr-toast-container ${isLight ? 'light' : 'dark'}`}
     >
-      <div
-        style={{
-          width: '38px',
-          height: '38px',
-          borderRadius: '10px',
-          background: 'linear-gradient(135deg, #0284C7 0%, #38BDF8 100%)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#FFFFFF',
-          fontWeight: 800,
-          fontSize: '15px',
-          flexShrink: 0,
-          boxShadow: '0 0 10px rgba(56, 189, 248, 0.5)',
-        }}
-      >
+      <div className="hr-toast-avatar">
         {activeToast.senderName.charAt(0).toUpperCase()}
       </div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-          <span style={{ fontSize: '13.5px', fontWeight: 700, color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div className="hr-toast-content">
+        <div className="hr-toast-header">
+          <span className="hr-toast-sender">
             💬 {activeToast.senderName}
           </span>
-          <span style={{ fontSize: '10px', color: '#38BDF8', fontWeight: 600, background: 'rgba(56, 189, 248, 0.15)', padding: '2px 6px', borderRadius: '999px' }}>
+          <span className="hr-toast-badge">
             NEW
           </span>
         </div>
-        <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#CBD5E1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <p className={`hr-toast-msg ${isLight ? 'light' : 'dark'}`}>
           {activeToast.content}
         </p>
       </div>
@@ -147,19 +115,13 @@ export const HrGlobalNotificationToast: React.FC = () => {
           e.stopPropagation();
           setActiveToast(null);
         }}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: '#94A3B8',
-          cursor: 'pointer',
-          padding: '4px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
+        className="hr-toast-close"
+        aria-label="Dismiss Notification"
       >
         <X size={14} />
       </button>
     </div>
   );
 };
+
+export default HrGlobalNotificationToast;

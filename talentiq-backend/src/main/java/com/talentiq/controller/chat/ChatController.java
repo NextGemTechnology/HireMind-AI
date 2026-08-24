@@ -211,16 +211,45 @@ public class ChatController {
         String subPath = fullPath.substring(fullPath.indexOf("/chat/files/") + "/chat/files/".length());
         byte[] bytes = fileStorageService.retrieveFile(subPath);
 
-        MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        org.springframework.http.MediaType mediaType = org.springframework.http.MediaType.APPLICATION_OCTET_STREAM;
         String lower = subPath.toLowerCase();
-        if (lower.endsWith(".png")) mediaType = MediaType.IMAGE_PNG;
-        else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) mediaType = MediaType.IMAGE_JPEG;
-        else if (lower.endsWith(".gif")) mediaType = MediaType.IMAGE_GIF;
-        else if (lower.endsWith(".webp")) mediaType = MediaType.parseMediaType("image/webp");
-        else if (lower.endsWith(".pdf")) mediaType = MediaType.APPLICATION_PDF;
+        if (lower.endsWith(".png")) mediaType = org.springframework.http.MediaType.IMAGE_PNG;
+        else if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) mediaType = org.springframework.http.MediaType.IMAGE_JPEG;
+        else if (lower.endsWith(".gif")) mediaType = org.springframework.http.MediaType.IMAGE_GIF;
+        else if (lower.endsWith(".webp")) mediaType = org.springframework.http.MediaType.parseMediaType("image/webp");
+        else if (lower.endsWith(".pdf")) mediaType = org.springframework.http.MediaType.APPLICATION_PDF;
 
         return ResponseEntity.ok()
                 .contentType(mediaType)
                 .body(bytes);
+    }
+
+    /**
+     * Flag or unflag a candidate contact (by HR).
+     */
+    @PostMapping("/flag/{otherUserId}")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Toggle flag / priority mark on a chat contact")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> toggleFlag(
+            @PathVariable Long otherUserId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        boolean flagged = chatService.toggleFlagCandidate(principal.getId(), otherUserId);
+        return ResponseEntity.ok(ApiResponse.success(java.util.Map.of(
+                "otherUserId", otherUserId,
+                "flagged", flagged,
+                "message", flagged ? "Candidate flagged as priority" : "Candidate unflagged"
+        )));
+    }
+
+    /**
+     * Get all flagged candidate user IDs for current user.
+     */
+    @GetMapping("/flagged")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get list of flagged candidate user IDs")
+    public ResponseEntity<ApiResponse<List<Long>>> getFlagged(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        List<Long> flaggedIds = chatService.getFlaggedCandidateIds(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(flaggedIds));
     }
 }

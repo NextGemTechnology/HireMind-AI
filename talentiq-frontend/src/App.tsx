@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
@@ -18,6 +19,10 @@ import { CandidateProfile } from './pages/CandidateProfile';
 import HrCalendar from './pages/HrCalendar';
 import { UserMessages } from './pages/UserMessages';
 import { CosmicQuotePopup } from './components/CosmicQuotePopup';
+import Contact from './pages/Contact';
+import About from './pages/About';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
 import { HrGlobalNotificationToast } from './components/HrGlobalNotificationToast';
 
 // Wrapper that hides the global Navbar on the home page
@@ -51,6 +56,10 @@ function AppLayout() {
           <Route path="/hr-calendar" element={<HrCalendar />} />
           <Route path="/admin" element={<AdminPortal />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
           <Route path="/candidate-profile/:id" element={<CandidateProfile />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -65,11 +74,13 @@ function AppLayout() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppLayout />
-      </BrowserRouter>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppLayout />
+        </BrowserRouter>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

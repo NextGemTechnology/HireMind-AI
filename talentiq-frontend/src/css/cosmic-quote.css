@@ -185,3 +185,33 @@
     width: auto;
   }
 }
+
+/* ── Light Mode Overrides for Cosmic Quote Popup ── */
+.theme-light .cosmic-popup-toast {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12), 0 0 20px rgba(99, 102, 241, 0.15) !important;
+  color: #0F172A !important;
+}
+
+.theme-light .cosmic-popup-text {
+  color: #475569 !important;
+}
+
+.theme-light .cosmic-popup-icon-btn {
+  background: #F1F5F9 !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #64748B !important;
+}
+
+.theme-light .cosmic-popup-icon-btn:hover {
+  background: #EEF2FF !important;
+  color: #4F46E5 !important;
+}
+
+.theme-light .cosmic-popup-minimized {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+  color: #4F46E5 !important;
+}

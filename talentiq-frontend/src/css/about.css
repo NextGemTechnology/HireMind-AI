@@ -1,0 +1,281 @@
+/* ============================================================
+   TalentIQ / NextGem-Technology — About Page Styles
+   ============================================================ */
+
+.about-container {
+  min-height: calc(100vh - 70px);
+  padding: 40px 20px 80px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  background: var(--bg-dark);
+  color: var(--text-main);
+}
+
+.about-hero {
+  text-align: center;
+  max-width: 800px;
+  margin-bottom: 48px;
+}
+
+.about-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 18px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--primary-cyan);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  margin-bottom: 20px;
+}
+
+.about-title {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+  line-height: 1.2;
+}
+
+.about-subtitle {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+.about-content-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  width: 100%;
+  max-width: 1000px;
+}
+
+/* ── Company Card ── */
+.about-card-main {
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 24px;
+  padding: 40px;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  gap: 36px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .about-card-main {
+    flex-direction: column;
+    text-align: center;
+    padding: 28px;
+  }
+}
+
+.about-logo-box {
+  width: 120px;
+  height: 120px;
+  min-width: 120px;
+  border-radius: 24px;
+  background: var(--gradient-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
+}
+
+.about-logo-box span {
+  font-size: 2.4rem;
+  font-weight: 900;
+  color: #FFFFFF;
+}
+
+.about-company-info h2 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.about-company-info p {
+  color: var(--text-muted);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 18px;
+}
+
+.about-actions-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Pillars Grid ── */
+.about-pillars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.pillar-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  padding: 28px;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.pillar-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-glow);
+}
+
+.pillar-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.15);
+  color: #8B5CF6;
+  margin-bottom: 18px;
+}
+
+.pillar-card h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.pillar-card p {
+  color: var(--text-muted);
+  font-size: 0.93rem;
+  line-height: 1.55;
+}
+
+/* ── Official Channels & Links ── */
+.about-links-section {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  padding: 32px;
+  text-align: center;
+}
+
+.about-links-section h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 20px;
+}
+
+.channels-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.channel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.channel-btn:hover {
+  border-color: var(--primary-violet);
+  background: rgba(99, 102, 241, 0.12);
+  color: #8B5CF6;
+  transform: translateY(-2px);
+}
+
+.channel-btn.purple-tint {
+  background: rgba(99, 102, 241, 0.15);
+  color: #8B5CF6;
+}
+
+.channel-btn.cyan-tint {
+  background: rgba(6, 182, 212, 0.15);
+  color: #06B6D4;
+}
+
+.channel-btn.brand-cta {
+  background: var(--gradient-brand);
+  color: #FFFFFF;
+  border: none;
+}
+
+.about-theme-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.about-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.about-theme-toggle:hover {
+  border-color: var(--border-glow);
+  transform: translateY(-1px);
+}
+
+/* ── Footer / Copyright ── */
+.about-footer {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.about-footer .legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 10px;
+}
+
+.about-footer .legal-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.88rem;
+  transition: color 0.2s ease;
+}
+
+.about-footer .legal-links a:hover {
+  color: #8B5CF6;
+}

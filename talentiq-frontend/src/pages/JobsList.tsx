@@ -126,152 +126,10 @@ export const JobsList: React.FC = () => {
     setLoading(true);
     try {
       const res = await apiClient.get('/jobs?page=0&size=50');
-      const jobList = Array.isArray(res.data.data) ? res.data.data : (res.data.content || []);
-      if (jobList.length > 0) {
-        setJobs(jobList);
-      } else {
-        throw new Error('No jobs returned');
-      }
+      const jobList = Array.isArray(res.data.data) ? res.data.data : (res.data.content || res.data.data?.content || []);
+      setJobs(Array.isArray(jobList) ? jobList : []);
     } catch (e) {
-      // Mock Fallback Data with rich Indian State & Global Hub distribution
-      setJobs([
-        {
-          id: 1,
-          title: 'Senior Java Developer (Microservices & Spring Boot)',
-          slug: 'senior-java-developer-whitefield',
-          company: { id: 100, name: 'Infosys Horizon Labs', verified: true },
-          location: 'Whitefield, Bangalore, Karnataka',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'SENIOR',
-          remote: false,
-          hybrid: true,
-          salaryMin: 140000,
-          salaryMax: 185000,
-          currency: 'USD',
-          description: 'Architect and scale high-throughput Java microservices using Spring Boot 3, Kafka, Docker, and Redis caching. Lead architectural reviews and optimize distributed database queries.',
-          requiredSkills: [{ skillName: 'Java' }, { skillName: 'Spring Boot' }, { skillName: 'Microservices' }, { skillName: 'Kafka' }],
-          postedAt: new Date().toISOString()
-        },
-        {
-          id: 2,
-          title: 'Full Stack Java & React Engineer',
-          slug: 'fullstack-java-react-bangalore',
-          company: { id: 101, name: 'Flipkart Tech Dynamics', verified: true },
-          location: 'Electronic City, Bangalore, Karnataka',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'MID',
-          remote: true,
-          hybrid: false,
-          salaryMin: 130000,
-          salaryMax: 165000,
-          currency: 'USD',
-          description: 'Build enterprise-grade e-commerce microservices with Java Spring framework and modern responsive React/TypeScript interfaces.',
-          requiredSkills: [{ skillName: 'Java' }, { skillName: 'React' }, { skillName: 'TypeScript' }, { skillName: 'MySQL' }],
-          postedAt: new Date().toISOString()
-        },
-        {
-          id: 3,
-          title: 'Lead Java Cloud Architect',
-          slug: 'lead-java-cloud-architect-koramangala',
-          company: { id: 102, name: 'Swiggy Cloud Platform', verified: true },
-          location: 'Koramangala, Bangalore, Karnataka',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'LEAD',
-          remote: false,
-          hybrid: true,
-          salaryMin: 175000,
-          salaryMax: 220000,
-          currency: 'USD',
-          description: 'Design distributed hyper-scalable backend systems with Java 17+, AWS ECS, Kubernetes, and high-speed Redis message brokers.',
-          requiredSkills: [{ skillName: 'Java' }, { skillName: 'Kubernetes' }, { skillName: 'AWS' }, { skillName: 'Redis' }],
-          postedAt: new Date().toISOString()
-        },
-        {
-          id: 4,
-          title: 'AI Machine Learning Architect',
-          slug: 'ai-ml-architect-hyderabad',
-          company: { id: 103, name: 'NeuralAI Labs', verified: true },
-          location: 'HITEC City, Hyderabad, Telangana',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'LEAD',
-          remote: true,
-          hybrid: true,
-          salaryMin: 180000,
-          salaryMax: 230000,
-          currency: 'USD',
-          description: 'Deploy state-of-the-art LLM fine-tuning pipelines, vector databases (Pinecone / Milvus), and scalable PyTorch inference microservices.',
-          requiredSkills: [{ skillName: 'Python' }, { skillName: 'PyTorch' }, { skillName: 'AI' }, { skillName: 'LangChain' }],
-          postedAt: new Date().toISOString()
-        },
-        {
-          id: 5,
-          title: 'Senior Frontend Engineer (React & 3D WebGL)',
-          slug: 'senior-frontend-mumbai',
-          company: { id: 104, name: 'Tata Digital Ventures', verified: true },
-          location: 'Mumbai, Maharashtra',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'SENIOR',
-          remote: true,
-          hybrid: false,
-          salaryMin: 135000,
-          salaryMax: 175000,
-          currency: 'USD',
-          description: 'Craft cutting-edge responsive UI web applications using React, Three.js 3D graphics, Tailwind CSS, and WebSockets.',
-          requiredSkills: [{ skillName: 'React' }, { skillName: 'TypeScript' }, { skillName: 'Three.js' }, { skillName: 'Tailwind' }],
-          postedAt: new Date().toISOString()
-        },
-        {
-          id: 6,
-          title: 'DevOps & Site Reliability Engineer',
-          slug: 'devops-engineer-pune',
-          company: { id: 105, name: 'Cybage Cloud Systems', verified: true },
-          location: 'Hinjawadi, Pune, Maharashtra',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'MID',
-          remote: false,
-          hybrid: true,
-          salaryMin: 125000,
-          salaryMax: 160000,
-          currency: 'USD',
-          description: 'Manage automated CI/CD GitHub Actions pipelines, Terraform infrastructure-as-code, Prometheus monitoring, and Kubernetes clusters.',
-          requiredSkills: [{ skillName: 'Docker' }, { skillName: 'Kubernetes' }, { skillName: 'Terraform' }, { skillName: 'CI/CD' }],
-          postedAt: new Date().toISOString()
-        },
-        {
-          id: 7,
-          title: 'Principal Distributed Systems Engineer',
-          slug: 'principal-engineer-sf',
-          company: { id: 106, name: 'Stripe Horizon', verified: true },
-          location: 'San Francisco, CA',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'EXECUTIVE',
-          remote: true,
-          hybrid: false,
-          salaryMin: 210000,
-          salaryMax: 280000,
-          currency: 'USD',
-          description: 'Drive high-availability financial infrastructure processing millions of global API calls per minute.',
-          requiredSkills: [{ skillName: 'Java' }, { skillName: 'Go' }, { skillName: 'Distributed Systems' }, { skillName: 'Kafka' }],
-          postedAt: new Date().toISOString()
-        },
-        {
-          id: 8,
-          title: 'Data Science & Analytics Lead',
-          slug: 'data-science-lead-nyc',
-          company: { id: 107, name: 'Bloomberg Quant Lab', verified: true },
-          location: 'New York, NY',
-          jobType: 'FULL_TIME',
-          experienceLevel: 'LEAD',
-          remote: false,
-          hybrid: true,
-          salaryMin: 190000,
-          salaryMax: 245000,
-          currency: 'USD',
-          description: 'Build predictive statistical models and automated trading analytics dashboards using Python, Spark, and SQL.',
-          requiredSkills: [{ skillName: 'Python' }, { skillName: 'SQL' }, { skillName: 'Data' }, { skillName: 'Machine Learning' }],
-          postedAt: new Date().toISOString()
-        }
-      ]);
+      setJobs([]);
     } finally {
       setLoading(false);
     }
@@ -290,8 +148,9 @@ export const JobsList: React.FC = () => {
       setSuccessMessage('Application submitted successfully! Recruiter notified.');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (e: any) {
+      const errDetail = e.response?.data?.message || 'Application submitted or already exists.';
+      setSuccessMessage(errDetail);
       setAppliedJobIds([...appliedJobIds, jobId]);
-      setSuccessMessage('Application submitted successfully!');
       setTimeout(() => setSuccessMessage(''), 4000);
     } finally {
       setApplyingJobId(null);
@@ -318,9 +177,9 @@ export const JobsList: React.FC = () => {
       .split(',')
       .map(s => s.trim())
       .filter(s => s.length > 0)
-      .map(s => ({ skillName: s, required: true }));
+      .map(s => ({ skillName: s }));
 
-    const slug = title.toLowerCase().trim().replaceAll('[^a-z0-9]', '-') + '-' + Date.now();
+    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now();
 
     const payload = {
       title: title.trim(),
@@ -343,46 +202,26 @@ export const JobsList: React.FC = () => {
 
     try {
       if (editingJobId) {
-        // mock edit
-        setJobs(jobs.map(j => j.id === editingJobId ? { ...j, ...payload } : j));
+        const res = await apiClient.put(`/jobs/${editingJobId}`, payload);
+        const updated = res.data.data;
+        setJobs(jobs.map(j => j.id === editingJobId ? (updated || { ...j, ...payload }) : j));
         setSuccessMessage(`Job posting updated successfully!`);
       } else {
         const res = await apiClient.post('/jobs', payload);
         const newJob = res.data.data;
-        setJobs([newJob, ...jobs]);
-        setSuccessMessage(`Job posting "${newJob.title}" created successfully and published live!`);
+        if (newJob) {
+          setJobs([newJob, ...jobs]);
+        } else {
+          fetchJobs();
+        }
+        setSuccessMessage(`Job posting created successfully and published live!`);
       }
       setShowPostModal(false);
       resetForm();
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err: any) {
-      if (editingJobId) {
-        setJobs(jobs.map(j => j.id === editingJobId ? { ...j, ...payload } : j));
-        setSuccessMessage(`Job posting updated successfully!`);
-      } else {
-        const mockNewJob: JobItem = {
-          id: Date.now(),
-          title: title.trim(),
-          slug,
-          company: { id: 99, name: 'Your Company', verified: true },
-          location: location.trim() || 'Remote',
-          jobType,
-          experienceLevel,
-          remote,
-          hybrid,
-          salaryMin: salaryMin ? Number(salaryMin) : 120000,
-          salaryMax: salaryMax ? Number(salaryMax) : 160000,
-          currency: 'USD',
-          description,
-          requiredSkills: parsedSkills,
-          postedAt: new Date().toISOString()
-        };
-        setJobs([mockNewJob, ...jobs]);
-        setSuccessMessage(`Job posting "${mockNewJob.title}" published live!`);
-      }
-      setShowPostModal(false);
-      resetForm();
-      setTimeout(() => setSuccessMessage(''), 5000);
+      const errMsg = err.response?.data?.message || err.message || 'Failed to save job posting';
+      setPostError(errMsg);
     } finally {
       setPostLoading(false);
     }
@@ -391,8 +230,8 @@ export const JobsList: React.FC = () => {
   const handleEditJob = (job: JobItem) => {
     setTitle(job.title);
     setDescription(job.description || '');
-    setResponsibilities(''); // Mock
-    setRequirements(''); // Mock
+    setResponsibilities('');
+    setRequirements('');
     setJobType(job.jobType);
     setExperienceLevel(job.experienceLevel);
     setLocation(job.location);
@@ -405,6 +244,20 @@ export const JobsList: React.FC = () => {
     setShowPostModal(true);
   };
 
+  const handleDeleteJob = async (jobId: number) => {
+    if (!window.confirm('Are you sure you want to archive/delete this job posting?')) return;
+    try {
+      await apiClient.delete(`/jobs/${jobId}`);
+      setJobs(prev => prev.filter(j => j.id !== jobId));
+      setSuccessMessage('Job posting deleted successfully.');
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || 'Failed to delete job posting';
+      setSuccessMessage(msg);
+      setTimeout(() => setSuccessMessage(''), 4000);
+    }
+  };
+
   const handleShowDetails = async (jobId: number) => {
     setSelectedJobIdForDetails(jobId);
     setJobDetailsLoading(true);
@@ -412,9 +265,7 @@ export const JobsList: React.FC = () => {
       const res = await apiClient.get(`/jobs/${jobId}`);
       setJobDetailsData(res.data.data);
     } catch (e) {
-      // Mock Fallback
-      const found = jobs.find(j => j.id === jobId);
-      setJobDetailsData(found || null);
+      setJobDetailsData(null);
     } finally {
       setJobDetailsLoading(false);
     }
@@ -623,8 +474,23 @@ export const JobsList: React.FC = () => {
             {filteredJobs.length === 0 ? (
               <div className="cosmic-card jobs-empty-card">
                 <Rocket size={36} color="#7C3AED" className="jobs-empty-icon" />
-                <h3 className="jobs-empty-title">No Orbiting Roles Found</h3>
-                <p>Try adjusting your keywords or clearing selected filters.</p>
+                <h3 className="jobs-empty-title">
+                  {isHr || isAdmin ? 'No Active Job Postings in Database' : 'No Orbiting Roles Found'}
+                </h3>
+                <p style={{ maxWidth: '500px', margin: '0 auto 16px' }}>
+                  {isHr || isAdmin
+                    ? 'Your database is currently clean with 0 jobs. Click "+ Post New Job" to publish corporate roles!'
+                    : 'Try adjusting your keywords or clearing selected filters to find active positions.'}
+                </p>
+                {(isHr || isAdmin) && (
+                  <button
+                    onClick={() => { resetForm(); setEditingJobId(null); setShowPostModal(true); }}
+                    className="cosmic-btn-primary jobs-post-btn-hero"
+                    style={{ margin: '0 auto' }}
+                  >
+                    <Plus size={16} /> + Post New Job
+                  </button>
+                )}
               </div>
             ) : (
               filteredJobs.map(job => {
@@ -681,39 +547,58 @@ export const JobsList: React.FC = () => {
                     <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
                       <button
                         onClick={() => handleShowDetails(job.id)}
-                        className="cosmic-btn-primary jobs-apply-btn"
+                        className="btn btn-secondary btn-sm"
                       >
                         Show Details
                       </button>
-                      {(!isHr && !isAdmin) && (
-                        <button
-                          onClick={() => handleChatWithRecruiter(job)}
-                          className="cosmic-btn-primary jobs-apply-btn"
-                        >
-                          <MessageSquare size={14} /> Message HR
-                        </button>
-                      )}
+
                       {isHr || isAdmin ? (
-                        <button
-                          onClick={() => handleEditJob(job)}
-                          className="cosmic-btn-primary jobs-apply-btn"
-                        >
-                          Edit
-                        </button>
-                      ) : (
-                        isApplied ? (
-                          <span className="jobs-applied-badge">
-                            <CheckCircle2 size={16} /> Applied
-                          </span>
-                        ) : (
+                        <>
                           <button
-                            onClick={() => handleApply(job.id)}
+                            onClick={() => navigate('/hr-applications')}
                             className="cosmic-btn-primary jobs-apply-btn"
-                            disabled={applyingJobId === job.id}
                           >
-                            {applyingJobId === job.id ? 'Submitting Orbit...' : 'Apply Now 🚀'}
+                            View Applicants
                           </button>
-                        )
+                          <div style={{ display: 'flex', gap: '6px' }}>
+                            <button
+                              onClick={() => handleEditJob(job)}
+                              className="btn btn-secondary btn-sm"
+                              style={{ flex: 1 }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteJob(job.id)}
+                              className="btn btn-danger btn-sm"
+                              style={{ flex: 1 }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleChatWithRecruiter(job)}
+                            className="btn btn-secondary btn-sm"
+                          >
+                            <MessageSquare size={14} /> Message HR
+                          </button>
+                          {isApplied ? (
+                            <span className="jobs-applied-badge">
+                              <CheckCircle2 size={16} /> Applied
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleApply(job.id)}
+                              className="cosmic-btn-primary jobs-apply-btn"
+                              disabled={applyingJobId === job.id}
+                            >
+                              {applyingJobId === job.id ? 'Submitting Orbit...' : 'Apply Now 🚀'}
+                            </button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

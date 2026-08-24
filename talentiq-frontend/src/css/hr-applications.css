@@ -20,13 +20,13 @@
 .hr-apps-title {
   font-size: 32px;
   margin-bottom: 8px;
-  color: #FFFFFF !important;
+  color: var(--heading-color) !important;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
 
 .hr-apps-subtitle {
-  color: #CBD5E1 !important;
+  color: var(--text-muted) !important;
   font-size: 15px;
 }
 
@@ -34,15 +34,20 @@
   margin-top: 16px;
   padding: 14px 18px;
   border-radius: 12px;
-  background: rgba(16, 185, 129, 0.22) !important;
+  background: rgba(16, 185, 129, 0.15) !important;
   border: 1px solid rgba(52, 211, 153, 0.5) !important;
-  color: #6EE7B7 !important;
+  color: #059669 !important;
   font-size: 14px;
   font-weight: 600;
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+}
+
+body:not(.theme-light) .hr-apps-alert-success {
+  color: #6EE7B7 !important;
+  background: rgba(16, 185, 129, 0.22) !important;
 }
 
 /* ── Filter Controls ─────────────────────────────────────── */
@@ -63,7 +68,7 @@
   position: absolute;
   left: 16px;
   top: 16px;
-  color: #A78BFA !important;
+  color: var(--primary-indigo) !important;
 }
 
 .hr-apps-search-input {
@@ -71,16 +76,16 @@
   height: 50px !important;
   font-size: 14px !important;
   font-weight: 500;
-  background: rgba(13, 19, 39, 0.95) !important;
-  border: 1px solid rgba(167, 139, 250, 0.45) !important;
-  color: #FFFFFF !important;
+  background: var(--input-bg) !important;
+  border: 1px solid var(--input-border) !important;
+  color: var(--input-text) !important;
   border-radius: 12px !important;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 
 .hr-apps-search-input:focus {
-  border-color: #C084FC !important;
-  box-shadow: 0 0 20px rgba(167, 139, 250, 0.4), inset 0 1px 2px rgba(0, 0, 0, 0.4) !important;
+  border-color: var(--primary-indigo) !important;
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.3) !important;
 }
 
 .hr-apps-stage-filters {
@@ -99,53 +104,54 @@
 /* ── Applications List ───────────────────────────────────── */
 .hr-apps-loading {
   text-align: center;
-  padding: 60px;
-  color: #DDD6FE;
+  padding: 80px 0;
+  color: var(--text-dim);
   font-size: 16px;
-  font-weight: 600;
 }
 
 .hr-apps-empty {
-  padding: 60px;
   text-align: center;
-  color: #CBD5E1 !important;
-  background: rgba(17, 24, 48, 0.94) !important;
-  border: 1px solid rgba(167, 139, 250, 0.35) !important;
-  border-radius: 16px;
+  padding: 60px 20px;
+  color: var(--text-dim);
+}
+
+.hr-apps-empty-icon {
+  margin: 0 auto 16px;
+  color: var(--text-dim);
+  opacity: 0.6;
 }
 
 .hr-apps-list {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .hr-app-card {
-  padding: 28px !important;
-  background: linear-gradient(135deg, rgba(20, 29, 56, 0.95) 0%, rgba(13, 19, 40, 0.97) 100%) !important;
-  border: 1px solid rgba(167, 139, 250, 0.42) !important;
+  padding: 24px 28px !important;
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-subtle) !important;
   border-radius: 16px !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
-  backdrop-filter: blur(20px) !important;
-  transition: all 0.25s ease !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all 0.25s ease;
 }
 
 .hr-app-card:hover {
-  border-color: rgba(192, 132, 252, 0.75) !important;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 0 28px rgba(124, 58, 237, 0.25) !important;
+  border-color: var(--border-glow) !important;
+  box-shadow: var(--shadow-lg) !important;
   transform: translateY(-2px);
 }
 
-.hr-app-card-top {
+.hr-app-main-info {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.hr-app-name-row {
+.hr-app-candidate-header {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -153,8 +159,8 @@
 }
 
 .hr-app-candidate-name {
-  font-size: 24px !important;
-  color: #FFFFFF !important;
+  font-size: 22px !important;
+  color: var(--heading-color) !important;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -164,13 +170,14 @@
   border-radius: 20px;
   font-size: 13px;
   font-weight: 800;
-  background: rgba(15, 23, 42, 0.9) !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: var(--primary-indigo) !important;
+  border: 1px solid rgba(99, 102, 241, 0.3) !important;
 }
 
 .hr-app-candidate-headline {
   font-size: 15px !important;
-  color: #38BDF8 !important;
+  color: var(--primary-cyan) !important;
   font-weight: 600;
   margin-bottom: 14px;
 }
@@ -178,7 +185,7 @@
 .hr-app-candidate-meta {
   display: flex;
   gap: 22px;
-  color: #CBD5E1 !important;
+  color: var(--text-muted) !important;
   font-size: 13.5px;
   flex-wrap: wrap;
 }
@@ -215,16 +222,16 @@
 .hr-app-cover-box {
   padding: 16px 20px !important;
   border-radius: 12px !important;
-  background: rgba(10, 15, 32, 0.8) !important;
-  border: 1px solid rgba(139, 92, 246, 0.28) !important;
+  background: var(--bg-card-hover) !important;
+  border: 1px solid var(--border-subtle) !important;
   font-size: 13.5px !important;
-  color: #E2E8F0 !important;
+  color: var(--text-main) !important;
   line-height: 1.65;
   margin-bottom: 20px;
 }
 
 .hr-app-cover-heading {
-  color: #C4B5FD !important;
+  color: var(--primary-violet) !important;
   display: block;
   font-weight: 700;
   margin-bottom: 6px;
@@ -232,7 +239,7 @@
 
 .hr-app-stage-pipeline {
   padding-top: 18px;
-  border-top: 1px solid rgba(139, 92, 246, 0.25) !important;
+  border-top: 1px solid var(--border-subtle) !important;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -242,7 +249,7 @@
 
 .hr-app-stage-current {
   font-size: 13px !important;
-  color: #CBD5E1 !important;
+  color: var(--text-muted) !important;
   font-weight: 500;
 }
 
@@ -262,6 +269,6 @@
 
 .hr-app-stage-label {
   font-size: 13px !important;
-  color: #94A3B8 !important;
+  color: var(--text-dim) !important;
   font-weight: 600;
 }

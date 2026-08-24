@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   User as UserIcon, Upload, CheckCircle2, Sparkles,
@@ -21,29 +22,18 @@ interface ParsedResult {
 
 export const ProfilePage: React.FC = () => {
   const { user, isHr } = useAuth();
+  const { theme, toggleTheme, isUniverse } = useTheme();
   const navigate = useNavigate();
-
-  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
-    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'universe';
-  });
-
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'universe' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('hr_theme', nextTheme);
-  };
-
-  const isUniverse = theme === 'universe';
 
   // Edit Mode state
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
-  const [phone, setPhone] = useState('');
-  const [jobTitle, setJobTitle] = useState('Senior Talent Acquisition Lead');
-  const [department, setDepartment] = useState('Technical Recruiting');
-  const [companyName, setCompanyName] = useState('HireMind Global');
-  const [location, setLocation] = useState('Bangalore, India');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [jobTitle, setJobTitle] = useState('');
+  const [department, setDepartment] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [location, setLocation] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState('');
 
@@ -54,11 +44,51 @@ export const ProfilePage: React.FC = () => {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    const loadProfileData = async () => {
+      try {
+        const uRes = await apiClient.get('/users/me');
+        const uData = uRes.data?.data || uRes.data;
+        if (uData) {
+          setFirstName(uData.firstName || '');
+          setLastName(uData.lastName || '');
+          setPhone(uData.phone || '');
+        }
+
+        if (isHr) {
+          try {
+            const hrRes = await apiClient.get('/hr/me');
+            const hrData = hrRes.data?.data || hrRes.data;
+            if (hrData) {
+              setJobTitle(hrData.designation || hrData.jobTitle || '');
+              setDepartment(hrData.department || '');
+              setCompanyName(hrData.company?.name || hrData.companyName || '');
+              setLocation(hrData.company?.location || hrData.location || '');
+            }
+          } catch {
+            // HR profile not yet created
+          }
+        } else {
+          try {
+            const candRes = await apiClient.get('/candidates/me');
+            const candData = candRes.data?.data || candRes.data;
+            if (candData) {
+              setJobTitle(candData.currentTitle || '');
+              setCompanyName(candData.currentCompany || '');
+              setLocation(candData.location || '');
+            }
+          } catch {
+            // Candidate profile not yet created
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load user profile details:', err);
+      }
+    };
+
     if (user) {
-      setFirstName(user.firstName || '');
-      setLastName(user.lastName || '');
+      loadProfileData();
     }
-  }, [user]);
+  }, [user, isHr]);
 
   // Handle Profile Update (Email is strictly immutable/read-only)
   const handleSaveProfile = async (e: React.FormEvent) => {

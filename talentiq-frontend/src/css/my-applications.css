@@ -717,3 +717,120 @@
     justify-content: flex-start;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES FOR MY APPLICATIONS
+   ════════════════════════════════════════════════════════════════ */
+.theme-light .lunar-page-wrapper {
+  background: var(--bg-dark);
+  color: var(--text-main);
+}
+
+.theme-light .lunar-hero-panel {
+  background: #FFFFFF !important;
+  border: 1.5px solid #CBD5E1 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-hero-title {
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-hero-subtitle {
+  color: #475569 !important;
+}
+
+.theme-light .lunar-metric-card {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+.theme-light .lunar-metric-card:hover {
+  border-color: #6366F1 !important;
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.15) !important;
+}
+
+.theme-light .lunar-metric-val {
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-metric-lbl {
+  color: #475569 !important;
+}
+
+.theme-light .lunar-tabs-bar {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+}
+
+.theme-light .lunar-tab-btn {
+  color: #64748B !important;
+}
+
+.theme-light .lunar-tab-btn.active-tab {
+  background: #EEF2FF !important;
+  color: #4F46E5 !important;
+  border-color: #C7D2FE !important;
+}
+
+.theme-light .lunar-search-input {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-app-card {
+  background: #FFFFFF !important;
+  border: 1.5px solid #E2E8F0 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-app-card:hover {
+  border-color: #818CF8 !important;
+  box-shadow: 0 10px 25px rgba(99, 102, 241, 0.12) !important;
+}
+
+.theme-light .lunar-job-title {
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-company {
+  color: #475569 !important;
+}
+
+.theme-light .lunar-company strong {
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-step-line {
+  background: #E2E8F0 !important;
+}
+
+.theme-light .lunar-step-node .lunar-step-name {
+  color: #64748B !important;
+}
+
+.theme-light .lunar-step-node.completed .lunar-step-name,
+.theme-light .lunar-step-node.active .lunar-step-name {
+  color: #0F172A !important;
+  font-weight: 700 !important;
+}
+
+.theme-light .lunar-step-desc {
+  color: #64748B !important;
+}
+
+.theme-light .lunar-action-btn.secondary {
+  background: #F8FAFC !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+.theme-light .lunar-action-btn.secondary:hover {
+  background: #EEF2F6 !important;
+  border-color: #94A3B8 !important;
+}

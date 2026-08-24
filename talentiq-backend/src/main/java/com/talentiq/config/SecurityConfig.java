@@ -57,6 +57,9 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/api-docs/**",
             "/actuator/health",
+            "/v1/public/**",
+            "/v1/analytics/public/**",
+            "/v1/analytics/public-stats",
             // WebSocket SockJS handshake endpoints
             "/ws/**",
             "/ws/info/**",

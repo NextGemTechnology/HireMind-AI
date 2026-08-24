@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { Bot, Send, Sparkles, UserCheck, Briefcase, Settings, Sun, Moon } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
@@ -17,18 +18,8 @@ export const HrCopilot: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [contextType, setContextType] = useState<'GENERAL' | 'CANDIDATE' | 'JOB'>('GENERAL');
   const [preferredModel, setPreferredModel] = useState('gpt-4o');
-
-  const [theme, setTheme] = useState<'light' | 'universe'>(() => {
-    return (localStorage.getItem('hr_theme') as 'light' | 'universe') || 'universe';
-  });
-
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'universe' : 'light';
-    setTheme(nextTheme);
-    localStorage.setItem('hr_theme', nextTheme);
-  };
-
-  const isUniverse = theme === 'universe';
+  const { theme, toggleTheme, isUniverse } = useTheme();
+  const [conversationId, setConversationId] = useState<number | null>(null);
 
   useEffect(() => {
     // Initial greeting
@@ -36,7 +27,7 @@ export const HrCopilot: React.FC = () => {
       {
         id: 1,
         role: 'ASSISTANT',
-        content: 'Hello! I am your TalentIQ HR AI Copilot. Select a candidate or job context above to begin deep evaluation, resume parsing, or interview question generation.',
+        content: 'Hello! I am your HireMind AI Copilot. Ask me any question to analyze job requirements, synthesize candidate evaluations, or generate technical interview questions.',
         createdAt: new Date().toISOString()
       }
     ]);
@@ -46,10 +37,11 @@ export const HrCopilot: React.FC = () => {
     e.preventDefault();
     if (!prompt.trim() || loading) return;
 
+    const userText = prompt.trim();
     const userMsg: ChatMessage = {
       id: Date.now(),
       role: 'USER',
-      content: prompt.trim(),
+      content: userText,
       createdAt: new Date().toISOString()
     };
 
@@ -58,35 +50,38 @@ export const HrCopilot: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await apiClient.post('/copilot/query', {
-        prompt: userMsg.content,
-        contextType: contextType,
-        model: preferredModel
-      });
+      let activeConvId = conversationId;
+      if (!activeConvId) {
+        const convRes = await apiClient.post('/copilot/conversations', {
+          title: userText.slice(0, 30),
+          contextType: contextType || 'GENERAL'
+        });
+        activeConvId = convRes.data?.data?.id;
+        setConversationId(activeConvId);
+      }
 
-      const replyContent = res.data?.data?.response || res.data?.response || 'I have analyzed the request. Ready for follow-up evaluation questions.';
-
+      if (activeConvId) {
+        const res = await apiClient.post(`/copilot/conversations/${activeConvId}/messages`, {
+          content: userText
+        });
+        const reply = res.data?.data;
+        if (reply) {
+          setMessages(prev => [...prev, {
+            id: reply.id || Date.now() + 1,
+            role: reply.role || 'ASSISTANT',
+            content: reply.content || 'Analysis complete.',
+            createdAt: reply.createdAt || new Date().toISOString()
+          }]);
+        }
+      }
+    } catch (err: any) {
+      console.warn('AI Copilot request failed:', err);
       setMessages(prev => [...prev, {
         id: Date.now() + 1,
         role: 'ASSISTANT',
-        content: replyContent,
+        content: 'AI Copilot service is currently unavailable or generating response. Please check server logs or retry.',
         createdAt: new Date().toISOString()
       }]);
-    } catch (err) {
-      // Mock Intelligent Copilot fallback
-      setTimeout(() => {
-        let mockReply = 'Based on the candidate match pipeline, candidate skills align 92% with the Job Specifications. Core proficiencies in Java 17, Spring Boot, and Kubernetes are fully verified.';
-        if (contextType === 'JOB') {
-          mockReply = 'Here are 3 tailored technical interview questions for this Job Posting:\n1. How would you design a distributed idempotency mechanism using Redis and MySQL in Spring Boot?\n2. Describe your approach to zero-downtime database migrations with Flyway.\n3. How do you monitor WebSocket connection drops under heavy load?';
-        }
-        setMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          role: 'ASSISTANT',
-          content: mockReply,
-          createdAt: new Date().toISOString()
-        }]);
-        setLoading(false);
-      }, 800);
     } finally {
       setLoading(false);
     }

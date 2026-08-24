@@ -1,0 +1,240 @@
+/* ============================================================
+   HireMind-AI Logo & 20-Second Periodic Reflection Shining
+   ============================================================ */
+
+/* ── 20-Second Shining Reflection Keyframe ── */
+@keyframes hiremindShine20s {
+  0% {
+    left: -120%;
+    opacity: 0;
+  }
+  2.5% {
+    opacity: 0.85;
+  }
+  5% {
+    left: 150%;
+    opacity: 0;
+  }
+  100% {
+    left: 150%;
+    opacity: 0;
+  }
+}
+
+@keyframes hiremindPulseGlow20s {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.25));
+  }
+  2.5% {
+    filter: drop-shadow(0 0 16px rgba(124, 58, 237, 0.7)) drop-shadow(0 0 24px rgba(56, 189, 248, 0.8));
+    transform: scale(1.02);
+  }
+  5% {
+    filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.25));
+    transform: scale(1);
+  }
+}
+
+.hiremind-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.hiremind-logo-wrap:hover {
+  transform: translateY(-1px);
+}
+
+/* ── Navbar Mode ── */
+.hiremind-logo-wrap.navbar-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hiremind-nav-emblem {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #FFFFFF;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25), 0 0 10px rgba(56, 189, 248, 0.2);
+  flex-shrink: 0;
+  animation: hiremindPulseGlow20s 20s infinite ease-in-out;
+}
+
+.hiremind-nav-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  transform: scale(1.4);
+}
+
+/* ── Icon Mode ── */
+.hiremind-icon-container {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
+  animation: hiremindPulseGlow20s 20s infinite ease-in-out;
+}
+
+.size-sm .hiremind-icon-container { width: 32px; height: 32px; }
+.size-md .hiremind-icon-container { width: 44px; height: 44px; }
+.size-lg .hiremind-icon-container { width: 56px; height: 56px; }
+.size-xl .hiremind-icon-container { width: 72px; height: 72px; }
+
+.hiremind-emblem-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 22%;
+  transform: scale(1.35);
+}
+
+/* ── Full Mode ── */
+.hiremind-full-card {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #FFFFFF;
+  padding: 12px;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35), 0 0 20px rgba(124, 58, 237, 0.25);
+  animation: hiremindPulseGlow20s 20s infinite ease-in-out;
+}
+
+.hiremind-image-shine-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.hiremind-full-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}
+
+/* ── Periodic 20s Reflection Shining Beam ── */
+.hiremind-shine-beam {
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 70%;
+  height: 100%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 25%,
+    rgba(255, 255, 255, 0.85) 50%,
+    rgba(56, 189, 248, 0.9) 60%,
+    transparent 80%
+  );
+  transform: skewX(-25deg);
+  pointer-events: none;
+  animation: hiremindShine20s 20s infinite ease-in-out;
+  z-index: 10;
+}
+
+/* ── Text Typography & NGT Badge ── */
+.hiremind-text-lockup {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.hiremind-brand-line {
+  display: flex;
+  align-items: center;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.brand-hire {
+  color: #FFFFFF;
+}
+
+.theme-light .brand-hire {
+  color: #0F172A;
+}
+
+.brand-mind {
+  background: linear-gradient(135deg, #A78BFA 0%, #38BDF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-dash {
+  color: #818CF8;
+  margin: 0 1px;
+}
+
+.brand-ai-ngt-box {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.brand-ngt-tag {
+  position: absolute;
+  top: -11px;
+  right: 0;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, #C084FC 0%, #38BDF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  line-height: 1;
+}
+
+.brand-ai {
+  background: linear-gradient(135deg, #818CF8 0%, #38BDF8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.brand-tagline {
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #94A3B8;
+  margin-top: 3px;
+  text-transform: uppercase;
+}
+
+.size-sm .hiremind-brand-line { font-size: 16px; }
+.size-sm .brand-ai { font-size: 16px; }
+.size-sm .brand-ngt-tag { font-size: 7px; top: -9px; }
+
+.size-lg .hiremind-brand-line { font-size: 24px; }
+.size-lg .brand-ai { font-size: 24px; }
+.size-lg .brand-ngt-tag { font-size: 9px; top: -12px; }
+
+.size-xl .hiremind-brand-line { font-size: 32px; }
+.size-xl .brand-ai { font-size: 32px; }
+.size-xl .brand-ngt-tag { font-size: 11px; top: -15px; }

@@ -1315,3 +1315,75 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════
+   LIGHT THEME OVERRIDES FOR RECOMMENDATIONS
+   ════════════════════════════════════════════════════════════════ */
+.theme-light .recs-page-wrapper {
+  background: var(--bg-dark);
+  color: var(--text-main);
+}
+
+.theme-light .recs-hero-panel {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06) !important;
+  color: #0F172A !important;
+}
+
+.theme-light .recs-hero-title {
+  color: #0F172A !important;
+}
+
+.theme-light .recs-hero-desc {
+  color: #475569 !important;
+}
+
+.theme-light .recs-metric-chip {
+  background: #F8FAFC !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #475569 !important;
+}
+
+.theme-light .recs-metric-chip strong {
+  color: #0F172A !important;
+}
+
+.theme-light .recs-rec-card,
+.theme-light .recs-chat-card,
+.theme-light .recs-card {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+  color: #0F172A !important;
+}
+
+.theme-light .recs-rec-card:hover {
+  border-color: #6366F1 !important;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12) !important;
+}
+
+.theme-light .recs-job-title {
+  color: #0F172A !important;
+}
+
+.theme-light .recs-company-name {
+  color: #475569 !important;
+}
+
+.theme-light .recs-chat-bubble.assistant {
+  background: #F1F5F9 !important;
+  border: 1px solid #E2E8F0 !important;
+  color: #0F172A !important;
+}
+
+.theme-light .recs-chat-input-bar {
+  background: #FFFFFF !important;
+  border-top: 1px solid #E2E8F0 !important;
+}
+
+.theme-light .recs-input-field {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+}
