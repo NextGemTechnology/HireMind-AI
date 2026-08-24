@@ -10,7 +10,7 @@ import {
   MessageSquare, Users, Briefcase, Settings, LogOut,
   Circle, Sun, Moon, Trash2, Copy, Paperclip, Image as ImageIcon,
   Check, CheckCheck, Clock, ChevronDown, CheckCircle2, Sparkles, X,
-  UserCheck, ShieldCheck, User as UserIcon, Flag
+  UserCheck, ShieldCheck, User as UserIcon, Flag, Award
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HireMindLogo } from '../components/HireMindLogo';
@@ -99,6 +99,42 @@ export const HrMessages: React.FC = () => {
 
   // Flagged Candidate User IDs Set
   const [flaggedUserIds, setFlaggedUserIds] = useState<Set<number>>(new Set());
+
+  // Verified Tag Modal State (For HR Tagging)
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [tagJobTitle, setTagJobTitle] = useState('');
+  const [tagDept, setTagDept] = useState('');
+  const [tagNotes, setTagNotes] = useState('');
+  const [tagSubmitting, setTagSubmitting] = useState(false);
+  const [tagSuccessMsg, setTagSuccessMsg] = useState('');
+  const [tagErrorMsg, setTagErrorMsg] = useState('');
+
+  const handleSendTagRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tagJobTitle.trim() || !selectedContact) return;
+    setTagSubmitting(true);
+    setTagErrorMsg('');
+    try {
+      await apiClient.post('/company/verifications/request', {
+        candidateUserId: selectedContact.userId,
+        jobTitle: tagJobTitle.trim(),
+        department: tagDept.trim() || undefined,
+        notes: tagNotes.trim() || undefined
+      });
+      setTagSuccessMsg('Verified tag request submitted to your Company Director for final approval!');
+      setTimeout(() => {
+        setShowTagModal(false);
+        setTagSuccessMsg('');
+        setTagJobTitle('');
+        setTagDept('');
+        setTagNotes('');
+      }, 2200);
+    } catch (err: any) {
+      setTagErrorMsg(err?.response?.data?.message || 'Failed to submit verification request.');
+    } finally {
+      setTagSubmitting(false);
+    }
+  };
 
   // WebRTC state
   const [callState, setCallState] = useState<'idle' | 'calling' | 'in-call'>('idle');
@@ -1028,6 +1064,15 @@ export const HrMessages: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={() => setShowTagModal(true)}
+                  className="msg-header-btn"
+                  style={{ color: '#10B981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                  title="Give Candidate Company Verified Tag"
+                >
+                  <Award size={13} /> Give Verified Tag
+                </button>
+
+                <button
                   onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
                   className="msg-header-btn"
                   title="Open Full Candidate Profile"
@@ -1315,6 +1360,92 @@ export const HrMessages: React.FC = () => {
                 Yes, Delete Chat
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Give Verified Tag / Badge Modal */}
+      {showTagModal && selectedContact && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, backdropFilter: 'blur(8px)' }}>
+          <div style={{ background: '#0F172A', border: '1px solid rgba(16, 185, 129, 0.4)', borderRadius: 18, width: 460, padding: 24, boxShadow: '0 25px 60px rgba(0,0,0,0.85)', color: '#FFFFFF' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Award size={20} color="#10B981" />
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Give Company Verified Tag</h3>
+              </div>
+              <button onClick={() => setShowTagModal(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#94A3B8', lineHeight: 1.4 }}>
+              Tag <strong style={{ color: '#F8FAFC' }}>{selectedContact.name}</strong> with an official verified corporate credential. Your company director will review and approve the issuance.
+            </p>
+
+            {tagSuccessMsg && (
+              <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10B981', color: '#34D399', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 14, fontWeight: 600 }}>
+                ✓ {tagSuccessMsg}
+              </div>
+            )}
+
+            {tagErrorMsg && (
+              <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #EF4444', color: '#F87171', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 14, fontWeight: 600 }}>
+                ⚠️ {tagErrorMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSendTagRequest}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
+                  Verified Role / Job Title *
+                </label>
+                <input
+                  required
+                  placeholder="e.g. Lead Full-Stack Architect, Senior Backend Engineer"
+                  value={tagJobTitle}
+                  onChange={e => setTagJobTitle(e.target.value)}
+                  style={{ width: '100%', background: '#1E293B', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', color: '#FFFFFF', fontSize: 13.5, outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
+                  Department / Business Unit (Optional)
+                </label>
+                <input
+                  placeholder="e.g. Core Engineering, AI Platforms"
+                  value={tagDept}
+                  onChange={e => setTagDept(e.target.value)}
+                  style={{ width: '100%', background: '#1E293B', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', color: '#FFFFFF', fontSize: 13.5, outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>
+                  Endorsement / Screening Notes
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Completed 5 rigorous technical interview rounds with outstanding problem-solving skills."
+                  value={tagNotes}
+                  onChange={e => setTagNotes(e.target.value)}
+                  style={{ width: '100%', background: '#1E293B', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, padding: '10px 14px', color: '#FFFFFF', fontSize: 13.5, outline: 'none', resize: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button type="button" onClick={() => setShowTagModal(false)} style={{ background: 'rgba(255,255,255,0.08)', color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={tagSubmitting || !tagJobTitle.trim()}
+                  style={{ background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)', color: '#FFFFFF', border: 'none', borderRadius: 10, padding: '9px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: tagSubmitting ? 0.7 : 1 }}
+                >
+                  {tagSubmitting ? 'Submitting...' : 'Submit Verified Tag 🏷️'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
