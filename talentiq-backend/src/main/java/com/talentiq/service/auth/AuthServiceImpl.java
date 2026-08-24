@@ -235,6 +235,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    @Transactional(noRollbackFor = {BadCredentialsException.class, UnauthorizedException.class})
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
         validateEmailFormat(email);
@@ -604,19 +605,19 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private RuntimeException handleFailedLogin(User user) {
-        userRepository.incrementLoginAttempts(user.getId());
-        User updated = userRepository.findById(user.getId()).orElse(user);
-        int attempts = updated.getLoginAttempts();
+        int attempts = user.getLoginAttempts() + 1;
+        user.setLoginAttempts(attempts);
 
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
-            updated.setLockedUntil(Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
-            userRepository.save(updated);
-            log.warn("Account temporarily locked for {} minutes due to {} failed login attempts: {}", LOCKOUT_MINUTES, attempts, updated.getEmail());
+            user.setLockedUntil(Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            userRepository.saveAndFlush(user);
+            log.warn("Account temporarily locked for {} minutes due to {} failed login attempts: {}", LOCKOUT_MINUTES, attempts, user.getEmail());
             return new UnauthorizedException(
                     String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts. Please try again after %d minutes or reset your password.",
                             LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES)
             );
         } else {
+            userRepository.saveAndFlush(user);
             int remaining = MAX_LOGIN_ATTEMPTS - attempts;
             if (remaining < 0) remaining = 0;
             return new BadCredentialsException(
