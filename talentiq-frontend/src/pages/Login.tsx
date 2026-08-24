@@ -254,7 +254,13 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
           setError(`Unauthorized: Your account is not registered as ${roleLabel}.`);
           return;
         }
-        navigate('/admin');
+        if (adminLoginRole === 'ROLE_APP_DEVELOPER') {
+          navigate('/admin-application-developere-suit');
+        } else if (adminLoginRole === 'ROLE_MANAGEMENT_TEAM') {
+          navigate('/admin-Management-team');
+        } else {
+          navigate('/admin-Register-Company');
+        }
       } else {
         if (!userIsCandidate && !userIsAdmin) {
           logout();

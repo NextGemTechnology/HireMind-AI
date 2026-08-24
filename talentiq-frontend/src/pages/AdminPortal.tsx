@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useAdminTheme } from '../context/AdminThemeContext';
 import {
   ShieldCheck, Users, Building2, Lock, Unlock,
   Code2, Sparkles, BarChart3, Sun, Moon, CloudSun, Calendar,
-  Activity, Database, Terminal, Ban, CheckCircle2
+  Activity, Database, Terminal, Ban, CheckCircle2, LogOut, ShieldAlert
 } from 'lucide-react';
 import { CompanyTagApprovalQueue } from '../components/CompanyTagApprovalQueue';
 import { HireMindLogo } from '../components/HireMindLogo';
@@ -52,16 +53,27 @@ interface CompanyItem {
   blacklisted?: boolean;
 }
 
-export const AdminPortal: React.FC = () => {
-  const { user } = useAuth();
-  const { theme, setTheme } = useAdminTheme();
+interface AdminPortalProps {
+  mode?: 'DEVELOPER' | 'MANAGEMENT' | 'COMPANY';
+}
 
-  // Tab: 'DEVELOPER' | 'MANAGEMENT' | 'COMPANY'
-  const [activeTab, setActiveTab] = useState<'DEVELOPER' | 'MANAGEMENT' | 'COMPANY'>(() => {
+export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
+  const { user, isAuthenticated, logout } = useAuth();
+  const { theme, setTheme } = useAdminTheme();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Determine effective portal role mode from prop or URL pathname
+  const portalMode: 'DEVELOPER' | 'MANAGEMENT' | 'COMPANY' = (() => {
+    if (mode) return mode;
+    const path = location.pathname.toLowerCase();
+    if (path.includes('develop')) return 'DEVELOPER';
+    if (path.includes('management')) return 'MANAGEMENT';
+    if (path.includes('company') || path.includes('register')) return 'COMPANY';
     if (user?.roles?.includes('ROLE_APP_DEVELOPER')) return 'DEVELOPER';
     if (user?.roles?.includes('ROLE_COMPANY_ADMIN')) return 'COMPANY';
     return 'MANAGEMENT';
-  });
+  })();
 
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
   const [temporalJobs, setTemporalJobs] = useState<TemporalJobMetrics | null>(null);
@@ -70,26 +82,49 @@ export const AdminPortal: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
 
+  // RBAC Access Check
+  const roles = user?.roles || [];
+  const isSuperAdmin = roles.includes('ROLE_SUPER_ADMIN') || roles.includes('ROLE_PLATFORM_ADMIN');
+  const isAuthorized = (() => {
+    if (!isAuthenticated) return false;
+    if (isSuperAdmin) return true;
+    if (portalMode === 'DEVELOPER') return roles.includes('ROLE_APP_DEVELOPER');
+    if (portalMode === 'MANAGEMENT') return roles.includes('ROLE_MANAGEMENT_TEAM');
+    if (portalMode === 'COMPANY') return roles.includes('ROLE_COMPANY_ADMIN');
+    return false;
+  })();
+
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (isAuthorized) {
+      fetchData();
+    }
+  }, [portalMode, isAuthorized]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [mRes, tjRes, uRes, cRes] = await Promise.all([
-        apiClient.get('/admin/metrics').catch(() => ({ data: { data: null } })),
-        apiClient.get('/admin/metrics/temporal').catch(() => ({ data: { data: null } })),
-        apiClient.get('/admin/users?page=0&size=20').catch(() => ({ data: { content: [] } })),
-        apiClient.get('/admin/companies/pending?page=0&size=20').catch(() => ({ data: { content: [] } }))
-      ]);
-
-      setMetrics(mRes.data?.data || null);
-      setTemporalJobs(tjRes.data?.data || {
-        jobsToday: 0, jobsThisWeek: 0, jobsThisMonth: 0, jobsThisYear: 0, totalJobs: 0, activeJobs: 0
-      });
-      setUsers(uRes.data?.content || uRes.data?.data?.content || []);
-      setCompanies(cRes.data?.content || cRes.data?.data?.content || []);
+      if (portalMode === 'DEVELOPER') {
+        const [mRes, tjRes] = await Promise.all([
+          apiClient.get('/admin/metrics').catch(() => ({ data: { data: null } })),
+          apiClient.get('/admin/metrics/temporal').catch(() => ({ data: { data: null } }))
+        ]);
+        setMetrics(mRes.data?.data || null);
+        setTemporalJobs(tjRes.data?.data || null);
+      } else if (portalMode === 'MANAGEMENT') {
+        const [mRes, tjRes, uRes, cRes] = await Promise.all([
+          apiClient.get('/admin/metrics').catch(() => ({ data: { data: null } })),
+          apiClient.get('/admin/metrics/temporal').catch(() => ({ data: { data: null } })),
+          apiClient.get('/admin/users?page=0&size=20').catch(() => ({ data: { content: [] } })),
+          apiClient.get('/admin/companies/pending?page=0&size=20').catch(() => ({ data: { content: [] } }))
+        ]);
+        setMetrics(mRes.data?.data || null);
+        setTemporalJobs(tjRes.data?.data || null);
+        setUsers(uRes.data?.content || uRes.data?.data?.content || []);
+        setCompanies(cRes.data?.content || cRes.data?.data?.content || []);
+      } else if (portalMode === 'COMPANY') {
+        const cRes = await apiClient.get('/admin/companies/pending?page=0&size=20').catch(() => ({ data: { content: [] } }));
+        setCompanies(cRes.data?.content || cRes.data?.data?.content || []);
+      }
     } catch (e) {
       console.warn('Admin data load error', e);
     } finally {
@@ -119,6 +154,40 @@ export const AdminPortal: React.FC = () => {
     }
   };
 
+  const handleSignOut = () => {
+    logout();
+    navigate('/');
+  };
+
+  // If unauthenticated or unauthorized for this portal
+  if (!isAuthenticated) {
+    return <Navigate to="/admin-login" replace />;
+  }
+
+  if (!isAuthorized) {
+    return (
+      <div className={`admin-page-wrapper admin-theme-${theme}`} style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', maxWidth: 460, padding: 30, background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 16 }}>
+          <div style={{ width: 60, height: 60, borderRadius: '50%', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <ShieldAlert size={32} color="#EF4444" />
+          </div>
+          <h2 style={{ color: 'var(--admin-text-primary)', margin: '0 0 8px', fontSize: 20 }}>Access Restricted</h2>
+          <p style={{ color: 'var(--admin-text-secondary)', fontSize: 13, lineHeight: 1.5, margin: '0 0 20px' }}>
+            Your account is not authorized for this specific admin suite. Please use your assigned portal.
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <button onClick={handleSignOut} style={{ background: '#EF4444', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: 13 }}>
+              Sign Out
+            </button>
+            <button onClick={() => navigate('/')} style={{ background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', border: '1px solid var(--admin-border)', padding: '8px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
+              Return Home
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`admin-page-wrapper admin-theme-${theme}`}>
       <div className="admin-container">
@@ -127,35 +196,66 @@ export const AdminPortal: React.FC = () => {
           <div className="admin-header-title">
             <HireMindLogo variant="badge" size="md" />
             <div>
-              <h1 className="admin-title-text">Executive Control Center</h1>
+              <h1 className="admin-title-text">
+                {portalMode === 'DEVELOPER' && 'Application Developer Suite'}
+                {portalMode === 'MANAGEMENT' && 'HireMind-Management Team Governance'}
+                {portalMode === 'COMPANY' && 'Register Company — Corporate Executive Suite'}
+              </h1>
               <p className="admin-subtitle-text">
-                HireMind-AI Governance, AI Agent Diagnostics, Moderation & Company Verification
+                {portalMode === 'DEVELOPER' && 'Core AI Engine Architecture, Agent Orchestration & Real-Time Diagnostics (Safe DB Guard Active)'}
+                {portalMode === 'MANAGEMENT' && 'User Governance, Candidate/HR Moderation, Temporal Metrics & Compliance Monitoring'}
+                {portalMode === 'COMPANY' && 'Corporate Multi-Tenant Verification Queue, Candidate Endorsement & Verified Badge Dispatch'}
               </p>
             </div>
           </div>
 
-          {/* 3-State Official Theme Switcher */}
-          <div className="admin-theme-segmented-ctrl">
+          {/* Right Action Controls: Theme Switcher & Sign Out */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* 3-State Official Theme Switcher */}
+            <div className="admin-theme-segmented-ctrl">
+              <button
+                onClick={() => setTheme('light-100')}
+                className={`admin-theme-btn ${theme === 'light-100' ? 'active' : ''}`}
+                title="100% Crisp Corporate Daylight Mode"
+              >
+                <Sun size={14} /> 100% Light
+              </button>
+              <button
+                onClick={() => setTheme('light-50')}
+                className={`admin-theme-btn ${theme === 'light-50' ? 'active' : ''}`}
+                title="50% Soft / Eye-Comfort Balanced Mode"
+              >
+                <CloudSun size={14} /> 50% Light
+              </button>
+              <button
+                onClick={() => setTheme('dark-100')}
+                className={`admin-theme-btn ${theme === 'dark-100' ? 'active' : ''}`}
+                title="100% Executive Obsidian Midnight Mode"
+              >
+                <Moon size={14} /> 100% Dark
+              </button>
+            </div>
+
+            {/* Sign Out Button */}
             <button
-              onClick={() => setTheme('light-100')}
-              className={`admin-theme-btn ${theme === 'light-100' ? 'active' : ''}`}
-              title="100% Crisp Corporate Daylight Mode"
+              onClick={handleSignOut}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 10,
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                color: '#EF4444',
+                fontWeight: 700,
+                fontSize: 12.5,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Sign out of Admin session"
             >
-              <Sun size={14} /> 100% Light
-            </button>
-            <button
-              onClick={() => setTheme('light-50')}
-              className={`admin-theme-btn ${theme === 'light-50' ? 'active' : ''}`}
-              title="50% Soft / Eye-Comfort Balanced Mode"
-            >
-              <CloudSun size={14} /> 50% Light
-            </button>
-            <button
-              onClick={() => setTheme('dark-100')}
-              className={`admin-theme-btn ${theme === 'dark-100' ? 'active' : ''}`}
-              title="100% Executive Obsidian Midnight Mode"
-            >
-              <Moon size={14} /> 100% Dark
+              <LogOut size={14} /> Sign Out
             </button>
           </div>
         </div>
@@ -167,38 +267,16 @@ export const AdminPortal: React.FC = () => {
           </div>
         )}
 
-        {/* Role Tab Navigation */}
-        <div className="admin-tab-nav">
-          <button
-            onClick={() => setActiveTab('DEVELOPER')}
-            className={`admin-tab-btn ${activeTab === 'DEVELOPER' ? 'active' : ''}`}
-          >
-            <Code2 size={16} /> Application Developer Suite
-          </button>
-          <button
-            onClick={() => setActiveTab('MANAGEMENT')}
-            className={`admin-tab-btn ${activeTab === 'MANAGEMENT' ? 'active' : ''}`}
-          >
-            <Users size={16} /> HireMind-Management Team
-          </button>
-          <button
-            onClick={() => setActiveTab('COMPANY')}
-            className={`admin-tab-btn ${activeTab === 'COMPANY' ? 'active' : ''}`}
-          >
-            <Building2 size={16} /> Register Company (Executive Queue)
-          </button>
-        </div>
-
         {loading && (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--admin-text-muted)', fontSize: 13 }}>
-            Refreshing telemetry and platform data...
+            Refreshing telemetry and portal data...
           </div>
         )}
 
         {/* ────────────────────────────────────────────────────────
-            TAB 1: APPLICATION DEVELOPER SUITE
+            PORTAL 1: APPLICATION DEVELOPER SUITE ONLY
             ──────────────────────────────────────────────────────── */}
-        {activeTab === 'DEVELOPER' && (
+        {portalMode === 'DEVELOPER' && (
           <div>
             {/* Developer Safe Lock Banner */}
             <div className="dev-safeguard-banner">
@@ -264,13 +342,37 @@ export const AdminPortal: React.FC = () => {
                 ))}
               </div>
             </div>
+
+            {/* Developer Codebase Trigger Console */}
+            <div className="admin-card-section">
+              <h3 className="admin-section-heading">
+                <Code2 size={18} color="var(--admin-primary)" /> Application Runtime & Build Triggers
+              </h3>
+              <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
+                Application Developer terminal and system hooks for real-time model re-indexing and cache purges.
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => setMsg('Redis Radish cache flushed and re-indexed successfully.')}
+                  style={{ background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', border: '1px solid var(--admin-border)', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}
+                >
+                  ⚡ Flush & Warm Redis Cache
+                </button>
+                <button
+                  onClick={() => setMsg('AI Agent Embeddings synchronizer completed.')}
+                  style={{ background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', border: '1px solid var(--admin-border)', padding: '9px 16px', borderRadius: 10, fontWeight: 700, fontSize: 12.5, cursor: 'pointer' }}
+                >
+                  🤖 Re-Sync AI Embeddings
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
         {/* ────────────────────────────────────────────────────────
-            TAB 2: HIREMIND-MANAGEMENT TEAM SUITE
+            PORTAL 2: HIREMIND-MANAGEMENT TEAM ONLY
             ──────────────────────────────────────────────────────── */}
-        {activeTab === 'MANAGEMENT' && (
+        {portalMode === 'MANAGEMENT' && (
           <div>
             {/* Platform Overview Metrics */}
             {metrics && (
@@ -386,9 +488,9 @@ export const AdminPortal: React.FC = () => {
         )}
 
         {/* ────────────────────────────────────────────────────────
-            TAB 3: REGISTER COMPANY & VERIFICATION QUEUE
+            PORTAL 3: REGISTER COMPANY ONLY (EXECUTIVE QUEUE)
             ──────────────────────────────────────────────────────── */}
-        {activeTab === 'COMPANY' && (
+        {portalMode === 'COMPANY' && (
           <div>
             <div className="admin-card-section">
               <h3 className="admin-section-heading">

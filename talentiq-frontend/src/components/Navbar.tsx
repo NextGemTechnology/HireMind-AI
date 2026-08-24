@@ -78,9 +78,15 @@ export const Navbar: React.FC = () => {
     navigate('/');
   };
 
+  const adminHomePath = user?.roles?.includes('ROLE_APP_DEVELOPER')
+    ? '/admin-application-developere-suit'
+    : user?.roles?.includes('ROLE_MANAGEMENT_TEAM')
+    ? '/admin-Management-team'
+    : '/admin-Register-Company';
+
   return (
     <nav className="global-navbar">
-      <Link to={isHr ? '/hr-analytics' : isAdmin ? '/admin' : '/'} className="nav-brand-link">
+      <Link to={isHr ? '/hr-analytics' : isAdmin ? adminHomePath : '/'} className="nav-brand-link">
         <HireMindLogo variant="navbar" size="md" />
       </Link>
 
