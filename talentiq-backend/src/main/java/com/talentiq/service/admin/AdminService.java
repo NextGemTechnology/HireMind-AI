@@ -25,4 +25,8 @@ public interface AdminService {
     UserDto.Response setHrBlockStatus(Long adminUserId, Long hrProfileId, AdminDto.ModerationRequest request);
 
     CompanyDto.Response setCompanyBlacklistStatus(Long adminUserId, Long companyId, AdminDto.ModerationRequest request);
+
+    AdminDto.UserDetailsResponse getUserDetails(Long adminUserId, Long targetUserId);
+
+    AdminDto.AgentQueryResponse processManagementAgentPrompt(Long adminUserId, AdminDto.AgentQueryRequest request);
 }

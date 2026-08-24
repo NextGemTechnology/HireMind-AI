@@ -116,4 +116,22 @@ public class AdminController {
         String msg = Boolean.TRUE.equals(request.getBlocked()) ? "Company blacklisted" : "Company whitelisted / unblocked";
         return ResponseEntity.ok(ApiResponse.success(msg, response));
     }
+
+    @GetMapping("/users/{id}/details")
+    @Operation(summary = "Get full user profile dossier (Management Team & Admin)")
+    public ResponseEntity<ApiResponse<AdminDto.UserDetailsResponse>> getUserDetails(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        AdminDto.UserDetailsResponse response = adminService.getUserDetails(principal.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping("/management/agent/query")
+    @Operation(summary = "Execute Management AI Agent prompt & database/Radish query (Management Team & Admin)")
+    public ResponseEntity<ApiResponse<AdminDto.AgentQueryResponse>> processManagementAgentQuery(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody AdminDto.AgentQueryRequest request) {
+        AdminDto.AgentQueryResponse response = adminService.processManagementAgentPrompt(principal.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 }

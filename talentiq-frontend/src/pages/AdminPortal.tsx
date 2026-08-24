@@ -53,6 +53,40 @@ interface CompanyItem {
   blacklisted?: boolean;
 }
 
+interface UserDetailsModalData {
+  id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
+  status: string;
+  roles: string[];
+  emailVerified: boolean;
+  createdAt: string;
+  lastLoginAt?: string;
+  loginAttempts?: number;
+  headline?: string;
+  bio?: string;
+  location?: string;
+  openToWork?: boolean;
+  skills?: string[];
+  educations?: Array<{ id: number; institution: string; degree: string; fieldOfStudy: string; startYear?: number; endYear?: number }>;
+  experiences?: Array<{ id: number; company: string; title: string; location: string; description: string }>;
+  companyName?: string;
+  designation?: string;
+  companyAdmin?: boolean;
+  totalApplicationsCount?: number;
+  verifiedBadges?: string[];
+}
+
+interface AgentChatMessage {
+  id: string;
+  sender: 'user' | 'agent';
+  text: string;
+  timestamp: string;
+  actionType?: string;
+  data?: any;
+}
+
 interface AdminPortalProps {
   mode?: 'DEVELOPER' | 'MANAGEMENT' | 'COMPANY';
 }
@@ -81,6 +115,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState('');
+
+  // Management AI Agent & Search States
+  const [agentPrompt, setAgentPrompt] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentMessages, setAgentMessages] = useState<AgentChatMessage[]>([
+    {
+      id: '1',
+      sender: 'agent',
+      text: '👋 **HireMind Management AI Copilot is Online**.\nConnected directly to **MySQL InnoDB** and **Redis (Radish) Cache**.\n\nYou can query temporal analytics, inspect candidate dossiers, block/unblock candidates or HRs, and verify companies using prompts.',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ]);
+  const [searchFilter, setSearchFilter] = useState('');
+  const [activeCategory, setActiveCategory] = useState<'ALL' | 'CANDIDATE' | 'HR' | 'COMPANY'>('ALL');
+  const [inspectedUser, setInspectedUser] = useState<UserDetailsModalData | null>(null);
+  const [inspectLoading, setInspectLoading] = useState(false);
 
   // RBAC Access Check
   const roles = user?.roles || [];
@@ -114,15 +164,15 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
         const [mRes, tjRes, uRes, cRes] = await Promise.all([
           apiClient.get('/admin/metrics').catch(() => ({ data: { data: null } })),
           apiClient.get('/admin/metrics/temporal').catch(() => ({ data: { data: null } })),
-          apiClient.get('/admin/users?page=0&size=20').catch(() => ({ data: { content: [] } })),
-          apiClient.get('/admin/companies/pending?page=0&size=20').catch(() => ({ data: { content: [] } }))
+          apiClient.get('/admin/users?page=0&size=50').catch(() => ({ data: { content: [] } })),
+          apiClient.get('/admin/companies/pending?page=0&size=50').catch(() => ({ data: { content: [] } }))
         ]);
         setMetrics(mRes.data?.data || null);
         setTemporalJobs(tjRes.data?.data || null);
         setUsers(uRes.data?.content || uRes.data?.data?.content || []);
         setCompanies(cRes.data?.content || cRes.data?.data?.content || []);
       } else if (portalMode === 'COMPANY') {
-        const cRes = await apiClient.get('/admin/companies/pending?page=0&size=20').catch(() => ({ data: { content: [] } }));
+        const cRes = await apiClient.get('/admin/companies/pending?page=0&size=50').catch(() => ({ data: { content: [] } }));
         setCompanies(cRes.data?.content || cRes.data?.data?.content || []);
       }
     } catch (e) {
@@ -137,7 +187,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
     try {
       await apiClient.put(`/admin/candidates/${userId}/block`, { blocked: willBlock, reason: 'Management review' });
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, status: willBlock ? 'BLOCKED' : 'ACTIVE' } : u));
-      setMsg(willBlock ? 'Candidate account blocked.' : 'Candidate account unblocked.');
+      if (inspectedUser && inspectedUser.id === userId) {
+        setInspectedUser({ ...inspectedUser, status: willBlock ? 'BLOCKED' : 'ACTIVE' });
+      }
+      setMsg(willBlock ? `Candidate account ID ${userId} blocked.` : `Candidate account ID ${userId} unblocked.`);
     } catch (e: any) {
       setMsg(`Action failed: ${e?.response?.data?.message || 'Error'}`);
     }
@@ -148,9 +201,85 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
     try {
       await apiClient.put(`/admin/companies/${companyId}/blacklist`, { blocked: willBlacklist, reason: 'Compliance review' });
       setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, blacklisted: willBlacklist } : c));
-      setMsg(willBlacklist ? 'Company blacklisted from platform.' : 'Company unblocked / whitelisted.');
+      setMsg(willBlacklist ? `Company ID ${companyId} blacklisted.` : `Company ID ${companyId} unblocked.`);
     } catch (e: any) {
       setMsg(`Action failed: ${e?.response?.data?.message || 'Error'}`);
+    }
+  };
+
+  const handleVerifyCompany = async (companyId: number) => {
+    try {
+      await apiClient.put(`/admin/companies/${companyId}/verify`, { approved: true, notes: 'Verified by Management Team' });
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, verified: true } : c));
+      setMsg(`Company ID ${companyId} verified successfully.`);
+    } catch (e: any) {
+      setMsg(`Action failed: ${e?.response?.data?.message || 'Error'}`);
+    }
+  };
+
+  const handleInspectUser = async (userId: number) => {
+    setInspectLoading(true);
+    try {
+      const res = await apiClient.get(`/admin/users/${userId}/details`);
+      setInspectedUser(res.data?.data || null);
+    } catch (e: any) {
+      setMsg(`Could not fetch details for user ID ${userId}`);
+    } finally {
+      setInspectLoading(false);
+    }
+  };
+
+  const handleSendAgentQuery = async (queryText?: string) => {
+    const promptToSend = queryText || agentPrompt;
+    if (!promptToSend.trim()) return;
+
+    const userMsg: AgentChatMessage = {
+      id: Date.now().toString(),
+      sender: 'user',
+      text: promptToSend.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setAgentMessages(prev => [...prev, userMsg]);
+    setAgentPrompt('');
+    setAgentLoading(true);
+
+    try {
+      const res = await apiClient.post('/admin/management/agent/query', { prompt: promptToSend.trim() });
+      const agentRes = res.data?.data;
+
+      const replyMsg: AgentChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'agent',
+        text: agentRes?.reply || 'Command processed successfully.',
+        actionType: agentRes?.actionType,
+        data: agentRes?.data,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+
+      setAgentMessages(prev => [...prev, replyMsg]);
+
+      // If inspect user returned
+      if (agentRes?.actionType === 'INSPECT_USER' && agentRes?.data) {
+        setInspectedUser(agentRes.data);
+      }
+
+      // Refresh platform data if moderation was performed
+      if (agentRes?.actionType === 'MODERATION_PERFORMED') {
+        fetchData();
+      }
+    } catch (e: any) {
+      setAgentMessages(prev => [
+        ...prev,
+        {
+          id: (Date.now() + 1).toString(),
+          sender: 'agent',
+          text: `⚠️ Error executing query: ${e?.response?.data?.message || e.message || 'Server error'}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }
+      ]);
+    } finally {
+      setAgentLoading(false);
     }
   };
 
@@ -188,6 +317,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
     );
   }
 
+  // Filter users by search
+  const filteredUsers = users.filter(u => {
+    const matchesSearch = !searchFilter.trim() ||
+      u.email.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      `${u.firstName} ${u.lastName}`.toLowerCase().includes(searchFilter.toLowerCase()) ||
+      u.id.toString() === searchFilter.trim();
+
+    if (!matchesSearch) return false;
+    if (activeCategory === 'ALL') return true;
+    if (activeCategory === 'CANDIDATE') return u.roles?.some(r => r.includes('CANDIDATE') || r.includes('USER'));
+    if (activeCategory === 'HR') return u.roles?.some(r => r.includes('HR') || r.includes('RECRUITER'));
+    return true;
+  });
+
   return (
     <div className={`admin-page-wrapper admin-theme-${theme}`}>
       <div className="admin-container">
@@ -203,7 +346,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               </h1>
               <p className="admin-subtitle-text">
                 {portalMode === 'DEVELOPER' && 'Core AI Engine Architecture, Agent Orchestration & Real-Time Diagnostics (Safe DB Guard Active)'}
-                {portalMode === 'MANAGEMENT' && 'User Governance, Candidate/HR Moderation, Temporal Metrics & Compliance Monitoring'}
+                {portalMode === 'MANAGEMENT' && 'AI Copilot Governance, Candidate/HR Dossiers, Temporal Analytics & MySQL/Radish Control'}
                 {portalMode === 'COMPANY' && 'Corporate Multi-Tenant Verification Queue, Candidate Endorsement & Verified Badge Dispatch'}
               </p>
             </div>
@@ -278,7 +421,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
             ──────────────────────────────────────────────────────── */}
         {portalMode === 'DEVELOPER' && (
           <div>
-            {/* Developer Safe Lock Banner */}
             <div className="dev-safeguard-banner">
               <div className="dev-safeguard-icon">
                 <ShieldCheck size={20} />
@@ -293,7 +435,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               </div>
             </div>
 
-            {/* System Diagnostics & Telemetry Cards */}
             <div className="temporal-metrics-grid">
               <div className="temporal-card">
                 <div className="temporal-label"><Activity size={13} /> Core Engine</div>
@@ -313,7 +454,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               </div>
             </div>
 
-            {/* AI Agents Manager */}
             <div className="admin-card-section">
               <h3 className="admin-section-heading">
                 <Sparkles size={18} color="var(--admin-accent)" /> HIREMIND-AI Agent Orchestration
@@ -343,14 +483,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               </div>
             </div>
 
-            {/* Developer Codebase Trigger Console */}
             <div className="admin-card-section">
               <h3 className="admin-section-heading">
                 <Code2 size={18} color="var(--admin-primary)" /> Application Runtime & Build Triggers
               </h3>
-              <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
-                Application Developer terminal and system hooks for real-time model re-indexing and cache purges.
-              </p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setMsg('Redis Radish cache flushed and re-indexed successfully.')}
@@ -374,7 +510,149 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
             ──────────────────────────────────────────────────────── */}
         {portalMode === 'MANAGEMENT' && (
           <div>
-            {/* Platform Overview Metrics */}
+            {/* ── AI MANAGEMENT AGENT CONSOLE (PROMPT & QUERY MODE) ── */}
+            <div className="admin-card-section" style={{ border: '1px solid rgba(56, 189, 248, 0.4)', background: 'linear-gradient(180deg, var(--admin-surface) 0%, var(--admin-surface-subtle) 100%)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Sparkles size={20} color="#38BDF8" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'var(--admin-text-primary)' }}>
+                      HireMind AI Management Copilot • Prompt & Query Mode
+                    </h3>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--admin-text-secondary)' }}>
+                      Connected to MySQL InnoDB Engine & Redis (Radish) High-Speed Cache
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 700 }}>
+                  <span style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', padding: '3px 9px', borderRadius: 6 }}>
+                    🟢 DB Engine: Active
+                  </span>
+                  <span style={{ background: 'rgba(56,189,248,0.15)', color: '#38BDF8', padding: '3px 9px', borderRadius: 6 }}>
+                    ⚡ Radish Cache: Ready
+                  </span>
+                </div>
+              </div>
+
+              {/* Chat Messages Stream */}
+              <div style={{
+                maxHeight: 280,
+                overflowY: 'auto',
+                padding: '14px',
+                borderRadius: 12,
+                background: 'var(--admin-surface)',
+                border: '1px solid var(--admin-border)',
+                marginBottom: 12,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 12
+              }}>
+                {agentMessages.map(m => (
+                  <div key={m.id} style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignSelf: m.sender === 'user' ? 'flex-end' : 'flex-start',
+                    maxWidth: '85%'
+                  }}>
+                    <div style={{
+                      padding: '10px 14px',
+                      borderRadius: 12,
+                      fontSize: 13,
+                      lineHeight: 1.5,
+                      whiteSpace: 'pre-wrap',
+                      background: m.sender === 'user' ? '#38BDF8' : 'var(--admin-surface-subtle)',
+                      color: m.sender === 'user' ? '#0F172A' : 'var(--admin-text-primary)',
+                      border: m.sender === 'user' ? 'none' : '1px solid var(--admin-border)',
+                      fontWeight: m.sender === 'user' ? 600 : 400
+                    }}>
+                      {m.text}
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--admin-text-muted)', marginTop: 3, textAlign: m.sender === 'user' ? 'right' : 'left' }}>
+                      {m.sender === 'user' ? 'Management Admin' : 'AI Copilot'} • {m.timestamp}
+                    </span>
+                  </div>
+                ))}
+                {agentLoading && (
+                  <div style={{ color: '#38BDF8', fontSize: 12.5, fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Sparkles size={14} className="animate-spin" /> Querying database & Redis (Radish) cache...
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Action Prompt Chips */}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                {[
+                  { label: '📊 Job Stats (Today/Week/Month/Year)', cmd: 'job stats' },
+                  { label: '🗄️ Database & Redis Health', cmd: 'database health' },
+                  { label: '👤 Inspect Candidate 85', cmd: 'details 85' },
+                  { label: '🛡️ Block Candidate 85', cmd: 'block candidate 85' },
+                  { label: '✅ Unblock Candidate 85', cmd: 'unblock candidate 85' },
+                  { label: '👔 Moderate HR 86', cmd: 'block hr 86' },
+                  { label: '🏢 Blacklist Company 1', cmd: 'blacklist company 1' }
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSendAgentQuery(chip.cmd)}
+                    style={{
+                      background: 'var(--admin-surface)',
+                      border: '1px solid var(--admin-border)',
+                      color: 'var(--admin-text-secondary)',
+                      padding: '5px 10px',
+                      borderRadius: 8,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input Form */}
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleSendAgentQuery(); }}
+                style={{ display: 'flex', gap: 10 }}
+              >
+                <input
+                  type="text"
+                  value={agentPrompt}
+                  onChange={(e) => setAgentPrompt(e.target.value)}
+                  placeholder="Ask AI Copilot: 'details 85', 'block candidate 85', 'how many jobs this month', 'verify company 3'..."
+                  style={{
+                    flex: 1,
+                    padding: '11px 16px',
+                    borderRadius: 10,
+                    border: '1px solid var(--admin-border)',
+                    background: 'var(--admin-surface)',
+                    color: 'var(--admin-text-primary)',
+                    fontSize: 13.5,
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={agentLoading || !agentPrompt.trim()}
+                  style={{
+                    background: '#38BDF8',
+                    color: '#0F172A',
+                    border: 'none',
+                    padding: '0 20px',
+                    borderRadius: 10,
+                    fontWeight: 800,
+                    fontSize: 13,
+                    cursor: agentLoading || !agentPrompt.trim() ? 'not-allowed' : 'pointer',
+                    opacity: agentLoading || !agentPrompt.trim() ? 0.6 : 1
+                  }}
+                >
+                  Send Query
+                </button>
+              </form>
+            </div>
+
+            {/* ── PLATFORM METRICS CARDS ── */}
             {metrics && (
               <div className="temporal-metrics-grid" style={{ marginBottom: 20 }}>
                 <div className="temporal-card">
@@ -396,7 +674,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               </div>
             )}
 
-            {/* Temporal Job Statistics Breakdown (Today, This Week, This Month, This Year) */}
+            {/* ── TEMPORAL JOB POSTINGS BREAKDOWN (Today, Week, Month, Year) ── */}
             <div className="admin-card-section">
               <h3 className="admin-section-heading">
                 <BarChart3 size={18} color="var(--admin-primary)" /> Temporal Job Postings Analytics
@@ -429,21 +707,85 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               </div>
             </div>
 
-            {/* Candidate & HR Moderation Controls */}
+            {/* ── USER GOVERNANCE & MODERATION DIRECTORY ── */}
             <div className="admin-card-section">
-              <h3 className="admin-section-heading">
-                <Users size={18} color="var(--admin-accent)" /> User Governance & Candidate / HR Moderation
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {users.slice(0, 10).map(u => (
-                  <div key={u.id} className="admin-moderation-item">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                <h3 className="admin-section-heading" style={{ margin: 0 }}>
+                  <Users size={18} color="var(--admin-accent)" /> User Governance & Moderation Directory
+                </h3>
+
+                {/* Filter Category Tabs */}
+                <div style={{ display: 'flex', gap: 6, background: 'var(--admin-surface-subtle)', padding: 4, borderRadius: 8, border: '1px solid var(--admin-border)' }}>
+                  {(['ALL', 'CANDIDATE', 'HR'] as const).map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCategory(cat)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: 'none',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        background: activeCategory === cat ? 'var(--admin-primary)' : 'transparent',
+                        color: activeCategory === cat ? '#0F172A' : 'var(--admin-text-secondary)'
+                      }}
+                    >
+                      {cat === 'ALL' ? 'All Accounts' : cat === 'CANDIDATE' ? 'Candidates' : 'HR Recruiters'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Search Bar */}
+              <div style={{ marginBottom: 14 }}>
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(e) => setSearchFilter(e.target.value)}
+                  placeholder="Search user by name, email, or user ID..."
+                  style={{
+                    width: '100%',
+                    padding: '9px 14px',
+                    borderRadius: 10,
+                    border: '1px solid var(--admin-border)',
+                    background: 'var(--admin-surface-subtle)',
+                    color: 'var(--admin-text-primary)',
+                    fontSize: 13,
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              {/* Users List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto' }}>
+                {filteredUsers.slice(0, 20).map(u => (
+                  <div key={u.id} className="admin-moderation-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                     <div>
-                      <div className="admin-user-info-name">{u.firstName} {u.lastName}</div>
+                      <div className="admin-user-info-name">
+                        {u.firstName} {u.lastName} <span style={{ fontSize: 11, color: 'var(--admin-text-muted)' }}>(ID: {u.id})</span>
+                      </div>
                       <div className="admin-user-info-meta">
                         {u.email} • Role: <strong>{u.roles?.join(', ')}</strong> • Status: <span style={{ color: u.status === 'BLOCKED' ? 'var(--admin-danger)' : 'var(--admin-success)', fontWeight: 700 }}>{u.status}</span>
                       </div>
                     </div>
-                    <div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleInspectUser(u.id)}
+                        style={{
+                          background: 'var(--admin-surface)',
+                          border: '1px solid var(--admin-border)',
+                          color: 'var(--admin-text-primary)',
+                          padding: '6px 12px',
+                          borderRadius: 8,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Inspect Dossier
+                      </button>
                       <button
                         onClick={() => handleToggleCandidateBlock(u.id, u.status)}
                         className={`btn-block-action ${u.status === 'BLOCKED' ? 'unblock' : 'block'}`}
@@ -456,31 +798,147 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               </div>
             </div>
 
-            {/* Company Blacklist & Moderation Controls */}
+            {/* ── CORPORATE ENTITIES & BLACKLIST DIRECTORY ── */}
             {companies.length > 0 && (
               <div className="admin-card-section">
                 <h3 className="admin-section-heading">
                   <Building2 size={18} color="var(--admin-warning)" /> Corporate Entity Moderation & Blacklist
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 300, overflowY: 'auto' }}>
                   {companies.map(c => (
-                    <div key={c.id} className="admin-moderation-item">
+                    <div key={c.id} className="admin-moderation-item" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                       <div>
-                        <div className="admin-user-info-name">{c.name}</div>
+                        <div className="admin-user-info-name">{c.name} <span style={{ fontSize: 11, color: 'var(--admin-text-muted)' }}>(ID: {c.id})</span></div>
                         <div className="admin-user-info-meta">
                           {c.industry || 'General Industry'} • {c.website || 'No website'} • Status: <span style={{ color: c.blacklisted ? 'var(--admin-danger)' : 'var(--admin-success)', fontWeight: 700 }}>{c.blacklisted ? 'BLACKLISTED' : (c.verified ? 'VERIFIED' : 'ACTIVE')}</span>
                         </div>
                       </div>
-                      <div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {!c.verified && (
+                          <button
+                            onClick={() => handleVerifyCompany(c.id)}
+                            style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            Verify
+                          </button>
+                        )}
                         <button
                           onClick={() => handleToggleCompanyBlacklist(c.id, !!c.blacklisted)}
                           className={`btn-block-action ${c.blacklisted ? 'unblock' : 'block'}`}
                         >
-                          {c.blacklisted ? <><CheckCircle2 size={13} /> Unblock / Whitelist</> : <><Ban size={13} /> Blacklist Company</>}
+                          {c.blacklisted ? <><CheckCircle2 size={13} /> Unblock</> : <><Ban size={13} /> Blacklist</>}
                         </button>
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── PROFILE INSPECTOR MODAL ── */}
+            {inspectLoading && (
+              <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 99999, background: '#38BDF8', color: '#0F172A', padding: '10px 18px', borderRadius: 10, fontWeight: 700, fontSize: 13, boxShadow: '0 8px 20px rgba(0,0,0,0.3)' }}>
+                Loading User Dossier...
+              </div>
+            )}
+            {inspectedUser && (
+              <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.7)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+                padding: 20
+              }}>
+                <div style={{
+                  background: 'var(--admin-surface)',
+                  border: '1px solid var(--admin-border)',
+                  borderRadius: 16,
+                  maxWidth: 600,
+                  width: '100%',
+                  maxHeight: '85vh',
+                  overflowY: 'auto',
+                  padding: 24,
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px', fontSize: 18, color: 'var(--admin-text-primary)' }}>
+                        {inspectedUser.firstName} {inspectedUser.lastName}
+                      </h3>
+                      <p style={{ margin: 0, fontSize: 13, color: 'var(--admin-text-secondary)' }}>
+                        {inspectedUser.email} • ID: {inspectedUser.id} • Status: <strong style={{ color: inspectedUser.status === 'BLOCKED' ? '#EF4444' : '#10B981' }}>{inspectedUser.status}</strong>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setInspectedUser(null)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--admin-text-muted)', fontSize: 20, cursor: 'pointer', padding: 4 }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 13, color: 'var(--admin-text-primary)' }}>
+                    <div>
+                      <strong>Roles:</strong> {inspectedUser.roles?.join(', ')}
+                    </div>
+                    {inspectedUser.headline && (
+                      <div><strong>Headline:</strong> {inspectedUser.headline}</div>
+                    )}
+                    {inspectedUser.bio && (
+                      <div><strong>Bio:</strong> {inspectedUser.bio}</div>
+                    )}
+                    {inspectedUser.location && (
+                      <div><strong>Location:</strong> {inspectedUser.location}</div>
+                    )}
+                    {inspectedUser.companyName && (
+                      <div><strong>Company:</strong> {inspectedUser.companyName} ({inspectedUser.designation})</div>
+                    )}
+
+                    {inspectedUser.skills && inspectedUser.skills.length > 0 && (
+                      <div>
+                        <strong>Skills:</strong>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                          {inspectedUser.skills.map((s, idx) => (
+                            <span key={idx} style={{ background: 'var(--admin-surface-subtle)', padding: '2px 8px', borderRadius: 6, fontSize: 11.5, border: '1px solid var(--admin-border)' }}>
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {inspectedUser.verifiedBadges && inspectedUser.verifiedBadges.length > 0 && (
+                      <div>
+                        <strong style={{ color: '#10B981' }}>🛡️ Verified Corporate Endorsements:</strong>
+                        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {inspectedUser.verifiedBadges.map((badge, idx) => (
+                            <span key={idx} style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', padding: '4px 10px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>
+                              ✓ {badge}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--admin-border)' }}>
+                    <button
+                      onClick={() => handleToggleCandidateBlock(inspectedUser.id, inspectedUser.status)}
+                      className={`btn-block-action ${inspectedUser.status === 'BLOCKED' ? 'unblock' : 'block'}`}
+                    >
+                      {inspectedUser.status === 'BLOCKED' ? 'Unblock Account' : 'Block Account'}
+                    </button>
+                    <button
+                      onClick={() => setInspectedUser(null)}
+                      style={{ background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', border: '1px solid var(--admin-border)', padding: '8px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

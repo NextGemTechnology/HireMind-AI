@@ -19,6 +19,8 @@ public interface JobApplicationRepository extends JpaRepository<JobApplication, 
 
     long countByStatus(ApplicationStatus status);
 
+    long countByCandidateId(Long candidateId);
+
     @EntityGraph(attributePaths = {"job", "job.company", "candidate", "candidate.user"})
     Page<JobApplication> findAllByJobId(Long jobId, Pageable pageable);
 

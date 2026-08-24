@@ -69,4 +69,70 @@ public class AdminDto {
         private String details;
         private Instant timestamp;
     }
+
+    @Data
+    public static class AgentQueryRequest {
+        private String prompt;
+        private String targetType;
+        private Long targetId;
+    }
+
+    @Data
+    @Builder
+    public static class AgentQueryResponse {
+        private String reply;
+        private String actionType;
+        private Object data;
+        private Instant timestamp;
+    }
+
+    @Data
+    @Builder
+    public static class UserDetailsResponse {
+        private Long id;
+        private String email;
+        private String firstName;
+        private String lastName;
+        private String status;
+        private List<String> roles;
+        private boolean emailVerified;
+        private Instant createdAt;
+        private Instant lastLoginAt;
+        private int loginAttempts;
+        // Candidate profile specific info if exists
+        private String headline;
+        private String bio;
+        private String location;
+        private Boolean openToWork;
+        private List<String> skills;
+        private List<CandidateEducationDto> educations;
+        private List<CandidateExperienceDto> experiences;
+        // HR profile specific info if exists
+        private String companyName;
+        private String designation;
+        private boolean companyAdmin;
+        private long totalApplicationsCount;
+        private List<String> verifiedBadges;
+    }
+
+    @Data
+    @Builder
+    public static class CandidateEducationDto {
+        private Long id;
+        private String institution;
+        private String degree;
+        private String fieldOfStudy;
+        private Integer startYear;
+        private Integer endYear;
+    }
+
+    @Data
+    @Builder
+    public static class CandidateExperienceDto {
+        private Long id;
+        private String company;
+        private String title;
+        private String location;
+        private String description;
+    }
 }
