@@ -3,8 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
 import {
-  User, Building2, CheckCircle2, ArrowRight, Eye, EyeOff, ShieldCheck,
-  RefreshCw, Code2, Users2, Briefcase, ChevronDown
+  Building2, CheckCircle2, ArrowRight, Eye, EyeOff, ShieldCheck,
+  RefreshCw, Code2, Users2, ChevronDown
 } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
@@ -12,11 +12,9 @@ import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/register.css';
 
 export type RoleOption =
-  | 'ROLE_CANDIDATE'
-  | 'ROLE_HR'
-  | 'ROLE_COMPANY_ADMIN'
+  | 'ROLE_APP_DEVELOPER'
   | 'ROLE_MANAGEMENT_TEAM'
-  | 'ROLE_APP_DEVELOPER';
+  | 'ROLE_COMPANY_ADMIN';
 
 interface FormData {
   firstName: string;
@@ -68,20 +66,6 @@ const ROLE_DEFINITIONS: { id: RoleOption; label: string; tag: string; icon: any;
     tag: 'Company Executive / CEO / Director',
     icon: Building2,
     desc: 'Register an enterprise corporate entity with isolated confidential data. Issue verified recruiter badges to HRs and approve/reject candidate verification tags.'
-  },
-  {
-    id: 'ROLE_HR',
-    label: 'HR Recruiter',
-    tag: 'Talent Acquisition & Candidate Screening',
-    icon: Briefcase,
-    desc: 'Post job opportunities, review applications, conduct AI-assisted screening interviews, and initiate verified company tag requests for hired talent.'
-  },
-  {
-    id: 'ROLE_CANDIDATE',
-    label: 'Candidate / Job Seeker',
-    tag: 'AI Career & Smart Matching',
-    icon: User,
-    desc: 'Build AI-enhanced portfolios, receive intelligent job recommendations, track interview schedules, and showcase company-verified credentials.'
   }
 ];
 
@@ -89,7 +73,7 @@ export const Register: React.FC = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const [selectedRole, setSelectedRole] = useState<RoleOption>('ROLE_CANDIDATE');
+  const [selectedRole, setSelectedRole] = useState<RoleOption>('ROLE_APP_DEVELOPER');
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -241,15 +225,14 @@ export const Register: React.FC = () => {
         location: form.location
       };
 
-      if (selectedRole === 'ROLE_CANDIDATE') {
-        payload.desiredRole = form.desiredRole;
-        payload.yearsExperience = Number(form.yearsExperience) || 0;
-      } else if (selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN') {
+      if (selectedRole === 'ROLE_COMPANY_ADMIN') {
         payload.companyName = form.companyName;
         payload.jobTitle = form.jobTitle;
         payload.companyWebsite = form.companyWebsite;
         payload.industry = form.industry;
         payload.companySize = form.companySize;
+      } else {
+        payload.specialization = form.specialization;
       }
 
       await register(payload);
@@ -357,7 +340,7 @@ export const Register: React.FC = () => {
                 {step > 2 ? <CheckCircle2 size={16} /> : '2'}
               </div>
               <span className="register-step-label">
-                {selectedRole === 'ROLE_CANDIDATE' ? 'Career' : (selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN' ? 'Company' : 'Credentials')}
+                {selectedRole === 'ROLE_COMPANY_ADMIN' ? 'Company' : 'Credentials'}
               </span>
             </div>
             <div className={`register-step-line ${step === 3 ? 'active' : ''}`} />
@@ -432,7 +415,7 @@ export const Register: React.FC = () => {
               </div>
 
               <GoogleAuthButton
-                role={(selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN' ? 'ROLE_HR' : 'ROLE_CANDIDATE')}
+                role={(selectedRole === 'ROLE_COMPANY_ADMIN' ? 'ROLE_HR' : 'ROLE_CANDIDATE')}
                 label={`Fast Register with Google as ${currentRoleInfo.label}`}
                 onError={setError}
               />
@@ -442,45 +425,18 @@ export const Register: React.FC = () => {
           {/* ── STEP 2: Role-specific Details ── */}
           {step === 2 && (
             <form onSubmit={handleSendOtp} className="register-form">
-              {selectedRole === 'ROLE_CANDIDATE' ? (
-                <>
-                  <div className="register-form-grid">
-                    <div className="register-form-group">
-                      <label className="register-label">Phone Number</label>
-                      <input className="register-input" type="tel" placeholder="+91 98765 43210"
-                        value={form.phone} onChange={e => update('phone', e.target.value)} />
-                    </div>
-                    <div className="register-form-group">
-                      <label className="register-label">Current Location</label>
-                      <input className="register-input" type="text" placeholder="e.g. Bangalore, India"
-                        value={form.location} onChange={e => update('location', e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="register-form-grid">
-                    <div className="register-form-group">
-                      <label className="register-label">Desired Job Title</label>
-                      <input className="register-input" type="text" placeholder="e.g. Senior Full-Stack Engineer"
-                        value={form.desiredRole} onChange={e => update('desiredRole', e.target.value)} />
-                    </div>
-                    <div className="register-form-group">
-                      <label className="register-label">Years of Experience</label>
-                      <input className="register-input" type="number" min="0" max="40" placeholder="e.g. 3"
-                        value={form.yearsExperience} onChange={e => update('yearsExperience', e.target.value)} />
-                    </div>
-                  </div>
-                </>
-              ) : (selectedRole === 'ROLE_HR' || selectedRole === 'ROLE_COMPANY_ADMIN') ? (
+              {selectedRole === 'ROLE_COMPANY_ADMIN' ? (
                 <>
                   <div className="register-form-grid">
                     <div className="register-form-group">
                       <label className="register-label">Company Legal Name *</label>
-                      <input className="register-input" type="text" required placeholder="e.g. Google / Microsoft / NextGem"
+                      <input className="register-input" type="text" required placeholder="e.g. Google / Microsoft / NextGen"
                         value={form.companyName} onChange={e => update('companyName', e.target.value)} />
                     </div>
                     <div className="register-form-group">
-                      <label className="register-label">Your Executive / HR Designation *</label>
+                      <label className="register-label">Your Executive Designation *</label>
                       <input className="register-input" type="text" required
-                        placeholder={selectedRole === 'ROLE_COMPANY_ADMIN' ? 'Managing Director / CEO' : 'Head of Talent Acquisition'}
+                        placeholder="Managing Director / CEO"
                         value={form.jobTitle} onChange={e => update('jobTitle', e.target.value)} />
                     </div>
                   </div>

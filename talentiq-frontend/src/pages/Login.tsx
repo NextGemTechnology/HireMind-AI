@@ -733,63 +733,55 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                     <HireMindLogo variant="navbar" size="lg" showTagline={true} />
                   </div>
-                  <h2 className="login-title">
-                    {location.pathname === '/admin-login' ? 'Admin & Executive Login' : 'Sign In to HireMind-AI'}
-                  </h2>
-                  <p className="login-subtitle">
-                    {location.pathname === '/admin-login'
-                      ? 'Enter administrative credentials to access platform governance and control center'
-                      : 'Select account type to sign in'}
-                  </p>
+                  <h2 className="login-title">Sign In to HireMind-AI</h2>
+                  <p className="login-subtitle">Select account type to sign in</p>
                 </div>
 
-                {/* On /admin-login: ONLY ADMIN ROLE IS SHOWN (No Candidate or HR tabs) */}
-                {location.pathname === '/admin-login' ? (
-                  <div className="login-role-banner admin" style={{ margin: '0 0 18px 0', borderLeftColor: '#FB7185' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                      <ShieldCheck size={16} color="#FB7185" />
-                      <strong style={{ color: '#FFFFFF', fontSize: '13.5px' }}>Executive Control Center</strong>
-                    </div>
-                    <span style={{ fontSize: '12px', color: '#CBD5E1' }}>
-                      Authorized for Super Administrators, Application Developers, Management Team &amp; Company Executives.
-                    </span>
-                  </div>
-                ) : (
-                  /* On /login & /hr-login: Show Candidate & HR Recruiter tabs */
-                  <>
-                    <div className="login-role-tabs">
-                      <button
-                        type="button"
-                        onClick={() => handleRoleSelect('CANDIDATE')}
-                        className={`login-role-tab ${selectedRole === 'CANDIDATE' ? 'active-candidate' : ''}`}
-                        title="Switch to Candidate"
-                      >
-                        <User size={18} color={selectedRole === 'CANDIDATE' ? '#FFF' : '#38bdf8'} />
-                        <span>Candidate</span>
-                      </button>
+                {/* Explicit Role Selector Tabs (Triggers 3D Super Motion Flip) */}
+                <div className="login-role-tabs">
+                  <button
+                    type="button"
+                    onClick={() => handleRoleSelect('CANDIDATE')}
+                    className={`login-role-tab ${selectedRole === 'CANDIDATE' ? 'active-candidate' : ''}`}
+                    title="Switch to Candidate"
+                  >
+                    <User size={18} color={selectedRole === 'CANDIDATE' ? '#FFF' : '#38bdf8'} />
+                    <span>Candidate</span>
+                  </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleRoleSelect('HR')}
-                        className={`login-role-tab ${selectedRole === 'HR' ? 'active-hr' : ''}`}
-                        title="Switch to HR Recruiter Portal"
-                      >
-                        <Building2 size={18} color={selectedRole === 'HR' ? '#FFF' : '#818cf8'} />
-                        <span>HR Recruiter</span>
-                      </button>
-                    </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRoleSelect('HR')}
+                    className={`login-role-tab ${selectedRole === 'HR' ? 'active-hr' : ''}`}
+                    title="Switch to HR Recruiter Portal"
+                  >
+                    <Building2 size={18} color={selectedRole === 'HR' ? '#FFF' : '#818cf8'} />
+                    <span>HR Recruiter</span>
+                  </button>
 
-                    {/* Selected Role Context Banner */}
-                    <div className={`login-role-banner ${selectedRole.toLowerCase()}`}>
-                      {selectedRole === 'CANDIDATE' && (
-                        <>🎯 Logging in as <strong>Candidate</strong> — AI resume scoring, job applications &amp; portfolio showcase.</>
-                      )}
-                      {selectedRole === 'HR' && (
-                        <>🏢 Logging in as <strong>HR Recruiter</strong> — Job posting modal, RAG AI Copilot &amp; candidate analytics.</>
-                      )}
-                    </div>
-                  </>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => handleRoleSelect('ADMIN')}
+                    className={`login-role-tab ${selectedRole === 'ADMIN' ? 'active-admin' : ''}`}
+                    title="Switch to Super Admin Portal"
+                  >
+                    <ShieldCheck size={18} color={selectedRole === 'ADMIN' ? '#FFF' : '#fb7185'} />
+                    <span>Admin</span>
+                  </button>
+                </div>
+
+                {/* Selected Role Context Banner */}
+                <div className={`login-role-banner ${selectedRole.toLowerCase()}`}>
+                  {selectedRole === 'CANDIDATE' && (
+                    <>🎯 Logging in as <strong>Candidate</strong> — AI resume scoring, job applications & portfolio showcase.</>
+                  )}
+                  {selectedRole === 'HR' && (
+                    <>🏢 Logging in as <strong>HR Recruiter</strong> — Job posting modal, RAG AI Copilot & candidate analytics.</>
+                  )}
+                  {selectedRole === 'ADMIN' && (
+                    <>🛡️ Logging in as <strong>Super Admin</strong> — User lockouts, company verification & platform telemetry.</>
+                  )}
+                </div>
 
                 {error && (
                   <div className={`login-error-alert ${error.toLowerCase().includes('locked') ? 'locked-alert' : ''}`}>
@@ -917,17 +909,17 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                 <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.65)', border: '1px solid rgba(255, 255, 255, 0.08)', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <span style={{ color: '#94A3B8', fontSize: '11px' }}>Switch Portal:</span>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                    {location.pathname !== '/login' && (
+                    {selectedRole !== 'CANDIDATE' && (
                       <Link to="/login" onClick={() => handleRoleSelect('CANDIDATE')} style={{ color: '#38BDF8', textDecoration: 'none', fontWeight: 600 }}>
                         👤 Candidate (/login)
                       </Link>
                     )}
-                    {location.pathname !== '/hr-login' && (
+                    {selectedRole !== 'HR' && (
                       <Link to="/hr-login" onClick={() => handleRoleSelect('HR')} style={{ color: '#818CF8', textDecoration: 'none', fontWeight: 600 }}>
                         🏢 HR Recruiter (/hr-login)
                       </Link>
                     )}
-                    {location.pathname !== '/admin-login' && (
+                    {selectedRole !== 'ADMIN' && (
                       <Link to="/admin-login" onClick={() => handleRoleSelect('ADMIN')} style={{ color: '#FB7185', textDecoration: 'none', fontWeight: 600 }}>
                         🛡️ Admin (/admin-login)
                       </Link>
@@ -935,26 +927,16 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                   </div>
                 </div>
 
-                {/* Sign Up / Create Account Action Footer */}
+                {/* 3D Flip Action Switcher Footer */}
                 <div className="login-flip-footer">
-                  {location.pathname === '/admin-login' ? (
-                    <Link
-                      to="/register"
-                      className="login-flip-toggle-btn"
-                      style={{ textDecoration: 'none' }}
-                    >
-                      Need an administrative or company account? <strong>Register Here</strong> →
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={toggleAuthCardMode}
-                      className="login-flip-toggle-btn"
-                    >
-                      <RefreshCw size={14} className="flip-icon-spin" />
-                      Don't have an account? <strong>Create New Account</strong> ↺
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={toggleAuthCardMode}
+                    className="login-flip-toggle-btn"
+                  >
+                    <RefreshCw size={14} className="flip-icon-spin" />
+                    Don't have an account? <strong>Create New Ac</strong> ↺
+                  </button>
                 </div>
               </>
             )}
