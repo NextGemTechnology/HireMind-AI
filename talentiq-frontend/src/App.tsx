@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { ShieldAlert } from 'lucide-react';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { AdminThemeProvider } from './context/AdminThemeContext';
@@ -27,6 +28,23 @@ import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import { HrGlobalNotificationToast } from './components/HrGlobalNotificationToast';
 
+const BlockedRoute = () => (
+  <div style={{ minHeight: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px', background: '#0B0F19', color: '#F8FAFC' }}>
+    <div style={{ background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #EF4444', borderRadius: '50%', padding: '20px', marginBottom: '20px' }}>
+      <ShieldAlert size={48} color="#EF4444" />
+    </div>
+    <h1 style={{ fontSize: '28px', fontWeight: 800, margin: '0 0 10px', color: '#F8FAFC' }}>404 — Route Disabled for Security</h1>
+    <p style={{ color: '#94A3B8', fontSize: '14px', maxWidth: '440px', margin: '0 0 24px', lineHeight: 1.5 }}>
+      Direct <code style={{ color: '#F43F5E', background: 'rgba(244,63,94,0.15)', padding: '2px 6px', borderRadius: '4px' }}>/login</code> and <code style={{ color: '#F43F5E', background: 'rgba(244,63,94,0.15)', padding: '2px 6px', borderRadius: '4px' }}>/register</code> endpoints are permanently blocked. Please use the official role portals.
+    </p>
+    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+      <a href="/user-login" style={{ background: '#38BDF8', color: '#0F172A', padding: '10px 18px', borderRadius: '10px', fontWeight: 700, textDecoration: 'none', fontSize: '13px' }}>Candidate Login</a>
+      <a href="/hr-login" style={{ background: '#818CF8', color: '#0F172A', padding: '10px 18px', borderRadius: '10px', fontWeight: 700, textDecoration: 'none', fontSize: '13px' }}>HR Login</a>
+      <a href="/admin-login" style={{ background: '#FB7185', color: '#0F172A', padding: '10px 18px', borderRadius: '10px', fontWeight: 700, textDecoration: 'none', fontSize: '13px' }}>Admin Login</a>
+    </div>
+  </div>
+);
+
 // Wrapper that hides the global Navbar on the home page
 // (Home.tsx has its own full custom navbar with dark/light toggle)
 function AppLayout() {
@@ -42,11 +60,11 @@ function AppLayout() {
       <main style={{ flex: 1 }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Navigate to="/user-login" replace />} />
+          <Route path="/login" element={<BlockedRoute />} />
           <Route path="/user-login" element={<Login initialRole="CANDIDATE" />} />
           <Route path="/hr-login" element={<Login initialRole="HR" />} />
           <Route path="/admin-login" element={<Login initialRole="ADMIN" />} />
-          <Route path="/register" element={<Navigate to="/admin-login" replace />} />
+          <Route path="/register" element={<BlockedRoute />} />
           <Route path="/jobs" element={<JobsList />} />
           <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/my-applications" element={<MyApplications />} />
