@@ -138,7 +138,7 @@ export const JobsList: React.FC = () => {
   const handleApply = async (jobId: number) => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      navigate('/login');
+      navigate('/user-login');
       return;
     }
     setApplyingJobId(jobId);
@@ -160,7 +160,7 @@ export const JobsList: React.FC = () => {
   const handleChatWithRecruiter = (job: JobItem) => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      navigate('/login');
+      navigate('/user-login');
       return;
     }
     const recruiterId = job.postedById || job.company?.id || 2;

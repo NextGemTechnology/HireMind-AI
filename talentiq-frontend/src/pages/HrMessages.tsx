@@ -847,7 +847,7 @@ export const HrMessages: React.FC = () => {
           <button onClick={() => navigate('/hr-settings')} className="msg-nav-item">
             <Settings size={17} /> Settings
           </button>
-          <button onClick={() => { logout(); navigate('/login'); }} className="msg-nav-item sign-out">
+          <button onClick={() => { logout(); navigate('/'); }} className="msg-nav-item sign-out">
             <LogOut size={17} /> Sign Out
           </button>
         </nav>

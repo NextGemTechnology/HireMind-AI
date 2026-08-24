@@ -195,7 +195,7 @@ export const Home: React.FC = () => {
   const handleHomeApply = async (jobId: number) => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      navigate('/login');
+      navigate('/user-login');
       return;
     }
     try {
@@ -209,7 +209,7 @@ export const Home: React.FC = () => {
   const handleHomeChat = (job: JobItem) => {
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      navigate('/login');
+      navigate('/user-login');
       return;
     }
     const recruiterId = job.postedById || job.company?.id || 2;

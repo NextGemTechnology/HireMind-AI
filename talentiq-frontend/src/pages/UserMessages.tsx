@@ -51,7 +51,7 @@ export const UserMessages: React.FC = () => {
   // Auth Guard
   useEffect(() => {
     if (!isAuthenticated) {
-      navigate('/login');
+      navigate('/user-login');
     }
   }, [isAuthenticated, navigate]);
 
@@ -550,7 +550,7 @@ export const UserMessages: React.FC = () => {
             <FolderGit2 size={17} /> Portfolio
           </button>
           <div className="msg-nav-divider" />
-          <button onClick={() => { logout(); navigate('/login'); }} className="msg-nav-item sign-out">
+          <button onClick={() => { logout(); navigate('/'); }} className="msg-nav-item sign-out">
             <LogOut size={17} /> Sign Out
           </button>
         </nav>
