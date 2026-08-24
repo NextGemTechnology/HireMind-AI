@@ -66,6 +66,9 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const [regPassword, setRegPassword] = useState('');
   const [regCompany, setRegCompany] = useState('');
   const [regDesiredRole, setRegDesiredRole] = useState('');
+  const [adminRoleOption, setAdminRoleOption] = useState<'ROLE_APP_DEVELOPER' | 'ROLE_MANAGEMENT_TEAM' | 'ROLE_COMPANY_ADMIN'>('ROLE_APP_DEVELOPER');
+  const [regSpecialization, setRegSpecialization] = useState('');
+  const [regJobTitle, setRegJobTitle] = useState('');
   const [regError, setRegError] = useState('');
   const [regLoading, setRegLoading] = useState(false);
   const [regStep, setRegStep] = useState<1 | 2>(1);
@@ -310,10 +313,16 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     }
     setRegLoading(true);
     try {
+      const targetRole = selectedRole === 'ADMIN'
+        ? adminRoleOption
+        : selectedRole === 'HR'
+        ? 'ROLE_HR'
+        : 'ROLE_CANDIDATE';
+
       await apiClient.post('/auth/register/send-otp', {
         email: trimmedEmail,
         firstName: regFirstName.trim(),
-        role: selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'
+        role: targetRole
       });
       setRegStep(2);
       setRegResendCountdown(60);
@@ -330,10 +339,16 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     setRegError('');
     setRegLoading(true);
     try {
+      const targetRole = selectedRole === 'ADMIN'
+        ? adminRoleOption
+        : selectedRole === 'HR'
+        ? 'ROLE_HR'
+        : 'ROLE_CANDIDATE';
+
       await apiClient.post('/auth/register/send-otp', {
         email: regEmail.trim().toLowerCase(),
         firstName: regFirstName.trim(),
-        role: selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'
+        role: targetRole
       });
       setRegResendCountdown(60);
     } catch (err: any) {
@@ -355,7 +370,24 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     setRegLoading(true);
     try {
       const trimmedEmail = regEmail.trim().toLowerCase();
-      if (selectedRole === 'HR') {
+      if (selectedRole === 'ADMIN') {
+        const payload: any = {
+          firstName: regFirstName.trim(),
+          lastName: regLastName.trim(),
+          email: trimmedEmail,
+          password: regPassword,
+          role: adminRoleOption,
+          otp: otpCode
+        };
+        if (adminRoleOption === 'ROLE_COMPANY_ADMIN') {
+          payload.companyName = regCompany || 'Enterprise Corporate Group';
+          payload.jobTitle = regJobTitle || 'Managing Director / CEO';
+        } else {
+          payload.specialization = regSpecialization || 'Core Systems & Governance';
+        }
+        await register(payload);
+        navigate('/admin-portal');
+      } else if (selectedRole === 'HR') {
         await register({
           firstName: regFirstName.trim(),
           lastName: regLastName.trim(),
@@ -953,7 +985,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
               </div>
               <h2 className="login-title">Create Account</h2>
               <p className="login-subtitle">
-                Fast Onboarding for {selectedRole === 'HR' ? 'HR Recruiters' : 'Candidates'}
+                Fast Onboarding for {selectedRole === 'ADMIN' ? 'Admin & Governance' : selectedRole === 'HR' ? 'HR Recruiters' : 'Candidates'}
               </p>
             </div>
 
@@ -964,7 +996,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                 onClick={() => handleRoleSelect('CANDIDATE')}
                 className={`login-role-tab ${selectedRole === 'CANDIDATE' ? 'active-candidate' : ''}`}
               >
-                <User size={18} color={selectedRole === 'CANDIDATE' ? '#FFF' : '#38bdf8'} />
+                <User size={16} color={selectedRole === 'CANDIDATE' ? '#FFF' : '#38bdf8'} />
                 <span>Candidate</span>
               </button>
 
@@ -973,8 +1005,17 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                 onClick={() => handleRoleSelect('HR')}
                 className={`login-role-tab ${selectedRole === 'HR' ? 'active-hr' : ''}`}
               >
-                <Building2 size={18} color={selectedRole === 'HR' ? '#FFF' : '#818cf8'} />
-                <span>HR Recruiter</span>
+                <Building2 size={16} color={selectedRole === 'HR' ? '#FFF' : '#818cf8'} />
+                <span>HR</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRoleSelect('ADMIN')}
+                className={`login-role-tab ${selectedRole === 'ADMIN' ? 'active-admin' : ''}`}
+              >
+                <ShieldCheck size={16} color={selectedRole === 'ADMIN' ? '#FFF' : '#fb7185'} />
+                <span>Admin</span>
               </button>
             </div>
 
@@ -987,6 +1028,22 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
             {/* Quick Register Form (Step 1: Info -> Step 2: OTP) */}
             {regStep === 1 ? (
               <form onSubmit={handleRegisterSubmit} className="login-form">
+                {selectedRole === 'ADMIN' && (
+                  <div className="login-form-group" style={{ marginBottom: 12 }}>
+                    <label className="login-label">Select Enterprise Admin Role *</label>
+                    <select
+                      value={adminRoleOption}
+                      onChange={(e: any) => setAdminRoleOption(e.target.value)}
+                      className="login-input"
+                      style={{ background: '#0F172A', color: '#F8FAFC', cursor: 'pointer', border: '1px solid rgba(251, 113, 133, 0.5)' }}
+                    >
+                      <option value="ROLE_APP_DEVELOPER">👨‍💻 Application Developer (Full App Control)</option>
+                      <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team (Moderation & Metrics)</option>
+                      <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Executive / CEO / Director)</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="login-grid-2col">
                   <div className="login-form-group">
                     <label className="login-label">First Name *</label>
@@ -1017,14 +1074,53 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                   <input
                     type="email"
                     className="login-input"
-                    placeholder={selectedRole === 'HR' ? 'recruiter@company.com' : 'candidate@example.com'}
+                    placeholder={selectedRole === 'ADMIN' ? 'admin@hiremind.ai' : selectedRole === 'HR' ? 'recruiter@company.com' : 'candidate@example.com'}
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
                     required
                   />
                 </div>
 
-                {selectedRole === 'HR' ? (
+                {selectedRole === 'ADMIN' ? (
+                  adminRoleOption === 'ROLE_COMPANY_ADMIN' ? (
+                    <div className="login-grid-2col">
+                      <div className="login-form-group">
+                        <label className="login-label">Company Name *</label>
+                        <input
+                          type="text"
+                          className="login-input"
+                          placeholder="NextGen Corp"
+                          value={regCompany}
+                          onChange={(e) => setRegCompany(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="login-form-group">
+                        <label className="login-label">Designation *</label>
+                        <input
+                          type="text"
+                          className="login-input"
+                          placeholder="Managing Director"
+                          value={regJobTitle}
+                          onChange={(e) => setRegJobTitle(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="login-form-group">
+                      <label className="login-label">Specialization *</label>
+                      <input
+                        type="text"
+                        className="login-input"
+                        placeholder={adminRoleOption === 'ROLE_APP_DEVELOPER' ? 'AI Platform & Diagnostics' : 'User Governance & Moderation'}
+                        value={regSpecialization}
+                        onChange={(e) => setRegSpecialization(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )
+                ) : selectedRole === 'HR' ? (
                   <div className="login-form-group">
                     <label className="login-label">Company Name *</label>
                     <input

@@ -216,8 +216,8 @@ export const Navbar: React.FC = () => {
             >
               {theme === 'universe' ? <Sun size={17} color="#F59E0B" /> : <Moon size={17} color="#7C3AED" />}
             </button>
-            <Link to="/login" className="btn btn-secondary">Sign In</Link>
-            <Link to="/register" className="btn btn-primary">Get Started</Link>
+            <Link to="/user-login" className="btn btn-secondary">Sign In</Link>
+            <Link to="/user-login" className="btn btn-primary">Get Started</Link>
           </div>
         )}
       </div>

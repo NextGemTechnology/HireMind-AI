@@ -51,9 +51,9 @@ apiClient.interceptors.response.use(
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
-          const publicRoutes = ['/', '/jobs', '/login', '/hr-login', '/admin-login', '/register'];
+          const publicRoutes = ['/', '/jobs', '/user-login', '/hr-login', '/admin-login'];
           if (!publicRoutes.includes(window.location.pathname)) {
-            window.location.href = '/login';
+            window.location.href = '/user-login';
           }
         }
       } else {
@@ -61,9 +61,9 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         sessionStorage.clear();
-        const publicRoutes = ['/', '/jobs', '/login', '/hr-login', '/admin-login', '/register'];
+        const publicRoutes = ['/', '/jobs', '/user-login', '/hr-login', '/admin-login'];
         if (!publicRoutes.includes(window.location.pathname)) {
-          window.location.href = '/login';
+          window.location.href = '/user-login';
         }
       }
     }

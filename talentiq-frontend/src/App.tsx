@@ -5,7 +5,6 @@ import { AdminThemeProvider } from './context/AdminThemeContext';
 import { Navbar } from './components/Navbar';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
-import { Register } from './pages/Register';
 import { JobsList } from './pages/JobsList';
 import { Recommendations } from './pages/Recommendations';
 import { MyApplications } from './pages/MyApplications';
@@ -43,11 +42,11 @@ function AppLayout() {
       <main style={{ flex: 1 }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login initialRole="CANDIDATE" />} />
+          <Route path="/login" element={<Navigate to="/user-login" replace />} />
           <Route path="/user-login" element={<Login initialRole="CANDIDATE" />} />
           <Route path="/hr-login" element={<Login initialRole="HR" />} />
           <Route path="/admin-login" element={<Login initialRole="ADMIN" />} />
-          <Route path="/register" element={<Register />} />
+          <Route path="/register" element={<Navigate to="/admin-login" replace />} />
           <Route path="/jobs" element={<JobsList />} />
           <Route path="/recommendations" element={<Recommendations />} />
           <Route path="/my-applications" element={<MyApplications />} />
