@@ -163,6 +163,88 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
         return mapToDto(verification);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<CompanyVerificationDto.HrMemberResponse> getCompanyHrTeam(Long companyAdminUserId) {
+        HrProfile adminProfile = hrProfileRepository.findByUserId(companyAdminUserId).orElse(null);
+        Long companyId = null;
+
+        if (adminProfile != null && adminProfile.getCompany() != null) {
+            companyId = adminProfile.getCompany().getId();
+        } else {
+            User user = userRepository.findById(companyAdminUserId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User", "id", companyAdminUserId));
+            boolean isSuperAdmin = user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_SUPER_ADMIN);
+            if (!isSuperAdmin) {
+                throw new ForbiddenException("Only registered company executives / administrators can view company HR team.");
+            }
+        }
+
+        List<HrProfile> hrs;
+        if (companyId != null) {
+            hrs = hrProfileRepository.findAllByCompanyId(companyId);
+        } else {
+            hrs = hrProfileRepository.findAll();
+        }
+
+        return hrs.stream().map(h -> CompanyVerificationDto.HrMemberResponse.builder()
+                .hrProfileId(h.getId())
+                .userId(h.getUser().getId())
+                .name(h.getUser().getFirstName() + " " + h.getUser().getLastName())
+                .email(h.getUser().getEmail())
+                .designation(h.getDesignation())
+                .department(h.getDepartment())
+                .companyAdmin(h.isCompanyAdmin())
+                .companyVerified(h.isCompanyVerified())
+                .companyVerifiedTitle(h.getCompanyVerifiedTitle())
+                .companyVerifiedAt(h.getCompanyVerifiedAt())
+                .active(h.isActive())
+                .build()).collect(Collectors.toList());
+    }
+
+    @Override
+    public CompanyVerificationDto.HrMemberResponse verifyHrRecruiter(Long companyAdminUserId, Long hrProfileId, CompanyVerificationDto.VerifyHrRequest request) {
+        HrProfile targetHr = hrProfileRepository.findById(hrProfileId)
+                .orElseThrow(() -> new ResourceNotFoundException("HR Profile", "id", hrProfileId));
+
+        HrProfile adminProfile = hrProfileRepository.findByUserId(companyAdminUserId).orElse(null);
+        User adminUser = userRepository.findById(companyAdminUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", companyAdminUserId));
+        boolean isSuperAdmin = adminUser.getRoles().contains(com.talentiq.common.enums.Role.ROLE_SUPER_ADMIN);
+
+        if (!isSuperAdmin) {
+            if (adminProfile == null || adminProfile.getCompany() == null || targetHr.getCompany() == null || !adminProfile.getCompany().getId().equals(targetHr.getCompany().getId())) {
+                throw new ForbiddenException("You can only verify HR recruiters who belong to your registered company.");
+            }
+        }
+
+        targetHr.setCompanyVerified(request.isVerified());
+        if (request.isVerified()) {
+            targetHr.setCompanyVerifiedAt(Instant.now());
+            targetHr.setCompanyVerifiedTitle(request.getBadgeTitle() != null ? request.getBadgeTitle() : "Official Verified Recruiter");
+        } else {
+            targetHr.setCompanyVerifiedAt(null);
+            targetHr.setCompanyVerifiedTitle(null);
+        }
+
+        HrProfile saved = hrProfileRepository.save(targetHr);
+        log.info("Company Admin ID {} updated HR Profile ID {} verification status to {}", companyAdminUserId, hrProfileId, saved.isCompanyVerified());
+
+        return CompanyVerificationDto.HrMemberResponse.builder()
+                .hrProfileId(saved.getId())
+                .userId(saved.getUser().getId())
+                .name(saved.getUser().getFirstName() + " " + saved.getUser().getLastName())
+                .email(saved.getUser().getEmail())
+                .designation(saved.getDesignation())
+                .department(saved.getDepartment())
+                .companyAdmin(saved.isCompanyAdmin())
+                .companyVerified(saved.isCompanyVerified())
+                .companyVerifiedTitle(saved.getCompanyVerifiedTitle())
+                .companyVerifiedAt(saved.getCompanyVerifiedAt())
+                .active(saved.isActive())
+                .build();
+    }
+
     private CompanyVerificationDto.Response mapToDto(CompanyCandidateVerification v) {
         return CompanyVerificationDto.Response.builder()
                 .id(v.getId())

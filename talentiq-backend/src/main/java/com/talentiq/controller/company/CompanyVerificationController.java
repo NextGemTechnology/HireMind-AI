@@ -76,4 +76,25 @@ public class CompanyVerificationController {
         CompanyVerificationDto.Response cert = verificationService.getVerificationByCertificate(certificateId);
         return ResponseEntity.ok(ApiResponse.success(cert));
     }
+
+    @GetMapping("/hrs")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'SUPER_ADMIN')")
+    @Operation(summary = "Company executive views HR team members and their verification status")
+    public ResponseEntity<ApiResponse<List<CompanyVerificationDto.HrMemberResponse>>> getCompanyHrTeam(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        List<CompanyVerificationDto.HrMemberResponse> hrs = verificationService.getCompanyHrTeam(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(hrs));
+    }
+
+    @PutMapping("/hrs/{id}/verify")
+    @PreAuthorize("hasAnyRole('COMPANY_ADMIN', 'SUPER_ADMIN')")
+    @Operation(summary = "Company executive awards or revokes verified recruiter badge for an HR team member")
+    public ResponseEntity<ApiResponse<CompanyVerificationDto.HrMemberResponse>> verifyHr(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id,
+            @RequestBody CompanyVerificationDto.VerifyHrRequest request) {
+        CompanyVerificationDto.HrMemberResponse res = verificationService.verifyHrRecruiter(principal.getId(), id, request);
+        String msg = request.isVerified() ? "HR Recruiter verified with official company badge" : "HR Recruiter verification revoked";
+        return ResponseEntity.ok(ApiResponse.success(msg, res));
+    }
 }

@@ -165,25 +165,22 @@ export const GroupCollaborationChat: React.FC = () => {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('receiverId', '0');
 
     try {
-      const uploadRes = await apiClient.post('/chat/upload', formData, {
+      const uploadRes = await apiClient.post(`/chat/groups/${selectedGroup.id}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      const fileUrl = uploadRes.data?.data?.fileUrl;
-
-      await apiClient.post(`/chat/groups/${selectedGroup.id}/messages`, {
-        content: `📎 Shared file: ${file.name}`,
-        type: file.type.startsWith('image/') ? 'IMAGE' : 'FILE',
-        fileUrl,
-        fileName: file.name
-      });
+      if (uploadRes.data?.data) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === uploadRes.data.data.id)) return prev;
+          return [...prev, uploadRes.data.data];
+        });
+      }
     } catch (err) {
       console.error('Group file upload failed', err);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (

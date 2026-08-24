@@ -60,4 +60,31 @@ public class CompanyVerificationDto {
         private String skillsTagged;
         private String notes;
     }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class VerifyHrRequest {
+        private boolean verified;
+        private String badgeTitle;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class HrMemberResponse {
+        private Long hrProfileId;
+        private Long userId;
+        private String name;
+        private String email;
+        private String designation;
+        private String department;
+        private boolean companyAdmin;
+        private boolean companyVerified;
+        private String companyVerifiedTitle;
+        private Instant companyVerifiedAt;
+        private boolean active;
+    }
 }

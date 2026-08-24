@@ -90,6 +90,16 @@ public class GroupChatController {
         return ResponseEntity.ok(ApiResponse.success("Message sent to group", res));
     }
 
+    @PostMapping(value = "/{groupId}/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Upload and share a document, resume, or image in a group collaboration channel")
+    public ResponseEntity<ApiResponse<GroupChatDto.MessageResponse>> uploadGroupFile(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long groupId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        GroupChatDto.MessageResponse res = groupChatService.sendGroupFileMessage(principal.getId(), groupId, file);
+        return ResponseEntity.ok(ApiResponse.success("File shared in group chat", res));
+    }
+
     // WebSocket STOMP endpoint for group messaging
     @MessageMapping("/group.chat.send.{groupId}")
     public void handleWsGroupMessage(

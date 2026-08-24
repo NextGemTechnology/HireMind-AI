@@ -12,11 +12,13 @@ import com.talentiq.repository.chat.ChatGroupRepository;
 import com.talentiq.repository.chat.GroupChatMessageRepository;
 import com.talentiq.repository.company.CompanyRepository;
 import com.talentiq.repository.user.UserRepository;
+import com.talentiq.infrastructure.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,6 +36,7 @@ public class GroupChatServiceImpl implements GroupChatService {
     private final GroupChatMessageRepository messageRepository;
     private final UserRepository userRepository;
     private final CompanyRepository companyRepository;
+    private final FileStorageService fileStorageService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @Override
@@ -208,6 +211,43 @@ public class GroupChatServiceImpl implements GroupChatService {
         // Broadcast to WebSocket STOMP topic
         broadcastMessage(groupId, response);
 
+        return response;
+    }
+
+    @Override
+    public GroupChatDto.MessageResponse sendGroupFileMessage(Long currentUserId, Long groupId, MultipartFile file) {
+        ChatGroup group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("ChatGroup", "id", groupId));
+
+        // Enforce membership check
+        if (!memberRepository.existsByGroupIdAndUserId(groupId, currentUserId)) {
+            throw new ForbiddenException("You are not a member of this group");
+        }
+
+        User sender = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", currentUserId));
+
+        String fileUrl = fileStorageService.storeFile(file, "group-chat-attachments", currentUserId);
+        String fileName = file.getOriginalFilename();
+        String contentType = file.getContentType();
+        String msgType = (contentType != null && contentType.startsWith("image/")) ? "IMAGE" : "FILE";
+
+        GroupChatMessage msg = GroupChatMessage.builder()
+                .group(group)
+                .senderId(currentUserId)
+                .senderName(sender.getFirstName() + " " + sender.getLastName())
+                .content(fileName != null ? fileName : "Shared a file attachment")
+                .type(msgType)
+                .fileUrl(fileUrl)
+                .fileName(fileName)
+                .sentAt(Instant.now())
+                .build();
+
+        GroupChatMessage saved = messageRepository.save(msg);
+        GroupChatDto.MessageResponse response = mapToMessageResponse(saved);
+
+        broadcastMessage(groupId, response);
+        log.info("File attachment uploaded to Group ID {} by User ID {}: {}", groupId, currentUserId, fileName);
         return response;
     }
 

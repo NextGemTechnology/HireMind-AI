@@ -19,4 +19,6 @@ public interface GroupChatService {
     List<GroupChatDto.MessageResponse> getGroupMessages(Long currentUserId, Long groupId);
 
     GroupChatDto.MessageResponse sendGroupMessage(Long currentUserId, Long groupId, GroupChatDto.SendMessageRequest request);
+
+    GroupChatDto.MessageResponse sendGroupFileMessage(Long currentUserId, Long groupId, org.springframework.web.multipart.MultipartFile file);
 }

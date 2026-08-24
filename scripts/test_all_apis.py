@@ -243,7 +243,21 @@ def run_suite():
     # ─────────────────────────────────────────────────────────────
     print(f"\n{YELLOW}{BOLD}SUITE 5: Company-HR-Candidate Tag Verification Workflow{RESET}")
 
-    # 1. HR requests candidate verified tag
+    # 1. Company Director views HR team members
+    code, res = request("/v1/company/verifications/hrs", "GET", token=comp_token)
+    hr_list = res.get("data", []) if isinstance(res, dict) else []
+    hr_prof_id = hr_list[0].get("hrProfileId") if hr_list else None
+    log_test("Verification", "/v1/company/verifications/hrs (Director lists HR team)", "GET", code, 200, f"HRs: {len(hr_list)}")
+
+    # 2. Company Director awards Verified Recruiter Badge to HR
+    if hr_prof_id:
+        code, res = request(f"/v1/company/verifications/hrs/{hr_prof_id}/verify", "PUT", {
+            "verified": True,
+            "badgeTitle": "Lead Talent Acquisition Partner"
+        }, token=comp_token)
+        log_test("Verification", f"/v1/company/verifications/hrs/{hr_prof_id}/verify (Award Verified Recruiter Badge)", "PUT", code, 200)
+
+    # 3. HR requests candidate verified tag
     code, res = request("/v1/company/verifications/request", "POST", {
         "candidateUserId": cand_id,
         "jobTitle": "Lead Full-Stack Architect",
@@ -254,12 +268,12 @@ def run_suite():
     cert_id = res.get("data", {}).get("badgeCertificateId") if code == 200 else None
     log_test("Verification", "/v1/company/verifications/request (HR initiates candidate tag request)", "POST", code, 200, f"Request ID: {verif_id}")
 
-    # 2. Company Director views pending verifications
+    # 4. Company Director views pending verifications
     code, res = request("/v1/company/verifications/pending?status=PENDING", "GET", token=comp_token)
     pending_list = res.get("content", []) if isinstance(res, dict) else []
     log_test("Verification", "/v1/company/verifications/pending (Director checks pending queue)", "GET", code, 200, f"Count: {len(pending_list)}")
 
-    # 3. Company Director Approves verification request
+    # 5. Company Director Approves verification request
     if verif_id:
         code, res = request(f"/v1/company/verifications/{verif_id}/decision", "PUT", {
             "approved": True,
@@ -267,12 +281,12 @@ def run_suite():
         }, token=comp_token)
         log_test("Verification", f"/v1/company/verifications/{verif_id}/decision (Director APPROVED badge)", "PUT", code, 200)
 
-    # 4. Public / Recruiter views candidate's approved badges
+    # 6. Public / Recruiter views candidate's approved badges
     code, res = request(f"/v1/company/verifications/candidate/{cand_id}", "GET")
     badges = res.get("data", [])
     log_test("Verification", f"/v1/company/verifications/candidate/{cand_id} (Public candidate badge list)", "GET", code, 200, f"Badges: {len(badges)}")
 
-    # 5. Certificate Verification Lookup
+    # 7. Certificate Verification Lookup
     if cert_id:
         code, res = request(f"/v1/company/verifications/certificate/{cert_id}", "GET")
         log_test("Verification", f"/v1/company/verifications/certificate/{cert_id} (Verify authenticity)", "GET", code, 200)
@@ -350,9 +364,19 @@ def run_suite():
     log_test("Candidate", "/v1/candidates/me (Retrieve candidate dossier)", "GET", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # SUITE 9: FRONTEND & STATIC ASSETS VERIFICATION
+    # SUITE 9: DEFENSIVE SECURITY & VULNERABILITY DIAGNOSTICS AUDIT
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}SUITE 9: Frontend Nginx & Web Assets{RESET}")
+    print(f"\n{YELLOW}{BOLD}SUITE 9: Defensive Security & Vulnerability Diagnostics Scanner{RESET}")
+    code, res = request("/v1/admin/security/audit", "GET", token=dev_token)
+    audit_data = res.get("data", {}) if isinstance(res, dict) else {}
+    passed_count = audit_data.get("passedChecks", 0)
+    score = audit_data.get("securityScore", 0)
+    log_test("SecurityAudit", "/v1/admin/security/audit (Run automated vulnerability scan)", "GET", code, 200, f"Score: {score}/100 ({passed_count} checks SECURE)")
+
+    # ─────────────────────────────────────────────────────────────
+    # SUITE 10: FRONTEND & STATIC ASSETS VERIFICATION
+    # ─────────────────────────────────────────────────────────────
+    print(f"\n{YELLOW}{BOLD}SUITE 10: Frontend Nginx & Web Assets{RESET}")
     code, _ = request(FRONTEND_URL, "GET")
     log_test("Frontend", f"{FRONTEND_URL} (React Single Page App HTML)", "GET", code, 200)
 
