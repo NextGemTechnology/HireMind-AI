@@ -376,14 +376,14 @@ export const Home: React.FC = () => {
           </button>
 
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/user-login')}
             className="home-candidate-login-btn"
             style={{ border: `1px solid ${T.border}`, color: T.text }}
           >
             Candidate Login
           </button>
 
-          <button onClick={() => navigate('/register')} className="home-signup-btn">
+          <button onClick={() => navigate('/user-login')} className="home-signup-btn">
             Sign Up
           </button>
         </div>

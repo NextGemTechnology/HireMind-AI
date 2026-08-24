@@ -263,7 +263,7 @@ export const Register: React.FC = () => {
             </div>
             <h1 className="register-title">Create Your HireMind-AI Account</h1>
             <p className="register-subtitle">
-              Already have an account? <Link to="/login" className="register-login-link">Sign in here →</Link>
+              Already have an account? <Link to="/user-login" className="register-login-link">Sign in here →</Link>
             </p>
           </div>
 

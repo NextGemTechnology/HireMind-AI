@@ -44,6 +44,7 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login initialRole="CANDIDATE" />} />
+          <Route path="/user-login" element={<Login initialRole="CANDIDATE" />} />
           <Route path="/hr-login" element={<Login initialRole="HR" />} />
           <Route path="/admin-login" element={<Login initialRole="ADMIN" />} />
           <Route path="/register" element={<Register />} />

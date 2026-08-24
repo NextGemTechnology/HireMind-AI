@@ -167,8 +167,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       navigate('/hr-login');
     } else if (role === 'ADMIN' && location.pathname !== '/admin-login') {
       navigate('/admin-login');
-    } else if (role === 'CANDIDATE' && location.pathname !== '/login') {
-      navigate('/login');
+    } else if (role === 'CANDIDATE' && location.pathname !== '/user-login' && location.pathname !== '/login') {
+      navigate('/user-login');
     }
 
     setTimeout(() => {
@@ -910,8 +910,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                   <span style={{ color: '#94A3B8', fontSize: '11px' }}>Switch Portal:</span>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     {selectedRole !== 'CANDIDATE' && (
-                      <Link to="/login" onClick={() => handleRoleSelect('CANDIDATE')} style={{ color: '#38BDF8', textDecoration: 'none', fontWeight: 600 }}>
-                        👤 Candidate (/login)
+                      <Link to="/user-login" onClick={() => handleRoleSelect('CANDIDATE')} style={{ color: '#38BDF8', textDecoration: 'none', fontWeight: 600 }}>
+                        👤 Candidate (/user-login)
                       </Link>
                     )}
                     {selectedRole !== 'HR' && (
