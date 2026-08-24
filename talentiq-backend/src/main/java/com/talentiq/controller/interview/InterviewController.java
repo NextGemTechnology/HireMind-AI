@@ -24,7 +24,7 @@ public class InterviewController {
     private final InterviewService interviewService;
 
     @PostMapping("/schedule")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasAnyRole('HR', 'COMPANY_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Schedule an interview slot — sends email to candidate")
     public ResponseEntity<ApiResponse<InterviewSlotDto.Response>> scheduleInterview(
             @AuthenticationPrincipal UserPrincipal principal,
@@ -34,7 +34,7 @@ public class InterviewController {
     }
 
     @PostMapping("/select")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasAnyRole('HR', 'COMPANY_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Send 'You are selected' email to candidate")
     public ResponseEntity<ApiResponse<Void>> sendSelectionEmail(
             @AuthenticationPrincipal UserPrincipal principal,
@@ -44,7 +44,7 @@ public class InterviewController {
     }
 
     @GetMapping("/calendar")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasAnyRole('HR', 'COMPANY_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Get HR's upcoming and past interview calendar slots")
     public ResponseEntity<ApiResponse<List<InterviewSlotDto.Response>>> getCalendar(
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -53,7 +53,7 @@ public class InterviewController {
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasAnyRole('HR', 'COMPANY_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Update interview slot status (CONFIRMED / CANCELLED / COMPLETED)")
     public ResponseEntity<ApiResponse<InterviewSlotDto.Response>> updateStatus(
             @PathVariable Long id,
@@ -64,7 +64,7 @@ public class InterviewController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('HR')")
+    @PreAuthorize("hasAnyRole('HR', 'COMPANY_ADMIN', 'SUPER_ADMIN')")
     @Operation(summary = "Delete future interview slot or deactivate past completed meeting")
     public ResponseEntity<ApiResponse<InterviewSlotDto.Response>> deleteMeeting(
             @PathVariable Long id,

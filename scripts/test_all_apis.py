@@ -292,9 +292,63 @@ def run_suite():
         log_test("Verification", f"/v1/company/verifications/certificate/{cert_id} (Verify authenticity)", "GET", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # SUITE 6: GROUP COLLABORATION CHAT & TEAM CHANNELS
+    # SUITE 6: COMPANY TASK ASSIGNMENT, GOALS & MEETING REMINDERS
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}SUITE 6: Team Collaboration Channels & Group Chat{RESET}")
+    print(f"\n{YELLOW}{BOLD}SUITE 6: Company Task Delegation, Goals & Meeting Reminders{RESET}")
+
+    # 1. Create and Assign Task to HR Recruiter
+    code, res = request("/v1/company/tasks", "POST", {
+        "title": "Screen top 10 Senior AI candidates for Core Engine",
+        "description": "Evaluate GitHub profiles and schedule initial technical screen",
+        "priority": "HIGH",
+        "category": "HIRING",
+        "assignedToUserId": hr_id
+    }, token=comp_token)
+    task_id = res.get("data", {}).get("id") if code == 200 else None
+    log_test("CompanyTasks", "/v1/company/tasks (Create & assign task to HR)", "POST", code, 200, f"Task ID: {task_id}")
+
+    # 2. List company tasks
+    code, res = request("/v1/company/tasks", "GET", token=comp_token)
+    task_list = res.get("data", []) if isinstance(res, dict) else []
+    log_test("CompanyTasks", "/v1/company/tasks (List company task roster)", "GET", code, 200, f"Tasks: {len(task_list)}")
+
+    # 3. Update task status to COMPLETED
+    if task_id:
+        code, res = request(f"/v1/company/tasks/{task_id}/status", "PUT", {
+            "status": "COMPLETED"
+        }, token=comp_token)
+        log_test("CompanyTasks", f"/v1/company/tasks/{task_id}/status (Mark task COMPLETED)", "PUT", code, 200)
+
+    # 4. Fetch task completion stats
+    code, res = request("/v1/company/tasks/stats", "GET", token=comp_token)
+    stats_data = res.get("data", {}) if isinstance(res, dict) else {}
+    rate = stats_data.get("completionRate", 0)
+    log_test("CompanyTasks", "/v1/company/tasks/stats (Task completion rate KPI)", "GET", code, 200, f"Completion: {rate}%")
+
+    # 5. Schedule Company Executive Meeting / Reminder
+    code, res = request("/v1/interviews/schedule", "POST", {
+        "applicationId": 0,
+        "candidateUserId": cand_id,
+        "candidateName": "Alex Mercer",
+        "candidateEmail": "alex.mercer@gmail.com",
+        "jobTitle": "Lead Full-Stack Architect",
+        "scheduledAt": "2026-08-30T10:00:00Z",
+        "durationMinutes": 45,
+        "meetingLink": "https://meet.google.com/hmd-exec-sync",
+        "notes": "Final Executive Interview"
+    }, token=comp_token)
+    meeting_id = res.get("data", {}).get("id") if code == 200 else None
+    log_test("CompanyMeetings", "/v1/interviews/schedule (Schedule executive meeting reminder)", "POST", code, 200, f"Meeting ID: {meeting_id}")
+
+    # 6. Fetch company meeting calendar
+    code, res = request("/v1/interviews/calendar", "GET", token=comp_token)
+    meeting_list = res.get("data", []) if isinstance(res, dict) else []
+    log_test("CompanyMeetings", "/v1/interviews/calendar (List upcoming meetings & reminders)", "GET", code, 200, f"Meetings: {len(meeting_list)}")
+
+    # ─────────────────────────────────────────────────────────────
+    # SUITE 7: GROUP COLLABORATION CHAT & TEAM CHANNELS
+    # ─────────────────────────────────────────────────────────────
+    print(f"\n{YELLOW}{BOLD}SUITE 7: Team Collaboration Channels & Group Chat{RESET}")
 
     # 1. Create Group
     code, res = request("/v1/chat/groups", "POST", {

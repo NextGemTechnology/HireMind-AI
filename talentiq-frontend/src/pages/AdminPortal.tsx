@@ -8,7 +8,7 @@ import {
   Code2, Sparkles, BarChart3, Sun, Moon, CloudSun, Calendar,
   Activity, Database, Terminal, Ban, CheckCircle2, LogOut, ShieldAlert
 } from 'lucide-react';
-import { CompanyTagApprovalQueue } from '../components/CompanyTagApprovalQueue';
+import { CompanyExecutiveDashboard } from '../components/CompanyExecutiveDashboard';
 import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/admin-theme.css';
 import '../css/admin-portal.css';
@@ -1053,21 +1053,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
         )}
 
         {/* ────────────────────────────────────────────────────────
-            PORTAL 3: REGISTER COMPANY ONLY (EXECUTIVE QUEUE)
+            PORTAL 3: REGISTER COMPANY ONLY (EXECUTIVE DASHBOARD & WORKSPACE)
             ──────────────────────────────────────────────────────── */}
         {portalMode === 'COMPANY' && (
           <div>
-            <div className="admin-card-section">
-              <h3 className="admin-section-heading">
-                <Building2 size={18} color="var(--admin-primary)" /> Corporate Multi-Tenant Leadership
-              </h3>
-              <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: 'var(--admin-text-secondary)' }}>
-                Your company's data and candidate tag verification requests are strictly isolated and confidential.
-              </p>
-            </div>
-
-            {/* Embedded Company Tag Approval Queue */}
-            <CompanyTagApprovalQueue />
+            <CompanyExecutiveDashboard />
           </div>
         )}
       </div>
