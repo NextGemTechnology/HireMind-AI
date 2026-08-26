@@ -3,6 +3,7 @@ import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { Bot, Send, Sparkles, UserCheck, Briefcase, Settings, Sun, Moon } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
+import { HrSidebar } from '../components/HrSidebar';
 import '../css/hr-copilot.css';
 
 interface ChatMessage {
@@ -88,11 +89,11 @@ export const HrCopilot: React.FC = () => {
   };
 
   return (
-    <div className={`copilot-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ position: 'relative', zIndex: 1 }}>
-      {/* ── Interactive Galaxy Background with Mouse Motion & Attraction ── */}
+    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
       <InteractiveGalaxyBackground theme={theme} />
-
-      {/* Context Sidebar */}
+      <HrSidebar activeNav="Copilot" />
+      <div className={`copilot-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ flex: 1, height: '100vh', overflowY: 'auto' }}>
+        {/* Context Sidebar */}
       <div className="glass-panel copilot-sidebar solar-theme-accent">
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -190,6 +191,7 @@ export const HrCopilot: React.FC = () => {
             <Send size={16} /> Send
           </button>
         </form>
+      </div>
       </div>
     </div>
   );

@@ -27,6 +27,20 @@ public class MailService {
 
     private final JavaMailSender mailSender;
     private final AppProperties appProperties;
+    private final com.talentiq.security.email.EmailSecurityValidator emailSecurityValidator;
+
+    /**
+     * Sends the 4-digit OTP email verification code for Admin 2FA logins.
+     */
+    @Async("mailExecutor")
+    public void sendAdmin2FaOtpEmail(String toEmail, String firstName, String role, String otp) {
+        String roleDisplay = role != null ? role.replace("ROLE_", "").replace("_", " ") : "Administrator";
+        String subject = "🔐 Your HireMind AI Admin 2FA Security Code: " + otp;
+        String body = buildAdmin2FaOtpHtml(firstName, roleDisplay, otp, 5);
+
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Admin 2FA 4-digit OTP email dispatched to: {} [{}] [OTP: {}]", toEmail, roleDisplay, otp);
+    }
 
     /**
      * Sends the email verification email.
@@ -89,7 +103,18 @@ public class MailService {
      */
     @Async("mailExecutor")
     public void sendAccountCreatedEmail(String toEmail, String firstName, String role) {
-        String roleDisplay = role != null && role.contains("HR") ? "HR Recruiter" : "Candidate";
+        String roleDisplay = "Candidate";
+        if (role != null) {
+            if (role.contains("HR")) {
+                roleDisplay = "HR Recruiter";
+            } else if (role.contains("COMPANY")) {
+                roleDisplay = "Company Executive";
+            } else if (role.contains("DEVELOPER")) {
+                roleDisplay = "Application Developer";
+            } else if (role.contains("MANAGEMENT")) {
+                roleDisplay = "Platform Management Team";
+            }
+        }
         String subject = "🎉 Welcome to HireMind AI — Your Account has been Created!";
         String body = buildAccountCreatedHtml(firstName, roleDisplay, appProperties.getFrontend().getBaseUrl());
         sendHtmlEmail(toEmail, subject, body);
@@ -573,10 +598,6 @@ public class MailService {
                     <p style="color:#94a3b8;font-size:13px;margin:0;"><strong>💻 Device/Client:</strong> <span style="color:#cbd5e1;">%s</span></p>
                   </div>
 
-                  <p style="color:#64748b;font-size:12px;margin:18px 0 0;line-height:1.5;">
-                    🔒 If this was you, no action is needed. If you did not log in, please reset your password immediately via the HireMind AI forgot password portal.
-                  </p>
-                </td></tr>
                 <tr><td style="padding:18px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
                   <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · hiremindai.ai@gmail.com</p>
                 </td></tr>
@@ -584,4 +605,44 @@ public class MailService {
                 </body></html>
                 """.formatted(firstName, loginTime, safeIp, safeAgent);
     }
+
+    private String buildAdmin2FaOtpHtml(String firstName, String roleDisplay, String otp, int expiryMinutes) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Admin 2FA Security Code</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(99,102,241,0.3);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#4f46e5,#6366f1);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:36px;margin-bottom:6px;">🔐</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.02em;">HireMind AI — Admin 2FA Verification</h1>
+                  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">Two-Factor Authentication Security Gateway</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 12px;font-size:20px;font-weight:700;">Hi %s 👋</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 24px;font-size:15px;">
+                    A sign-in request was initiated for your <strong style="color:#818cf8;">%s</strong> account. To ensure system security, please use the 4-digit Two-Factor Authentication (2FA) verification code below to authorize this session:
+                  </p>
+                  
+                  <div style="background:rgba(30,41,59,0.8);border:2px dashed #6366f1;border-radius:12px;padding:24px;text-align:center;margin:24px 0;">
+                    <div style="font-size:42px;font-weight:900;letter-spacing:14px;color:#a5b4fc;font-family:'Courier New',monospace;text-shadow:0 0 20px rgba(99,102,241,0.5);">
+                      %s
+                    </div>
+                    <p style="color:#64748b;font-size:13px;margin:10px 0 0;">Expires in <strong style="color:#f87171;">%d minutes</strong> · Single-Use Security Ticket</p>
+                  </div>
+
+                  <p style="color:#64748b;font-size:13px;line-height:1.6;margin:24px 0 0;">
+                    🛡️ <strong>Security Tip:</strong> Never share this code with anyone. HireMind AI staff will never ask for your 2FA verification code. If you did not attempt to sign in, change your password immediately.
+                  </p>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · hiremindai.ai@gmail.com · All rights reserved.</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(firstName, roleDisplay, otp, expiryMinutes);
+    }
 }
+

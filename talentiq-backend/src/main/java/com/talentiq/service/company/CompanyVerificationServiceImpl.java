@@ -38,7 +38,8 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
 
     @Override
     public CompanyVerificationDto.Response requestCandidateTag(Long hrUserId, CompanyVerificationDto.RequestTag request) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
+        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
+                .or(() -> hrProfileRepository.findByUserId(hrUserId))
                 .orElseThrow(() -> new BadRequestException("You must have an active HR profile attached to a registered company to request candidate verification tags."));
 
         Company company = hrProfile.getCompany();
@@ -54,8 +55,7 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
             throw new BadRequestException("A verification request for this candidate is already pending approval from Company Leadership.");
         }
 
-        User hrUser = userRepository.findById(hrUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("HR User", "id", hrUserId));
+        User hrUser = hrProfile.getUser() != null ? hrProfile.getUser() : candidate;
 
         String certCode = "HM-" + company.getSlug().toUpperCase().replaceAll("[^A-Z0-9]", "").substring(0, Math.min(company.getSlug().length(), 6))
                 + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
@@ -187,19 +187,24 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
             hrs = hrProfileRepository.findAll();
         }
 
-        return hrs.stream().map(h -> CompanyVerificationDto.HrMemberResponse.builder()
-                .hrProfileId(h.getId())
-                .userId(h.getUser().getId())
-                .name(h.getUser().getFirstName() + " " + h.getUser().getLastName())
-                .email(h.getUser().getEmail())
-                .designation(h.getDesignation())
-                .department(h.getDepartment())
-                .companyAdmin(h.isCompanyAdmin())
-                .companyVerified(h.isCompanyVerified())
-                .companyVerifiedTitle(h.getCompanyVerifiedTitle())
-                .companyVerifiedAt(h.getCompanyVerifiedAt())
-                .active(h.isActive())
-                .build()).collect(Collectors.toList());
+        return hrs.stream().map(h -> {
+            String name = h.getFullName();
+            String email = h.getEmail() != null ? h.getEmail() : (h.getUser() != null ? h.getUser().getEmail() : "");
+            Long uId = h.getUser() != null ? h.getUser().getId() : h.getId();
+            return CompanyVerificationDto.HrMemberResponse.builder()
+                    .hrProfileId(h.getId())
+                    .userId(uId)
+                    .name(name)
+                    .email(email)
+                    .designation(h.getDesignation())
+                    .department(h.getDepartment())
+                    .companyAdmin(h.isCompanyAdmin())
+                    .companyVerified(h.isCompanyVerified())
+                    .companyVerifiedTitle(h.getCompanyVerifiedTitle())
+                    .companyVerifiedAt(h.getCompanyVerifiedAt())
+                    .active(h.isActive())
+                    .build();
+        }).collect(Collectors.toList());
     }
 
     @Override
@@ -230,11 +235,15 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
         HrProfile saved = hrProfileRepository.save(targetHr);
         log.info("Company Admin ID {} updated HR Profile ID {} verification status to {}", companyAdminUserId, hrProfileId, saved.isCompanyVerified());
 
+        String name = saved.getFullName();
+        String email = saved.getEmail() != null ? saved.getEmail() : (saved.getUser() != null ? saved.getUser().getEmail() : "");
+        Long uId = saved.getUser() != null ? saved.getUser().getId() : saved.getId();
+
         return CompanyVerificationDto.HrMemberResponse.builder()
                 .hrProfileId(saved.getId())
-                .userId(saved.getUser().getId())
-                .name(saved.getUser().getFirstName() + " " + saved.getUser().getLastName())
-                .email(saved.getUser().getEmail())
+                .userId(uId)
+                .name(name)
+                .email(email)
                 .designation(saved.getDesignation())
                 .department(saved.getDepartment())
                 .companyAdmin(saved.isCompanyAdmin())

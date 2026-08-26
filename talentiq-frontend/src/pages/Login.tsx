@@ -17,7 +17,8 @@ import {
   Mail,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Loader2
 } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 import { GoogleAuthButton } from '../components/GoogleAuthButton';
@@ -73,7 +74,7 @@ interface LoginProps {
 }
 
 export const Login: React.FC<LoginProps> = ({ initialRole }) => {
-  const { login, register, logout } = useAuth();
+  const { login, register, logout, verify2Fa } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -101,6 +102,29 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const [adminLoginRole, setAdminLoginRole] = useState<'ROLE_APP_DEVELOPER' | 'ROLE_MANAGEMENT_TEAM' | 'ROLE_COMPANY_ADMIN'>('ROLE_APP_DEVELOPER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // 2FA Two-Factor Authentication State for Admin Login
+  const [is2FaStep, setIs2FaStep] = useState(false);
+  const [twoFactorToken, setTwoFactorToken] = useState('');
+  const [twoFactorDigits, setTwoFactorDigits] = useState<string[]>(['', '', '', '']);
+  const [twoFactorCountdown, setTwoFactorCountdown] = useState(0);
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState('');
+
+  const twoFactorRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null)
+  ];
+
+  useEffect(() => {
+    let timer: any;
+    if (twoFactorCountdown > 0) {
+      timer = setTimeout(() => setTwoFactorCountdown((c) => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [twoFactorCountdown]);
 
   // Quick Register Form State (Back Face)
   const [regFirstName, setRegFirstName] = useState('');
@@ -243,6 +267,88 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     setAuthCardMode('FORGOT_PASSWORD');
   };
 
+  // ── 2FA Code Input Handlers ──
+  const handleTwoFactorChange = (index: number, val: string) => {
+    const char = val.replace(/\D/g, '').slice(-1);
+    const newDigits = [...twoFactorDigits];
+    newDigits[index] = char;
+    setTwoFactorDigits(newDigits);
+    setTwoFactorError('');
+    if (char && index < 3) {
+      twoFactorRefs[index + 1].current?.focus();
+    }
+  };
+
+  const handleTwoFactorKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !twoFactorDigits[index] && index > 0) {
+      twoFactorRefs[index - 1].current?.focus();
+    }
+  };
+
+  const handleTwoFactorPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
+    if (!pasted) return;
+    const newDigits = ['', '', '', ''];
+    for (let i = 0; i < pasted.length; i++) {
+      newDigits[i] = pasted[i];
+    }
+    setTwoFactorDigits(newDigits);
+    setTwoFactorError('');
+    const nextIdx = Math.min(pasted.length, 3);
+    twoFactorRefs[nextIdx].current?.focus();
+  };
+
+  const handleVerify2FaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFactorError('');
+    const fullOtp = twoFactorDigits.join('');
+    if (fullOtp.length !== 4) {
+      setTwoFactorError('Please enter all 4 digits of your 2FA verification code.');
+      return;
+    }
+    setTwoFactorLoading(true);
+    try {
+      const authData = await verify2Fa({
+        email: email.trim().toLowerCase(),
+        twoFactorToken,
+        otp: fullOtp
+      });
+
+      if (adminLoginRole === 'ROLE_APP_DEVELOPER') {
+        navigate('/admin-application-developere-suit');
+      } else if (adminLoginRole === 'ROLE_MANAGEMENT_TEAM') {
+        navigate('/admin-Management-team');
+      } else {
+        const slug = authData?.companySlug || 'company';
+        navigate(`/Admin-${slug}`);
+      }
+    } catch (err: any) {
+      setTwoFactorError(err.response?.data?.message || 'Invalid or expired 2FA code. Please try again.');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
+  const handleResend2Fa = async () => {
+    if (twoFactorCountdown > 0 || twoFactorLoading) return;
+    setTwoFactorError('');
+    setTwoFactorLoading(true);
+    try {
+      await apiClient.post('/auth/admin/2fa-resend', {
+        email: email.trim().toLowerCase(),
+        twoFactorToken
+      });
+      setTwoFactorCountdown(60);
+      setTwoFactorDigits(['', '', '', '']);
+      twoFactorRefs[0].current?.focus();
+    } catch (err: any) {
+      setTwoFactorError(err.response?.data?.message || 'Failed to resend 2FA verification code.');
+    } finally {
+      setTwoFactorLoading(false);
+    }
+  };
+
   // ── Handle Login Submit ──
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,7 +367,18 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         ? 'ROLE_HR'
         : (selectedRole === 'ADMIN' ? adminLoginRole : 'ROLE_CANDIDATE');
 
-      await login({ email: trimmedEmail, password, requiredRole: targetRole });
+      const loginRes = await login({ email: trimmedEmail, password, requiredRole: targetRole });
+
+      // If server requires 2FA for Admin login, transition to 2FA verification step
+      if (loginRes && loginRes.requires2Fa) {
+        setTwoFactorToken(loginRes.twoFactorToken);
+        setIs2FaStep(true);
+        setTwoFactorCountdown(60);
+        setTwoFactorDigits(['', '', '', '']);
+        setTwoFactorError('');
+        setTimeout(() => twoFactorRefs[0].current?.focus(), 200);
+        return;
+      }
 
       const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
       const roles: string[] = savedUser.roles || [];
@@ -301,7 +418,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         } else if (adminLoginRole === 'ROLE_MANAGEMENT_TEAM') {
           navigate('/admin-Management-team');
         } else {
-          navigate('/admin-Register-Company');
+          const slug = savedUser?.companySlug || 'company';
+          navigate(`/Admin-${slug}`);
         }
       } else {
         if (!userIsCandidate && !userIsAdmin) {
@@ -378,7 +496,14 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         ? 'ROLE_HR'
         : 'ROLE_CANDIDATE';
 
-      await apiClient.post('/auth/register/send-otp', {
+      let otpEndpoint = '/auth/register/send-otp';
+      if (targetRole === 'ROLE_CANDIDATE') otpEndpoint = '/auth/candidate/send-otp';
+      else if (targetRole === 'ROLE_HR') otpEndpoint = '/auth/hr/send-otp';
+      else if (targetRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
+      else if (targetRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
+      else if (targetRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+
+      await apiClient.post(otpEndpoint, {
         email: trimmedEmail,
         firstName: regFirstName.trim(),
         role: targetRole
@@ -410,7 +535,14 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         ? 'ROLE_HR'
         : 'ROLE_CANDIDATE';
 
-      await apiClient.post('/auth/register/send-otp', {
+      let otpEndpoint = '/auth/register/send-otp';
+      if (targetRole === 'ROLE_CANDIDATE') otpEndpoint = '/auth/candidate/send-otp';
+      else if (targetRole === 'ROLE_HR') otpEndpoint = '/auth/hr/send-otp';
+      else if (targetRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
+      else if (targetRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
+      else if (targetRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+
+      await apiClient.post(otpEndpoint, {
         email: trimmedEmail,
         firstName: regFirstName.trim(),
         role: targetRole
@@ -919,128 +1051,254 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                   </div>
                 )}
 
-                {/* Login Form */}
-                <form onSubmit={handleLoginSubmit} className="login-form">
-                  {selectedRole === 'ADMIN' && (
-                    <div className="login-form-group">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label className="login-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Shield size={14} color="#FB7185" /> Admin Designation / Role
-                        </label>
-                        <span style={{ fontSize: '11px', color: '#FB7185' }}>
-                          Role Verified by Security
-                        </span>
+                {is2FaStep ? (
+                  /* Admin 2FA Verification Form */
+                  <form onSubmit={handleVerify2FaSubmit} className="login-form">
+                    <div style={{
+                      background: 'rgba(99, 102, 241, 0.12)',
+                      border: '1px solid rgba(99, 102, 241, 0.35)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      marginBottom: '20px',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ fontSize: '28px', marginBottom: '6px' }}>🔐</div>
+                      <h3 style={{ margin: '0 0 6px', color: '#F8FAFC', fontSize: '17px', fontWeight: 700 }}>
+                        Two-Factor Authentication (2FA)
+                      </h3>
+                      <p style={{ margin: 0, color: '#94A3B8', fontSize: '13px', lineHeight: 1.5 }}>
+                        We sent a 4-digit security code to <strong style={{ color: '#818CF8' }}>{email}</strong>. Enter the code below to complete admin login.
+                      </p>
+                    </div>
+
+                    {twoFactorError && (
+                      <div className="login-error-alert" style={{ marginBottom: '16px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', borderRadius: '8px', padding: '10px 14px', color: '#FECACA', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                        <span>⚠️</span>
+                        <span>{twoFactorError}</span>
                       </div>
-                      <select
-                        className="login-input"
-                        value={adminLoginRole}
-                        onChange={(e) => setAdminLoginRole(e.target.value as any)}
-                        style={{
-                          background: 'rgba(15, 23, 42, 0.95)',
-                          color: '#F8FAFC',
-                          border: '1px solid rgba(251, 113, 133, 0.45)',
-                          fontWeight: 600,
-                          cursor: 'pointer'
-                        }}
-                        required
-                      >
-                        <option value="ROLE_APP_DEVELOPER">👨💻 Application Developer (App Control)</option>
-                        <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team</option>
-                        <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Manage Team)</option>
-                      </select>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="login-form-group">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label className="login-label">Email Address</label>
-                      <span style={{ fontSize: '11px', color: '#38BDF8' }}>
-                        {selectedRole === 'ADMIN' ? 'Must end with @gmail.com or @hiremind.ai' : 'Must end with @gmail.com'}
-                      </span>
+                    <div className="login-form-group">
+                      <label className="login-label" style={{ textAlign: 'center', display: 'block', marginBottom: '12px' }}>
+                        Enter 4-Digit Security Code
+                      </label>
+                      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                        {twoFactorDigits.map((digit, idx) => (
+                          <input
+                            key={idx}
+                            ref={twoFactorRefs[idx]}
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={1}
+                            value={digit}
+                            onChange={(e) => handleTwoFactorChange(idx, e.target.value)}
+                            onKeyDown={(e) => handleTwoFactorKeyDown(idx, e)}
+                            onPaste={handleTwoFactorPaste}
+                            style={{
+                              width: '56px',
+                              height: '56px',
+                              textAlign: 'center',
+                              fontSize: '24px',
+                              fontWeight: 800,
+                              borderRadius: '12px',
+                              background: 'rgba(15, 23, 42, 0.9)',
+                              border: digit ? '2px solid #818CF8' : '1px solid rgba(255, 255, 255, 0.15)',
+                              color: '#F8FAFC',
+                              boxShadow: digit ? '0 0 14px rgba(99, 102, 241, 0.4)' : 'none',
+                              transition: 'all 0.2s ease',
+                              outline: 'none'
+                            }}
+                            autoFocus={idx === 0}
+                          />
+                        ))}
+                      </div>
                     </div>
-                    <input
-                      type="email"
-                      className="login-input"
-                      placeholder={
-                        selectedRole === 'HR'
-                          ? 'recruiter.hr@gmail.com'
-                          : selectedRole === 'ADMIN'
-                          ? 'admin.hiremind@gmail.com'
-                          : 'candidate.alex@gmail.com'
-                      }
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
 
-                  <div className="login-form-group">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <label className="login-label">Password</label>
+                    <button
+                      type="submit"
+                      disabled={twoFactorLoading || twoFactorDigits.join('').length !== 4}
+                      className="login-submit-btn admin"
+                      style={{
+                        marginTop: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {twoFactorLoading ? (
+                        <>
+                          <Loader2 size={18} className="spin" />
+                          <span>Verifying 2FA Code...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Shield size={18} />
+                          <span>Verify & Access Admin Portal →</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
                       <button
                         type="button"
-                        onClick={openForgotPassword}
+                        onClick={handleResend2Fa}
+                        disabled={twoFactorCountdown > 0 || twoFactorLoading}
                         style={{
                           background: 'none',
                           border: 'none',
-                          color: '#818CF8',
-                          fontSize: '11px',
-                          cursor: 'pointer',
-                          fontWeight: 600,
-                          padding: 0
+                          color: twoFactorCountdown > 0 ? '#64748B' : '#818CF8',
+                          fontSize: '13px',
+                          cursor: twoFactorCountdown > 0 ? 'default' : 'pointer',
+                          textDecoration: twoFactorCountdown > 0 ? 'none' : 'underline'
                         }}
                       >
-                        Forgot Password?
+                        {twoFactorCountdown > 0 ? `Resend code in ${twoFactorCountdown}s` : 'Resend 2FA Code'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIs2FaStep(false);
+                          setTwoFactorDigits(['', '', '', '']);
+                          setTwoFactorError('');
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#94A3B8',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ← Back to Password Login
                       </button>
                     </div>
-                    <input
-                      type="password"
-                      className="login-input"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className={`login-submit-btn ${selectedRole.toLowerCase()}`}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      'Authenticating...'
-                    ) : (
-                      <span className="login-btn-content">
-                        <LogIn size={17} /> Sign In as{' '}
-                        {selectedRole === 'CANDIDATE'
-                          ? 'Candidate'
-                          : selectedRole === 'HR'
-                          ? 'HR Recruiter'
-                          : adminLoginRole === 'ROLE_APP_DEVELOPER'
-                          ? 'Application Developer'
-                          : adminLoginRole === 'ROLE_MANAGEMENT_TEAM'
-                          ? 'Management Team'
-                          : 'Register Company'}{' '}
-                        <ArrowRight size={15} />
-                      </span>
+                  </form>
+                ) : (
+                  /* Login Form */
+                  <form onSubmit={handleLoginSubmit} className="login-form">
+                    {selectedRole === 'ADMIN' && (
+                      <div className="login-form-group">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <label className="login-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Shield size={14} color="#FB7185" /> Admin Designation / Role
+                          </label>
+                          <span style={{ fontSize: '11px', color: '#FB7185' }}>
+                            Role Verified by Security
+                          </span>
+                        </div>
+                        <select
+                          className="login-input"
+                          value={adminLoginRole}
+                          onChange={(e) => setAdminLoginRole(e.target.value as any)}
+                          style={{
+                            background: 'rgba(15, 23, 42, 0.95)',
+                            color: '#F8FAFC',
+                            border: '1px solid rgba(251, 113, 133, 0.45)',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                          required
+                        >
+                          <option value="ROLE_APP_DEVELOPER">👨💻 Application Developer (App Control)</option>
+                          <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team</option>
+                          <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Manage Team)</option>
+                        </select>
+                      </div>
                     )}
-                  </button>
 
-                  <div style={{ display: 'flex', alignItems: 'center', margin: '14px 0 6px', gap: '10px' }}>
-                    <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
-                    <span style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR</span>
-                    <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
-                  </div>
+                    <div className="login-form-group">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="login-label">Email Address</label>
+                        <span style={{ fontSize: '11px', color: '#38BDF8' }}>
+                          {selectedRole === 'ADMIN' ? 'Must end with @gmail.com or @hiremind.ai' : 'Must end with @gmail.com'}
+                        </span>
+                      </div>
+                      <input
+                        type="email"
+                        className="login-input"
+                        placeholder={
+                          selectedRole === 'HR'
+                            ? 'recruiter.hr@gmail.com'
+                            : selectedRole === 'ADMIN'
+                            ? 'admin.hiremind@gmail.com'
+                            : 'candidate.alex@gmail.com'
+                        }
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                      />
+                    </div>
 
-                  <GoogleAuthButton
-                    role={selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'}
-                    label={`Continue with Google as ${selectedRole === 'HR' ? 'HR' : 'Candidate'}`}
-                    onError={setError}
-                  />
-                </form>
+                    <div className="login-form-group">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label className="login-label">Password</label>
+                        <button
+                          type="button"
+                          onClick={openForgotPassword}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#818CF8',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            padding: 0
+                          }}
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
+                      <input
+                        type="password"
+                        className="login-input"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                      />
+                    </div>
 
-                {/* Quick Portal Direct Links */}
+                    <button
+                      type="submit"
+                      className={`login-submit-btn ${selectedRole.toLowerCase()}`}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        'Authenticating...'
+                      ) : (
+                        <span className="login-btn-content">
+                          <LogIn size={17} /> Sign In as{' '}
+                          {selectedRole === 'CANDIDATE'
+                            ? 'Candidate'
+                            : selectedRole === 'HR'
+                            ? 'HR Recruiter'
+                            : adminLoginRole === 'ROLE_APP_DEVELOPER'
+                            ? 'Application Developer'
+                            : adminLoginRole === 'ROLE_MANAGEMENT_TEAM'
+                            ? 'Management Team'
+                            : 'Register Company'}{' '}
+                          <ArrowRight size={15} />
+                        </span>
+                      )}
+                    </button>
+
+                    <div style={{ display: 'flex', alignItems: 'center', margin: '14px 0 6px', gap: '10px' }}>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
+                      <span style={{ fontSize: '11px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR</span>
+                      <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
+                    </div>
+
+                    <GoogleAuthButton
+                      role={selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'}
+                      label={`Continue with Google as ${selectedRole === 'HR' ? 'HR' : 'Candidate'}`}
+                      onError={setError}
+                    />
+                  </form>
+                )}
+
+                {/* Quick Portal Direct Links
                 <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.65)', border: '1px solid rgba(255, 255, 255, 0.08)', fontSize: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                   <span style={{ color: '#94A3B8', fontSize: '11px' }}>Switch Portal:</span>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -1061,6 +1319,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                     )}
                   </div>
                 </div>
+                */}
 
                 {/* 3D Flip Action Switcher Footer */}
                 <div className="login-flip-footer">
@@ -1070,7 +1329,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                     className="login-flip-toggle-btn"
                   >
                     <RefreshCw size={14} className="flip-icon-spin" />
-                    Don't have an account? <strong>Create New Ac</strong> ↺
+                    Don't have an account? <strong>Create New Ac</strong>
                   </button>
                 </div>
               </>
@@ -1378,7 +1637,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                 className="login-flip-toggle-btn"
               >
                 <RefreshCw size={14} className="flip-icon-spin" />
-                <strong>Sign In</strong> ↻
+                <strong>Sign In</strong>
               </button>
 
               <Link

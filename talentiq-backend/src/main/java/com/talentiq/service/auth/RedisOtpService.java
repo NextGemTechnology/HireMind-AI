@@ -26,10 +26,13 @@ import java.util.concurrent.TimeUnit;
 public class RedisOtpService {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final com.talentiq.security.email.EmailSecurityValidator emailSecurityValidator;
 
     // Keys and Prefixes
     private static final String OTP_CODE_PREFIX = "otp:code:";
     private static final String OTP_REG_PREFIX = "otp:reg:";
+    private static final String OTP_2FA_SESSION_PREFIX = "2fa:session:";
+    private static final String OTP_2FA_FAIL_PREFIX = "2fa:fail:";
     private static final String OTP_RATE_EMAIL_PREFIX = "otp:rate:email:";
     private static final String OTP_RATE_IP_PREFIX = "otp:rate:ip:";
     private static final String OTP_FAIL_PREFIX = "otp:fail:";
@@ -40,38 +43,15 @@ public class RedisOtpService {
     private final ConcurrentHashMap<String, Long> inMemoryOtpExpiries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> inMemoryRegOtpCodes = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> inMemoryRegOtpExpiries = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> inMemory2FaSessions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> inMemory2FaExpiries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> inMemoryFailCounts = new ConcurrentHashMap<>();
-
-    private static final java.util.Set<String> DISPOSABLE_EMAIL_DOMAINS = java.util.Set.of(
-            "temp-mail.org", "tmpmail.com", "tmpmail.net", "tmpmail.org",
-            "10minutemail.com", "10minutemail.net", "mailinator.com",
-            "guerrillamail.com", "sharklasers.com", "grr.la", "guerrillamailblock.com",
-            "pokemail.net", "dispostable.com", "throwawaymail.com", "yopmail.com",
-            "trashmail.com", "mohmal.com", "crazymailing.com", "fakemailgenerator.com",
-            "burnermail.io", "getairmail.com", "mailpoof.com", "tempmail.net",
-            "tempinbox.com", "dropmail.me", "nada.ltd", "getnada.com", "inboxkitten.com"
-    );
 
     public void validateSafeEmail(String email) {
         if (email == null || email.isBlank()) {
             throw new BadRequestException("Email is required");
         }
-        String clean = email.trim().toLowerCase();
-        String domain = clean.contains("@") ? clean.substring(clean.indexOf('@') + 1) : "";
-        
-        if (DISPOSABLE_EMAIL_DOMAINS.contains(domain)) {
-            log.warn("Security Alert: Blocked known disposable domain: {}", domain);
-            throw new BadRequestException("Security Policy: Disposable email service (" + domain + ") is blocked.");
-        }
-
-        boolean validDomain = domain.equals("gmail.com") || domain.endsWith(".com") || domain.endsWith(".org") 
-                           || domain.endsWith(".net") || domain.endsWith(".edu") || domain.endsWith(".gov") 
-                           || domain.endsWith(".in") || domain.endsWith(".co.in");
-
-        if (!validDomain) {
-            log.warn("Security Alert: Blocked unsupported email domain attempt: {}", email);
-            throw new BadRequestException("Security Policy: Only official @gmail.com or authorized enterprise domains are permitted.");
-        }
+        emailSecurityValidator.validateEmailSecurity(email, null);
     }
 
     /**
@@ -338,5 +318,112 @@ public class RedisOtpService {
         inMemoryOtpCodes.remove(email);
         inMemoryOtpExpiries.remove(email);
         inMemoryFailCounts.remove(email);
+    }
+
+    // ── 2FA SESSION TOKEN MANAGEMENT ──────────────────────────────────────────
+
+    /**
+     * Store 2FA session token and 4-digit code in Redis with 5-minute automatic TTL expiration.
+     */
+    public void store2FaSession(String email, String twoFactorToken, String otp, int ttlMinutes) {
+        String normalizedEmail = email.toLowerCase().trim();
+        String sessionKey = OTP_2FA_SESSION_PREFIX + twoFactorToken;
+        String data = normalizedEmail + ":" + otp;
+
+        try {
+            redisTemplate.opsForValue().set(sessionKey, data, ttlMinutes, TimeUnit.MINUTES);
+            log.info("2FA session registered in Redis for [{}] [Session: {}], expires in {} min", normalizedEmail, twoFactorToken, ttlMinutes);
+        } catch (Exception e) {
+            log.warn("Redis unavailable, storing 2FA session in local fallback: {}", e.getMessage());
+            inMemory2FaSessions.put(twoFactorToken, data);
+            inMemory2FaExpiries.put(twoFactorToken, System.currentTimeMillis() + (ttlMinutes * 60L * 1000L));
+        }
+    }
+
+    /**
+     * Verify 2FA OTP against session token with brute-force attack prevention.
+     */
+    public void verify2FaSession(String email, String twoFactorToken, String providedOtp) {
+        String normalizedEmail = email.toLowerCase().trim();
+        String sessionKey = OTP_2FA_SESSION_PREFIX + twoFactorToken;
+        String failKey = OTP_2FA_FAIL_PREFIX + twoFactorToken;
+
+        if (providedOtp == null || providedOtp.trim().isEmpty()) {
+            throw new BadRequestException("4-digit 2FA verification code is required.");
+        }
+        String targetOtp = providedOtp.trim();
+
+        try {
+            // Check brute-force lockout (max 3 failed attempts)
+            Integer fails = (Integer) redisTemplate.opsForValue().get(failKey);
+            if (fails != null && fails >= 3) {
+                redisTemplate.delete(sessionKey);
+                throw new BadRequestException("Too many failed 2FA verification attempts. This 2FA session has been revoked. Please sign in again.");
+            }
+
+            Object sessionDataObj = redisTemplate.opsForValue().get(sessionKey);
+            String sessionData = sessionDataObj != null ? sessionDataObj.toString() : null;
+
+            if (sessionData == null) {
+                Long exp = inMemory2FaExpiries.get(twoFactorToken);
+                if (exp != null && System.currentTimeMillis() < exp) {
+                    sessionData = inMemory2FaSessions.get(twoFactorToken);
+                }
+            }
+
+            if (sessionData == null) {
+                throw new BadRequestException("2FA verification session has expired or is invalid. Please sign in again.");
+            }
+
+            String[] parts = sessionData.split(":", 2);
+            if (parts.length != 2 || !parts[0].equalsIgnoreCase(normalizedEmail)) {
+                throw new BadRequestException("Invalid 2FA session credentials.");
+            }
+
+            String storedOtp = parts[1];
+            if (!storedOtp.equals(targetOtp)) {
+                Long newFails = redisTemplate.opsForValue().increment(failKey);
+                if (newFails != null && newFails == 1) {
+                    redisTemplate.expire(failKey, 5, TimeUnit.MINUTES);
+                }
+                int remaining = Math.max(0, 3 - (newFails != null ? newFails.intValue() : 1));
+                throw new BadRequestException("Invalid 4-digit 2FA code. " + remaining + " attempt(s) remaining before session is terminated.");
+            }
+
+            // Validated successfully
+            log.info("2FA OTP verified for [{}] [Session: {}]", normalizedEmail, twoFactorToken);
+
+        } catch (BadRequestException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Redis 2FA error, checking local memory: {}", e.getMessage());
+            Long exp = inMemory2FaExpiries.get(twoFactorToken);
+            if (exp != null && System.currentTimeMillis() < exp) {
+                String data = inMemory2FaSessions.get(twoFactorToken);
+                if (data != null) {
+                    String[] parts = data.split(":", 2);
+                    if (parts.length == 2 && parts[0].equalsIgnoreCase(normalizedEmail) && parts[1].equals(targetOtp)) {
+                        return;
+                    }
+                }
+            }
+            throw new BadRequestException("Invalid or expired 2FA verification code.");
+        }
+    }
+
+    /**
+     * Consume and destroy 2FA session immediately upon completion.
+     */
+    public void consume2FaSession(String email, String twoFactorToken) {
+        String sessionKey = OTP_2FA_SESSION_PREFIX + twoFactorToken;
+        String failKey = OTP_2FA_FAIL_PREFIX + twoFactorToken;
+        try {
+            redisTemplate.delete(sessionKey);
+            redisTemplate.delete(failKey);
+        } catch (Exception e) {
+            log.debug("Redis 2FA cleanup error: {}", e.getMessage());
+        }
+        inMemory2FaSessions.remove(twoFactorToken);
+        inMemory2FaExpiries.remove(twoFactorToken);
     }
 }

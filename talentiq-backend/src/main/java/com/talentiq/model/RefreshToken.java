@@ -1,7 +1,6 @@
 package com.talentiq.model;
-import lombok.*;
 
-import com.talentiq.model.User;
+import lombok.*;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -19,6 +18,7 @@ import java.time.Instant;
         name = "refresh_tokens",
         indexes = {
                 @Index(name = "idx_refresh_tokens_user_id", columnList = "user_id"),
+                @Index(name = "idx_refresh_tokens_email", columnList = "user_email"),
                 @Index(name = "idx_refresh_tokens_expires_at", columnList = "expires_at")
         }
 )
@@ -30,8 +30,11 @@ public class RefreshToken {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
+
+    @Column(name = "user_email", length = 255)
+    private String userEmail;
 
     @Column(nullable = false, length = 500)
     private String token;

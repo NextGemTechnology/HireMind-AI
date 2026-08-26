@@ -49,7 +49,8 @@ public class JobServiceImpl implements JobService {
 
     @Override
     public JobDto.Response createJob(Long hrUserId, JobDto.CreateRequest request) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
+        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
+                .or(() -> hrProfileRepository.findByUserId(hrUserId))
                 .orElseThrow(() -> new ForbiddenException("Only company HR members can post jobs"));
 
         Company company = hrProfile.getCompany();
@@ -65,6 +66,7 @@ public class JobServiceImpl implements JobService {
         Job job = Job.builder()
                 .company(company)
                 .postedBy(hrProfile.getUser())
+                .hrProfile(hrProfile)
                 .title(request.getTitle().trim())
                 .slug(slug)
                 .description(request.getDescription())
@@ -98,7 +100,7 @@ public class JobServiceImpl implements JobService {
         }
 
         Job saved = jobRepository.save(job);
-        log.info("HR user {} created job {} [{}]", hrProfile.getUser().getEmail(), saved.getTitle(), saved.getSlug());
+        log.info("HR user {} created job {} [{}]", hrProfile.getEmail(), saved.getTitle(), saved.getSlug());
         return mapToResponse(saved);
     }
 
@@ -122,7 +124,8 @@ public class JobServiceImpl implements JobService {
 
     @Override
     public JobDto.Response updateJob(Long hrUserId, Long jobId, JobDto.UpdateRequest request) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
+        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
+                .or(() -> hrProfileRepository.findByUserId(hrUserId))
                 .orElseThrow(() -> new ForbiddenException("Only HR team members can update jobs"));
 
         Job job = jobRepository.findById(jobId)
@@ -164,13 +167,14 @@ public class JobServiceImpl implements JobService {
         }
 
         Job saved = jobRepository.save(job);
-        log.info("Job {} updated by HR user {}", saved.getSlug(), hrProfile.getUser().getEmail());
+        log.info("Job {} updated by HR user {}", saved.getSlug(), hrProfile.getEmail());
         return mapToResponse(saved);
     }
 
     @Override
     public void deleteJob(Long hrUserId, Long jobId) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
+        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
+                .or(() -> hrProfileRepository.findByUserId(hrUserId))
                 .orElseThrow(() -> new ForbiddenException("Only HR team members can delete jobs"));
 
         Job job = jobRepository.findById(jobId)
@@ -182,7 +186,7 @@ public class JobServiceImpl implements JobService {
 
         job.setStatus(JobStatus.ARCHIVED);
         jobRepository.save(job);
-        log.info("Job {} archived by HR user {}", job.getSlug(), hrProfile.getUser().getEmail());
+        log.info("Job {} archived by HR user {}", job.getSlug(), hrProfile.getEmail());
     }
 
     @Override

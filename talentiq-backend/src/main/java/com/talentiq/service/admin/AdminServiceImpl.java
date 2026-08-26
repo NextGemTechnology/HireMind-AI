@@ -27,6 +27,8 @@ import com.talentiq.model.HrProfile;
 import com.talentiq.model.User;
 import com.talentiq.repository.hr.HrProfileRepository;
 import com.talentiq.repository.user.UserRepository;
+import com.talentiq.repository.auth.UserCredentialRepository;
+import com.talentiq.model.auth.UserCredential;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +66,7 @@ public class AdminServiceImpl implements AdminService {
     private final CandidateEducationRepository candidateEducationRepository;
     private final CandidateExperienceRepository candidateExperienceRepository;
     private final CompanyCandidateVerificationRepository companyCandidateVerificationRepository;
+    private final UserCredentialRepository userCredentialRepository;
     private final MailService mailService;
 
     @Autowired(required = false)
@@ -248,6 +251,10 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", targetUserId));
 
+        UserCredential cred = userCredentialRepository.findByUserId(targetUserId).orElse(null);
+        Instant lastLogin = cred != null ? cred.getLastLoginAt() : null;
+        int loginAttempts = cred != null ? cred.getLoginAttempts() : 0;
+
         AdminDto.UserDetailsResponse.UserDetailsResponseBuilder builder = AdminDto.UserDetailsResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -257,8 +264,8 @@ public class AdminServiceImpl implements AdminService {
                 .roles(user.getRoles() != null ? user.getRoles().stream().map(Enum::name).collect(Collectors.toList()) : List.of())
                 .emailVerified(user.isEmailVerified())
                 .createdAt(user.getCreatedAt())
-                .lastLoginAt(user.getLastLoginAt())
-                .loginAttempts(user.getLoginAttempts())
+                .lastLoginAt(lastLogin)
+                .loginAttempts(loginAttempts)
                 .verifiedBadges(new ArrayList<>());
 
         // Check Candidate Profile

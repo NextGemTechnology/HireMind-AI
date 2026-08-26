@@ -58,6 +58,39 @@ services:
       timeout: 3s
       retries: 3
 
+  # ── Zookeeper (for Kafka) ────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: talentiq-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - talentiq-net
+
+  # ── Kafka (Distributed Message Broker) ───────────────────────
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: talentiq-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "9093:9093"
+    networks:
+      - talentiq-net
+
   # ── Backend ───────────────────────────────────────────────────
   backend:
     image: abhaygupta002/talentiq-backend:latest

@@ -33,6 +33,7 @@ class NotificationServiceImplTest {
     @Mock private NotificationPreferencesRepository preferencesRepository;
     @Mock private UserRepository userRepository;
     @Mock private MailService mailService;
+    @Mock private SseNotificationService sseNotificationService;
 
     @InjectMocks
     private NotificationServiceImpl notificationService;

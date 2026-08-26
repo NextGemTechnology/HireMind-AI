@@ -19,6 +19,7 @@ import {
   Moon
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
+import { HrSidebar } from '../components/HrSidebar';
 import '../css/hr-applications.css';
 
 interface ApplicationItem {
@@ -142,11 +143,11 @@ export const HrApplications: React.FC = () => {
   });
 
   return (
-    <div className={`hr-apps-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ position: 'relative', zIndex: 1 }}>
-      {/* ── Interactive Galaxy Background with Mouse Motion & Attraction ── */}
+    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
       <InteractiveGalaxyBackground theme={theme} />
-
-      {/* Header */}
+      <HrSidebar activeNav="Candidates" />
+      <div className={`hr-apps-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ flex: 1, height: '100vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+        {/* Header */}
       <div className="hr-apps-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
           <div className="solar-badge-hr" style={{ margin: 0 }}>
@@ -361,7 +362,8 @@ export const HrApplications: React.FC = () => {
             );
           })}
         </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

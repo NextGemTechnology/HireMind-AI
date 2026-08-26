@@ -1,21 +1,23 @@
 package com.talentiq.model;
-import lombok.*;
 
+import lombok.*;
 import com.talentiq.common.audit.AuditEntity;
 import com.talentiq.common.enums.Role;
 import com.talentiq.common.enums.UserStatus;
 import jakarta.persistence.*;
 import org.hibernate.annotations.BatchSize;
 
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Master user entity — represents all platform users regardless of role.
- * Role-specific data lives in separate profile entities (Candidate, HrProfile, etc.).
+ * Master User Profile Entity.
+ * Contains purely business and profile attributes.
+ * All authentication secrets, passwords, OTPs, and lockout metadata
+ * are stored exclusively in the dedicated UserCredential entity/table.
  */
 @Data
+@EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
@@ -37,9 +39,6 @@ public class User extends AuditEntity {
     @Column(nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
-
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
 
@@ -55,39 +54,11 @@ public class User extends AuditEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private UserStatus status = UserStatus.PENDING_VERIFICATION;
+    private UserStatus status = UserStatus.ACTIVE;
 
     @Column(name = "email_verified")
     @Builder.Default
-    private boolean emailVerified = false;
-
-    @Column(name = "email_verification_token")
-    private String emailVerificationToken;
-
-    @Column(name = "email_verification_token_expires_at")
-    private Instant emailVerificationTokenExpiresAt;
-
-    @Column(name = "password_reset_token")
-    private String passwordResetToken;
-
-    @Column(name = "password_reset_token_expires_at")
-    private Instant passwordResetTokenExpiresAt;
-
-    @Column(name = "password_reset_otp", length = 10)
-    private String passwordResetOtp;
-
-    @Column(name = "password_reset_otp_expires_at")
-    private Instant passwordResetOtpExpiresAt;
-
-    @Column(name = "last_login_at")
-    private Instant lastLoginAt;
-
-    @Column(name = "login_attempts")
-    @Builder.Default
-    private int loginAttempts = 0;
-
-    @Column(name = "locked_until")
-    private Instant lockedUntil;
+    private boolean emailVerified = true;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
@@ -101,7 +72,7 @@ public class User extends AuditEntity {
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
-    // ── Business Methods ──────────────────────────────────────────────────────
+    // ── Business Profile Methods ──────────────────────────────────────────────
 
     public String getFullName() {
         return firstName + " " + lastName;
@@ -109,19 +80,6 @@ public class User extends AuditEntity {
 
     public boolean isActive() {
         return status == UserStatus.ACTIVE && emailVerified;
-    }
-
-    public boolean isLocked() {
-        return lockedUntil != null && Instant.now().isBefore(lockedUntil);
-    }
-
-    public void incrementLoginAttempts() {
-        this.loginAttempts++;
-    }
-
-    public void resetLoginAttempts() {
-        this.loginAttempts = 0;
-        this.lockedUntil = null;
     }
 
     public void addRole(Role role) {

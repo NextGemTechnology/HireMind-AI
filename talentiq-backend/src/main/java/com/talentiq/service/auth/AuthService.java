@@ -28,7 +28,23 @@ public interface AuthService {
 
     AuthResponse loginHr(LoginRequest request, HttpServletRequest httpRequest);
 
+    AuthResponse loginCompany(LoginRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse loginAppDeveloper(LoginRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse loginManagementTeam(LoginRequest request, HttpServletRequest httpRequest);
+
     AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse registerCandidate(RegisterRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse registerHr(RegisterRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse registerCompany(RegisterRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse registerAppDeveloper(RegisterRequest request, HttpServletRequest httpRequest);
+
+    AuthResponse registerManagementTeam(RegisterRequest request, HttpServletRequest httpRequest);
 
     /**
      * Rotate the refresh token. Invalidates old token, issues new pair.
@@ -71,4 +87,14 @@ public interface AuthService {
      * Complete password reset using verified 4-digit OTP or reset token and set new password.
      */
     void resetPassword(ResetPasswordRequest request);
+
+    /**
+     * Verify 4-digit 2FA OTP code and complete Admin login.
+     */
+    AuthResponse verify2FaAdmin(TwoFactorVerifyRequest request, HttpServletRequest httpRequest);
+
+    /**
+     * Resend 4-digit 2FA code for an active Admin 2FA session.
+     */
+    void resend2FaOtp(TwoFactorResendRequest request, HttpServletRequest httpRequest);
 }

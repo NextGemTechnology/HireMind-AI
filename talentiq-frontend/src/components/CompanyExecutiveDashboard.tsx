@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useAdminTheme } from '../context/AdminThemeContext';
 import { CompanyTagApprovalQueue } from './CompanyTagApprovalQueue';
 import {
   Building2, Calendar, Users, Settings, Plus, Trash2,
   DollarSign, Wallet, ShieldCheck, LogOut, Send,
   Clock, Search, Bell, ChevronDown, CheckCircle2,
-  FolderKanban, BarChart3, Activity
+  FolderKanban, BarChart3, Activity, Sun, Moon, CloudSun
 } from 'lucide-react';
+import '../css/admin-theme.css';
 import '../css/company-executive-dashboard.css';
 
 interface CompanyTask {
@@ -64,6 +66,7 @@ interface SalaryPayrollRecord {
 
 export const CompanyExecutiveDashboard: React.FC = () => {
   const { user, logout } = useAuth();
+  const { theme, setTheme } = useAdminTheme();
   const navigate = useNavigate();
 
   // Navigation state
@@ -299,7 +302,7 @@ export const CompanyExecutiveDashboard: React.FC = () => {
   const directorName = user ? `${user.firstName} ${user.lastName}` : 'Olivia Chen';
 
   return (
-    <div className="exec-dashboard-layout">
+    <div className={`exec-dashboard-layout admin-page-wrapper admin-theme-${theme}`}>
 
       {/* ────────────────────────────────────────────────────────
           LEFT VERTICAL DOCK SIDEBAR (Matching Reference Image)
@@ -309,7 +312,7 @@ export const CompanyExecutiveDashboard: React.FC = () => {
         <div
           className="exec-logo-glyph"
           onClick={() => setActiveNav('OVERVIEW')}
-          title="Auraflow Technologies Executive Hub"
+          title="Executive Hub"
         >
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2L2 22H7L12 12L17 22H22L12 2Z" fill="#FFFFFF" />
@@ -344,15 +347,6 @@ export const CompanyExecutiveDashboard: React.FC = () => {
             );
           })}
         </nav>
-
-        {/* Bottom Profile Avatar Thumbnail */}
-        <div
-          className="exec-sidebar-avatar"
-          onClick={() => setShowProfileMenu(!showProfileMenu)}
-          title={`${directorName} (CEO)`}
-        >
-          {directorName.charAt(0)}
-        </div>
       </aside>
 
       {/* ────────────────────────────────────────────────────────
@@ -360,7 +354,7 @@ export const CompanyExecutiveDashboard: React.FC = () => {
           ──────────────────────────────────────────────────────── */}
       <main className="exec-viewport">
 
-        {/* ── TOP HEADER BAR (Matching Reference Image) ── */}
+        {/* ── TOP HEADER BAR ── */}
         <header className="exec-header">
           <div className="exec-header-left">
             <div className="exec-header-title-row">
@@ -380,6 +374,31 @@ export const CompanyExecutiveDashboard: React.FC = () => {
 
           {/* Right Header Action Items */}
           <div className="exec-header-actions">
+            {/* 3-State Official Theme Switcher (100% Light | 50% Soft Light | 100% Dark) */}
+            <div className="admin-theme-segmented-ctrl">
+              <button
+                onClick={() => setTheme('light-100')}
+                className={`admin-theme-btn ${theme === 'light-100' ? 'active' : ''}`}
+                title="100% Crisp Corporate Daylight Mode"
+              >
+                <Sun size={13} /> Light
+              </button>
+              <button
+                onClick={() => setTheme('light-50')}
+                className={`admin-theme-btn ${theme === 'light-50' ? 'active' : ''}`}
+                title="50% Soft / Eye-Comfort Balanced Mode"
+              >
+                <CloudSun size={13} /> 50%
+              </button>
+              <button
+                onClick={() => setTheme('dark-100')}
+                className={`admin-theme-btn ${theme === 'dark-100' ? 'active' : ''}`}
+                title="100% Executive Obsidian Midnight Mode"
+              >
+                <Moon size={13} /> Dark
+              </button>
+            </div>
+
             {/* Quarter Filter Selector */}
             <div style={{ position: 'relative' }}>
               <button

@@ -34,9 +34,13 @@ public class CompanyCandidateVerification extends AuditEntity {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "hr_user_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hr_user_id")
     private User hrUser;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hr_profile_id")
+    private HrProfile hrProfile;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "candidate_user_id", nullable = false)

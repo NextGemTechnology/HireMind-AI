@@ -22,6 +22,7 @@ import org.springframework.test.context.TestPropertySource;
         "spring.data.redis.host=localhost",
         "spring.data.redis.port=6379",
         "app.jwt.secret=dGVzdC1zZWNyZXQta2V5LWZvci11bml0LXRlc3RpbmctbXVzdC1iZS1sb25n",
+        "app.cors.allowed-origins=http://localhost:3000",
         "app.ai.openai.api-key=test-key",
         "spring.cache.type=none",
         "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration," +

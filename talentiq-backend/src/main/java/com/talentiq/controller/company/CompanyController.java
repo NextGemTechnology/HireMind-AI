@@ -42,7 +42,7 @@ public class CompanyController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-    @GetMapping("/s/{slug}")
+    @GetMapping({"/s/{slug}", "/by-slug/{slug}"})
     @Operation(summary = "Get company details by slug")
     public ResponseEntity<ApiResponse<CompanyDto.Response>> getCompanyBySlug(@PathVariable String slug) {
         CompanyDto.Response response = companyService.getCompanyBySlug(slug);

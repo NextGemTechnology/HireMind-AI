@@ -55,7 +55,8 @@ function AppLayout() {
     '/hr-copilot', '/copilot', '/admin', '/team-chat',
     '/admin-application-developere-suit', '/admin-application-developer-suit', '/admin-application-developer-suite',
     '/admin-Management-team', '/admin-management-team',
-    '/admin-Register-Company', '/admin-register-company'
+    '/admin-Register-Company', '/admin-register-company',
+    '/admin-portal', '/Admin-', '/admin-'
   ];
   const isHome = location.pathname === '/';
   const hideNavbar = isHome || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
@@ -82,7 +83,7 @@ function AppLayout() {
           <Route path="/hr-applications" element={<HrApplications />} />
           <Route path="/hr-messages" element={<HrMessages />} />
           <Route path="/hr-calendar" element={<HrCalendar />} />
-          {/* ── 3 Dedicated Admin Portals ── */}
+          {/* ── Dedicated Admin Portals ── */}
           <Route path="/admin-application-developere-suit" element={<AdminPortal mode="DEVELOPER" />} />
           <Route path="/admin-application-developer-suit" element={<AdminPortal mode="DEVELOPER" />} />
           <Route path="/admin-application-developer-suite" element={<AdminPortal mode="DEVELOPER" />} />
@@ -90,6 +91,9 @@ function AppLayout() {
           <Route path="/admin-management-team" element={<AdminPortal mode="MANAGEMENT" />} />
           <Route path="/admin-Register-Company" element={<AdminPortal mode="COMPANY" />} />
           <Route path="/admin-register-company" element={<AdminPortal mode="COMPANY" />} />
+          <Route path="/admin-portal/:companySlug" element={<AdminPortal mode="COMPANY" />} />
+          <Route path="/Admin-:companySlug" element={<AdminPortal mode="COMPANY" />} />
+          <Route path="/admin-:companySlug" element={<AdminPortal mode="COMPANY" />} />
           <Route path="/admin" element={<AdminPortal />} />
           <Route path="/admin-portal" element={<AdminPortal />} />
           <Route path="/profile" element={<ProfilePage />} />

@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
-  LayoutDashboard, MessageSquare, Calendar, Briefcase,
-  Users, Star, UserCircle2, BarChart2,
-  Settings, Search, Bell, TrendingUp, ChevronDown,
-  Plus, MoreVertical, Bot, RefreshCw, LogOut, Sun, Moon
+  Search, Bell, TrendingUp, ChevronDown,
+  Plus, MoreVertical, RefreshCw, Sun, Moon,
+  Star, UserCircle2, BarChart2, Settings,
+  Calendar, ShieldCheck, Download, Award
 } from 'lucide-react';
 import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
+import { HrSidebar } from '../components/HrSidebar';
 import '../css/hr-analytics.css';
 
 /* ─── Types ─── */
@@ -71,48 +72,6 @@ interface ContactMessage {
   unreadCount: number;
 }
 
-/* ─── Sidebar Nav Item ─── */
-interface NavItemProps {
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-  isUniverse?: boolean;
-  onClick?: () => void;
-}
-
-const NavItem: React.FC<NavItemProps> = ({ icon, label, active, isUniverse, onClick }) => (
-  <button
-    onClick={onClick}
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px',
-      width: '100%',
-      padding: '10px 16px',
-      borderRadius: '10px',
-      border: 'none',
-      cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: active ? 600 : 400,
-      background: active
-        ? (isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#2563EB')
-        : 'transparent',
-      color: active ? '#FFFFFF' : (isUniverse ? '#94A3B8' : '#64748B'),
-      transition: 'all 0.2s',
-      textAlign: 'left',
-    }}
-    onMouseEnter={e => {
-      if (!active) (e.currentTarget as HTMLButtonElement).style.background = isUniverse ? 'rgba(99,102,241,0.12)' : '#F1F5F9';
-    }}
-    onMouseLeave={e => {
-      if (!active) (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-    }}
-  >
-    {icon}
-    {label}
-  </button>
-);
-
 /* ─── Circular Progress Ring ─── */
 const RingChart: React.FC<{ pct: number; color: string; isUniverse?: boolean }> = ({ pct, color, isUniverse }) => {
   const r = 28, circ = 2 * Math.PI * r;
@@ -158,7 +117,8 @@ const BarChartComponent: React.FC<{ data: Array<{ month: string; apps: number; s
 ═══════════════════════════════════ */
 export const HrAnalytics: React.FC = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user } = useAuth();
   const { theme, toggleTheme, isUniverse } = useTheme();
 
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
@@ -167,13 +127,39 @@ export const HrAnalytics: React.FC = () => {
   const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
   const [contacts, setContacts] = useState<ContactMessage[]>([]);
 
-  const [activeNav, setActiveNav] = useState('Dashboard');
+  const initialTab = searchParams.get('tab') || 'Dashboard';
+  const [activeNav, setActiveNav] = useState<string>(
+    initialTab.toLowerCase() === 'referrals' ? 'Referrals' :
+    initialTab.toLowerCase() === 'employee' ? 'Employee' :
+    initialTab.toLowerCase() === 'report' ? 'Report' :
+    initialTab.toLowerCase() === 'settings' ? 'Settings' : 'Dashboard'
+  );
+
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter] = useState('Month');
   const [notifications] = useState(3);
   const [loading, setLoading] = useState(true);
 
   const stompRef = useRef<StompClient | null>(null);
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      const normalized = tabParam.charAt(0).toUpperCase() + tabParam.slice(1).toLowerCase();
+      setActiveNav(normalized);
+    } else {
+      setActiveNav('Dashboard');
+    }
+  }, [searchParams]);
+
+  const handleSelectNav = (nav: string) => {
+    setActiveNav(nav);
+    if (['Referrals', 'Employee', 'Report', 'Settings'].includes(nav)) {
+      setSearchParams({ tab: nav.toLowerCase() });
+    } else if (nav === 'Dashboard') {
+      setSearchParams({});
+    }
+  };
 
   /* ── Fetch Real DB Data ── */
   const loadDashboardData = async () => {
@@ -289,11 +275,12 @@ export const HrAnalytics: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
     if (!token) return;
 
+    const wsUrl = `${window.location.origin}/api/ws`;
     const client = new StompClient({
-      webSocketFactory: () => new SockJS('http://localhost:8080/api/ws'),
+      webSocketFactory: () => new SockJS(wsUrl),
       connectHeaders: { Authorization: `Bearer ${token}` },
       reconnectDelay: 5000,
       onConnect: () => {
@@ -359,8 +346,6 @@ export const HrAnalytics: React.FC = () => {
     bg: isUniverse
       ? 'radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15), transparent 40%), radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.12), transparent 40%), #070B19'
       : '#F8FAFC',
-    sidebarBg: isUniverse ? '#0F172A' : '#FFFFFF',
-    sidebarBorder: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
     headerBg: isUniverse ? '#0F172A' : '#FFFFFF',
     headerBorder: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
     cardBg: isUniverse ? 'rgba(15, 23, 42, 0.75)' : '#FFFFFF',
@@ -386,59 +371,11 @@ export const HrAnalytics: React.FC = () => {
     }}>
       <InteractiveGalaxyBackground theme={theme} />
 
-      {/* ══════════ LEFT SIDEBAR ══════════ */}
-      <aside style={{
-        width: '220px',
-        minHeight: '100vh',
-        background: styles.sidebarBg,
-        borderRight: styles.sidebarBorder,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: '24px 12px',
-        flexShrink: 0,
-        position: 'sticky',
-        top: 0,
-        height: '100vh',
-        overflowY: 'auto',
-      }}>
-        {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 8px 24px', cursor: 'pointer' }} onClick={() => navigate('/')}>
-          <div style={{
-            width: '36px', height: '36px', borderRadius: '10px',
-            background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}>
-            <span style={{ fontSize: '16px' }}>🌌</span>
-          </div>
-          <span style={{ fontWeight: 700, fontSize: '16px', color: styles.heading }}>HireMind AI</span>
-        </div>
-
-        {/* MENU */}
-        <div style={{ marginBottom: '8px' }}>
-          <p style={{ fontSize: '10px', fontWeight: 700, color: styles.subtext, letterSpacing: '0.1em', padding: '0 16px', marginBottom: '8px' }}>MENU</p>
-          <NavItem icon={<LayoutDashboard size={16} />} label="Dashboard" active={activeNav === 'Dashboard'} isUniverse={isUniverse} onClick={() => setActiveNav('Dashboard')} />
-          <NavItem icon={<MessageSquare size={16} />} label="Message" active={activeNav === 'Message'} isUniverse={isUniverse} onClick={() => { setActiveNav('Message'); navigate('/hr-messages'); }} />
-          <NavItem icon={<Calendar size={16} />} label="Calendar" active={activeNav === 'Calendar'} isUniverse={isUniverse} onClick={() => { setActiveNav('Calendar'); navigate('/hr-calendar'); }} />
-        </div>
-
-        {/* RECRUITMENT */}
-        <div style={{ marginBottom: '8px', marginTop: '16px' }}>
-          <p style={{ fontSize: '10px', fontWeight: 700, color: styles.subtext, letterSpacing: '0.1em', padding: '0 16px', marginBottom: '8px' }}>RECRUITMENT</p>
-          <NavItem icon={<Briefcase size={16} />} label="Jobs" active={activeNav === 'Jobs'} isUniverse={isUniverse} onClick={() => { setActiveNav('Jobs'); navigate('/jobs'); }} />
-          <NavItem icon={<Users size={16} />} label="Candidates" active={activeNav === 'Candidates'} isUniverse={isUniverse} onClick={() => { setActiveNav('Candidates'); navigate('/hr-applications'); }} />
-          <NavItem icon={<Bot size={16} />} label="AI Copilot" active={activeNav === 'Copilot'} isUniverse={isUniverse} onClick={() => { setActiveNav('Copilot'); navigate('/copilot'); }} />
-          <NavItem icon={<Star size={16} />} label="My Referrals" active={activeNav === 'Referrals'} isUniverse={isUniverse} onClick={() => setActiveNav('Referrals')} />
-        </div>
-
-        {/* ORGANIZATION */}
-        <div style={{ marginTop: '16px' }}>
-          <p style={{ fontSize: '10px', fontWeight: 700, color: styles.subtext, letterSpacing: '0.1em', padding: '0 16px', marginBottom: '8px' }}>ORGANIZATION</p>
-          <NavItem icon={<UserCircle2 size={16} />} label="Employee" active={activeNav === 'Employee'} isUniverse={isUniverse} onClick={() => setActiveNav('Employee')} />
-          <NavItem icon={<BarChart2 size={16} />} label="Report" active={activeNav === 'Report'} isUniverse={isUniverse} onClick={() => setActiveNav('Report')} />
-          <NavItem icon={<Settings size={16} />} label="Settings" active={activeNav === 'Settings'} isUniverse={isUniverse} onClick={() => setActiveNav('Settings')} />
-          <NavItem icon={<LogOut size={16} />} label="Sign Out" isUniverse={isUniverse} onClick={() => { logout(); navigate('/'); }} />
-        </div>
-      </aside>
+      {/* ══════════ UNIFIED STABLE LEFT SIDEBAR ══════════ */}
+      <HrSidebar
+        activeNav={activeNav}
+        onSelectNav={handleSelectNav}
+      />
 
       {/* ══════════ MAIN CONTENT ══════════ */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -458,9 +395,15 @@ export const HrAnalytics: React.FC = () => {
         }}>
           <div style={{ flex: 1 }}>
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: styles.heading, margin: 0 }}>
-              {analytics?.companyName || 'Dashboard'}
+              {activeNav === 'Referrals' ? 'Candidate Referrals & Rewards' :
+               activeNav === 'Employee' ? 'Verified Company Team & Employees' :
+               activeNav === 'Report' ? 'Recruitment Telemetry & Reports' :
+               activeNav === 'Settings' ? 'Recruiter & Organization Settings' :
+               (analytics?.companyName || 'Dashboard')}
             </h1>
-            <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>Hello, {user?.firstName || 'HR Manager'}. Welcome to HireMind AI</p>
+            <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>
+              Hello, {user?.firstName || 'HR Manager'}. Welcome to HireMind AI Enterprise Suite
+            </p>
           </div>
 
           {/* Search */}
@@ -536,354 +479,527 @@ export const HrAnalytics: React.FC = () => {
           </div>
         </header>
 
-        {/* ── Page Body (scrollable) ── */}
-        <div style={{ flex: 1, padding: '24px', overflowY: 'auto', display: 'flex', gap: '24px' }}>
-
-          {/* ── Center Column ── */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
-
-            {/* KPI Cards Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-              {stats.map((s, i) => (
-                <div key={i} style={{
-                  background: styles.cardBg,
-                  borderRadius: '16px',
-                  padding: '20px 24px',
-                  border: styles.cardBorder,
-                  boxShadow: styles.cardShadow,
-                  backdropFilter: isUniverse ? 'blur(16px)' : 'none',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                }}>
-                  <div>
-                    <p style={{ fontSize: '12px', color: styles.subtext, margin: '0 0 4px', fontWeight: 500 }}>{s.label}</p>
-                    <h2 style={{ fontSize: '32px', fontWeight: 800, color: styles.heading, margin: '0 0 8px', lineHeight: 1 }}>
-                      {s.value.toLocaleString()}
-                    </h2>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: s.color }}>
-                      <TrendingUp size={12} />
-                      <span>{s.trend}</span>
-                    </div>
-                  </div>
-                  <RingChart pct={s.pct} color={s.color} isUniverse={isUniverse} />
-                </div>
-              ))}
-            </div>
-
-            {/* Monthly Bar Chart */}
-            <div style={{
-              background: styles.cardBg,
-              borderRadius: '16px',
-              padding: '24px',
-              border: styles.cardBorder,
-              boxShadow: styles.cardShadow,
-              backdropFilter: isUniverse ? 'blur(16px)' : 'none',
-            }}>
+        {/* ── Sub-view 1: Referrals Tab ── */}
+        {activeNav === 'Referrals' && (
+          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow, marginBottom: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h3 style={{ fontSize: '15px', fontWeight: 700, color: styles.heading, margin: 0 }}>Statistics of active Applications</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                  {[{ c: '#38BDF8', l: 'Applications' }, { c: '#FBBF24', l: 'Shortlisted' }, { c: '#FB7185', l: 'Rejected' }].map(item => (
-                    <div key={item.l} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: styles.subtext }}>
-                      <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: item.c }} />
-                      {item.l}
-                    </div>
-                  ))}
-                  <button style={{
-                    padding: '5px 12px', borderRadius: '8px', border: styles.cardBorder,
-                    background: styles.cardBg, fontSize: '12px', color: styles.heading, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '4px'
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Star size={20} color="#FBBF24" /> Candidate Referrals & Talent Incentives
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: styles.subtext }}>
+                    Track candidate employee referral tokens, bounty bonuses, and priority verification badges
+                  </p>
+                </div>
+                <button
+                  onClick={() => alert('Referral Link Copied: https://hiremind.ai/jobs?ref=HR-EXECUTIVE')}
+                  style={{
+                    padding: '10px 18px', borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                    color: '#FFF', border: 'none', fontWeight: 700, fontSize: '13px',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                  }}
+                >
+                  <Award size={16} /> Copy My Recruiter Referral Link
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
+                <div style={{ padding: '18px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div style={{ fontSize: '12px', color: styles.subtext, marginBottom: '4px' }}>Total Candidates Referred</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#38BDF8' }}>18</div>
+                  <div style={{ fontSize: '11px', color: '#10B981', marginTop: '4px' }}>+4 this week</div>
+                </div>
+                <div style={{ padding: '18px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div style={{ fontSize: '12px', color: styles.subtext, marginBottom: '4px' }}>Hired via Referral</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#10B981' }}>6</div>
+                  <div style={{ fontSize: '11px', color: styles.subtext, marginTop: '4px' }}>33.3% Conversion</div>
+                </div>
+                <div style={{ padding: '18px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div style={{ fontSize: '12px', color: styles.subtext, marginBottom: '4px' }}>Earned Referral Rewards</div>
+                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#FBBF24' }}>$4,200</div>
+                  <div style={{ fontSize: '11px', color: '#818CF8', marginTop: '4px' }}>Disbursed in Q3 Cycle</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Sub-view 2: Employee Verification Tab ── */}
+        {activeNav === 'Employee' && (
+          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow, marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <UserCircle2 size={20} color="#38BDF8" /> Verified Internal Team & Badge Registry
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: styles.subtext }}>
+                    Official employee and candidate badge verifications approved by company director
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/team-chat')}
+                  style={{
+                    padding: '10px 18px', borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                    color: '#FFF', border: 'none', fontWeight: 700, fontSize: '13px',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                  }}
+                >
+                  <ShieldCheck size={16} /> Open Verified Group Channel
+                </button>
+              </div>
+
+              <div style={{ padding: '20px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                  <ShieldCheck size={18} color="#10B981" />
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: styles.heading }}>
+                    Verified Recruiter Badge Active
+                  </span>
+                  <span style={{ fontSize: '11px', background: 'rgba(16,185,129,0.15)', color: '#10B981', padding: '2px 8px', borderRadius: '999px', fontWeight: 700 }}>
+                    OFFICIALLY AUTHENTICATED
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '12.5px', color: styles.subtext, lineHeight: 1.5 }}>
+                  Your HR Recruiter account has an official Company Verification badge. You are authorized to initiate direct candidate conversations, issue invite links, and participate in corporate communication groups.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Sub-view 3: Telemetry Report Tab ── */}
+        {activeNav === 'Report' && (
+          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart2 size={20} color="#818CF8" /> Executive Hiring & Telemetry Report
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: styles.subtext }}>
+                    Real-time performance analytics, candidate pipeline throughput, and time-to-hire metrics
+                  </p>
+                </div>
+                <button
+                  onClick={() => alert('Exporting Full Recruitment Telemetry PDF...')}
+                  style={{
+                    padding: '10px 18px', borderRadius: '10px',
+                    background: isUniverse ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
+                    color: styles.heading, border: styles.cardBorder, fontWeight: 700, fontSize: '13px',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+                  }}
+                >
+                  <Download size={16} /> Export Telemetry Report
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
+                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div style={{ fontSize: '11px', color: styles.subtext }}>Average Time to Hire</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: styles.heading }}>{analytics?.avgTimeToHireDays || 14} Days</div>
+                </div>
+                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div style={{ fontSize: '11px', color: styles.subtext }}>Shortlist Conversion</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#38BDF8' }}>{analytics?.conversionRate || 22}%</div>
+                </div>
+                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div style={{ fontSize: '11px', color: styles.subtext }}>Active Open Positions</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#FBBF24' }}>{analytics?.activeJobsCount || 8}</div>
+                </div>
+                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div style={{ fontSize: '11px', color: styles.subtext }}>Interviews Conducted</div>
+                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#10B981' }}>{meetings.length || 12}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Sub-view 4: Settings Tab ── */}
+        {activeNav === 'Settings' && (
+          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Settings size={20} color="#94A3B8" /> Recruiter Configuration & Preferences
+              </h2>
+              <p style={{ margin: '0 0 20px', fontSize: '13px', color: styles.subtext }}>
+                Manage calendar integrations, real-time message notification triggers, and auto-response templates
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: styles.heading }}>Real-time 2-Second Message Alerts</div>
+                    <div style={{ fontSize: '12px', color: styles.subtext }}>Displays immediate animated toast notification on incoming candidate inquiries</div>
+                  </div>
+                  <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: '#6366F1' }} />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: styles.heading }}>Google Meet Calendar Sync</div>
+                    <div style={{ fontSize: '12px', color: styles.subtext }}>Auto-generate video conference links on interview slot confirmation</div>
+                  </div>
+                  <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: '#6366F1' }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Standard Dashboard View ── */}
+        {activeNav === 'Dashboard' && (
+          <div style={{ flex: 1, padding: '24px', overflowY: 'auto', display: 'flex', gap: '24px' }}>
+
+            {/* ── Center Column ── */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+
+              {/* KPI Cards Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                {stats.map((s, i) => (
+                  <div key={i} style={{
+                    background: styles.cardBg,
+                    borderRadius: '16px',
+                    padding: '20px 24px',
+                    border: styles.cardBorder,
+                    boxShadow: styles.cardShadow,
+                    backdropFilter: isUniverse ? 'blur(16px)' : 'none',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                   }}>
-                    {timeFilter} <ChevronDown size={12} />
-                  </button>
+                    <div>
+                      <p style={{ fontSize: '12px', color: styles.subtext, margin: '0 0 4px', fontWeight: 500 }}>{s.label}</p>
+                      <h2 style={{ fontSize: '32px', fontWeight: 800, color: styles.heading, margin: '0 0 8px', lineHeight: 1 }}>
+                        {s.value.toLocaleString()}
+                      </h2>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: s.color }}>
+                        <TrendingUp size={12} />
+                        <span>{s.trend}</span>
+                      </div>
+                    </div>
+                    <RingChart pct={s.pct} color={s.color} isUniverse={isUniverse} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Monthly Bar Chart */}
+              <div style={{
+                background: styles.cardBg,
+                borderRadius: '16px',
+                padding: '24px',
+                border: styles.cardBorder,
+                boxShadow: styles.cardShadow,
+                backdropFilter: isUniverse ? 'blur(16px)' : 'none',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: styles.heading, margin: 0 }}>Statistics of active Applications</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    {[{ c: '#38BDF8', l: 'Applications' }, { c: '#FBBF24', l: 'Shortlisted' }, { c: '#FB7185', l: 'Rejected' }].map(item => (
+                      <div key={item.l} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: styles.subtext }}>
+                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: item.c }} />
+                        {item.l}
+                      </div>
+                    ))}
+                    <button style={{
+                      padding: '5px 12px', borderRadius: '8px', border: styles.cardBorder,
+                      background: styles.cardBg, fontSize: '12px', color: styles.heading, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '4px'
+                    }}>
+                      {timeFilter} <ChevronDown size={12} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Y-axis labels & Bar Chart */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '210px', alignItems: 'flex-end', paddingBottom: '20px' }}>
+                    {['100%', '80%', '60%', '40%', '20%'].map(l => (
+                      <span key={l} style={{ fontSize: '10px', color: styles.subtext }}>{l}</span>
+                    ))}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <BarChartComponent data={chartData} isUniverse={isUniverse} />
+                  </div>
                 </div>
               </div>
 
-              {/* Y-axis labels & Bar Chart */}
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '210px', alignItems: 'flex-end', paddingBottom: '20px' }}>
-                  {['100%', '80%', '60%', '40%', '20%'].map(l => (
-                    <span key={l} style={{ fontSize: '10px', color: styles.subtext }}>{l}</span>
-                  ))}
+              {/* Activity Feed + Meetings Row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+
+                {/* Activity Feed */}
+                <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: 0 }}>Activity Feed</h3>
+                    <button onClick={() => navigate('/hr-applications')} style={{
+                      padding: '4px 10px', borderRadius: '8px', border: styles.cardBorder,
+                      background: styles.cardBg, fontSize: '11px', color: styles.subtext, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '4px'
+                    }}>
+                      All Activity <ChevronDown size={11} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                    {activityFeed.length === 0 ? (
+                      <div style={{ fontSize: '12px', color: styles.subtext, textAlign: 'center', padding: '20px 0' }}>
+                        No recent activity recorded yet.
+                      </div>
+                    ) : (
+                      activityFeed.map(item => (
+                        <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                          <div style={{
+                            width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+                            background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#FFF', fontSize: '12px', fontWeight: 700,
+                          }}>{item.avatar}</div>
+                          <div style={{ flex: 1 }}>
+                            <p style={{ margin: 0, fontSize: '12px', color: styles.heading }}>
+                              <strong>{item.name}</strong> {item.action} <strong>{item.job}</strong>
+                            </p>
+                            <span style={{ fontSize: '10px', color: styles.subtext }}>{item.time}</span>
+                          </div>
+                          <span style={{
+                            fontSize: '10px', fontWeight: 600, padding: '3px 8px', borderRadius: '20px',
+                            background: item.tagColor + '20', color: item.tagColor, flexShrink: 0,
+                          }}>{item.tag}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <BarChartComponent data={chartData} isUniverse={isUniverse} />
+
+                {/* Last 10 Meetings Widget */}
+                <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 700, color: styles.heading, margin: 0 }}>Recent & Scheduled Meetings</h3>
+                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: isUniverse ? 'rgba(99,102,241,0.2)' : '#EFF6FF', color: isUniverse ? '#818CF8' : '#2563EB' }}>
+                        {meetings.length}
+                      </span>
+                    </div>
+                    <button onClick={() => navigate('/hr-calendar')} style={{
+                      padding: '4px 10px', borderRadius: '8px', border: styles.cardBorder,
+                      background: styles.cardBg, fontSize: '11px', fontWeight: 600, color: styles.subtext, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '4px'
+                    }}>
+                      View Calendar <ChevronDown size={11} />
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {meetings.length === 0 ? (
+                      <div style={{ fontSize: '12px', color: styles.subtext, textAlign: 'center', padding: '30px 0' }}>
+                        No meetings recorded. Schedule your first candidate interview!
+                      </div>
+                    ) : (
+                      meetings.map(m => {
+                        const badgeBg = m.status === 'CONFIRMED' ? 'rgba(16,185,129,0.15)' : m.status === 'COMPLETED' ? 'rgba(59,130,246,0.15)' : m.status === 'CANCELLED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
+                        const badgeColor = m.status === 'CONFIRMED' ? '#10B981' : m.status === 'COMPLETED' ? '#3B82F6' : m.status === 'CANCELLED' ? '#EF4444' : '#F59E0B';
+
+                        return (
+                          <div key={m.id} style={{
+                            display: 'flex', alignItems: 'center', gap: '12px',
+                            padding: '10px 12px', borderRadius: '12px', background: styles.cardSubBg,
+                            border: styles.cardBorder,
+                            borderLeft: `3px solid ${badgeColor}`
+                          }}>
+                            <div style={{
+                              width: '42px', height: '42px', borderRadius: '10px',
+                              background: m.color + '18', display: 'flex', flexDirection: 'column',
+                              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                            }}>
+                              <span style={{ fontSize: '9px', color: m.color, fontWeight: 700, textTransform: 'uppercase' }}>{m.month || m.day}</span>
+                              <span style={{ fontSize: '14px', color: m.color, fontWeight: 800, lineHeight: 1 }}>{m.date}</span>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
+                                <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: styles.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {m.candidateName}
+                                </p>
+                                <span style={{
+                                  fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px',
+                                  background: badgeBg, color: badgeColor, flexShrink: 0
+                                }}>
+                                  {m.status}
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '11px', color: styles.subtext, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {m.jobTitle}
+                              </p>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                                <span style={{ fontSize: '10px', color: styles.subtext, fontWeight: 500 }}>
+                                  ⏰ {m.time}
+                                </span>
+                                {m.meetingLink && (
+                                  <a
+                                    href={m.meetingLink}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ fontSize: '10px', color: isUniverse ? '#818CF8' : '#2563EB', textDecoration: 'none', fontWeight: 600 }}
+                                  >
+                                    📹 Join Call
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                            <button onClick={() => navigate('/hr-calendar')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: styles.subtext, padding: 4 }}>
+                              <MoreVertical size={14} />
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Quick Action Buttons */}
+                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => navigate('/hr-calendar')}
+                      style={{
+                        flex: 1, padding: '10px', borderRadius: '10px',
+                        background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#2563EB', color: '#FFFFFF !important', border: 'none',
+                        fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      }}
+                    >
+                      <Calendar size={14} /> Schedule Meeting
+                    </button>
+                    <button
+                      onClick={() => navigate('/jobs')}
+                      style={{
+                        flex: 1, padding: '10px', borderRadius: '10px',
+                        background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                        border: styles.cardBorder,
+                        color: styles.heading,
+                        fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
+                      }}
+                    >
+                      <Plus size={14} /> Post Job
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Activity Feed + Meetings Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* ══════════ RIGHT SIDEBAR ══════════ */}
+            <aside style={{
+              width: '240px',
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}>
 
-              {/* Activity Feed */}
-              <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: 0 }}>Activity Feed</h3>
-                  <button onClick={() => navigate('/hr-applications')} style={{
-                    padding: '4px 10px', borderRadius: '8px', border: styles.cardBorder,
-                    background: styles.cardBg, fontSize: '11px', color: styles.subtext, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '4px'
-                  }}>
-                    All Activity <ChevronDown size={11} />
-                  </button>
+              {/* Profile Card */}
+              <div style={{
+                background: styles.cardBg,
+                borderRadius: '16px',
+                padding: '24px 20px',
+                border: styles.cardBorder,
+                boxShadow: styles.cardShadow,
+                backdropFilter: isUniverse ? 'blur(16px)' : 'none',
+                textAlign: 'center',
+              }}>
+                <div style={{
+                  width: '72px', height: '72px', borderRadius: '50%',
+                  background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '28px', fontWeight: 800, color: '#FFF',
+                  margin: '0 auto 12px',
+                  boxShadow: isUniverse ? '0 4px 24px rgba(99, 102, 241, 0.45)' : '0 4px 20px rgba(37, 99, 235, 0.35)',
+                }}>
+                  {(user?.firstName?.[0] || 'H')}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                  {activityFeed.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: styles.subtext, textAlign: 'center', padding: '20px 0' }}>
-                      No recent activity recorded yet.
+                <p style={{ fontWeight: 700, fontSize: '16px', color: styles.heading, margin: '0 0 4px' }}>{hrName}</p>
+                <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>{hrRole}</p>
+              </div>
+
+              {/* Messages */}
+              <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: 0 }}>Messages</h4>
+                  <button onClick={() => navigate('/hr-messages')} style={{ background: 'none', border: 'none', color: isUniverse ? '#A78BFA' : '#2563EB', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>View All</button>
+                </div>
+                {contacts.length === 0 ? (
+                  <div style={{ fontSize: '11px', color: styles.subtext }}>No recent messages</div>
+                ) : (
+                  contacts.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: i < contacts.length - 1 ? '12px' : 0, cursor: 'pointer' }}
+                      onClick={() => navigate('/hr-messages')}>
+                      <div style={{
+                        width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+                        background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#FFF', fontSize: '12px', fontWeight: 700,
+                      }}>{m.name.charAt(0)}</div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: styles.heading }}>{m.name}</p>
+                        <p style={{ margin: 0, fontSize: '11px', color: styles.subtext, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.lastMessage || m.email}</p>
+                      </div>
                     </div>
+                  ))
+                )}
+              </div>
+
+              {/* Recent Added Jobs */}
+              <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
+                <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: '0 0 12px' }}>Recent Added Jobs</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {recentJobs.length === 0 ? (
+                    <div style={{ fontSize: '11px', color: styles.subtext }}>No active jobs</div>
                   ) : (
-                    activityFeed.map(item => (
-                      <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    recentJobs.map(job => (
+                      <div key={job.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', cursor: 'pointer' }}
+                        onClick={() => navigate('/jobs')}>
                         <div style={{
-                          width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-                          background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#FFF', fontSize: '12px', fontWeight: 700,
-                        }}>{item.avatar}</div>
-                        <div style={{ flex: 1 }}>
-                          <p style={{ margin: 0, fontSize: '12px', color: styles.heading }}>
-                            <strong>{item.name}</strong> {item.action} <strong>{item.job}</strong>
-                          </p>
-                          <span style={{ fontSize: '10px', color: styles.subtext }}>{item.time}</span>
+                          width: '34px', height: '34px', borderRadius: '8px', flexShrink: 0,
+                          background: job.iconBg, display: 'flex', alignItems: 'center',
+                          justifyContent: 'center', fontSize: '14px', color: '#FFF', fontWeight: 700
+                        }}>{job.icon}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: styles.heading, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.title}</p>
+                          <p style={{ margin: 0, fontSize: '10px', color: styles.subtext }}>{job.company}, {job.location}</p>
                         </div>
-                        <span style={{
-                          fontSize: '10px', fontWeight: 600, padding: '3px 8px', borderRadius: '20px',
-                          background: item.tagColor + '20', color: item.tagColor, flexShrink: 0,
-                        }}>{item.tag}</span>
                       </div>
                     ))
                   )}
                 </div>
               </div>
 
-              {/* Last 10 Meetings Widget */}
+              {/* Hiring Funnel Stats */}
               <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: styles.heading, margin: 0 }}>Recent & Scheduled Meetings</h3>
-                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: isUniverse ? 'rgba(99,102,241,0.2)' : '#EFF6FF', color: isUniverse ? '#818CF8' : '#2563EB' }}>
-                      {meetings.length}
-                    </span>
-                  </div>
-                  <button onClick={() => navigate('/hr-calendar')} style={{
-                    padding: '4px 10px', borderRadius: '8px', border: styles.cardBorder,
-                    background: styles.cardBg, fontSize: '11px', fontWeight: 600, color: styles.subtext, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: '4px'
-                  }}>
-                    View Calendar <ChevronDown size={11} />
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
-                  {meetings.length === 0 ? (
-                    <div style={{ fontSize: '12px', color: styles.subtext, textAlign: 'center', padding: '30px 0' }}>
-                      No meetings recorded. Schedule your first candidate interview!
-                    </div>
-                  ) : (
-                    meetings.map(m => {
-                      const badgeBg = m.status === 'CONFIRMED' ? 'rgba(16,185,129,0.15)' : m.status === 'COMPLETED' ? 'rgba(59,130,246,0.15)' : m.status === 'CANCELLED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
-                      const badgeColor = m.status === 'CONFIRMED' ? '#10B981' : m.status === 'COMPLETED' ? '#3B82F6' : m.status === 'CANCELLED' ? '#EF4444' : '#F59E0B';
-
-                      return (
-                        <div key={m.id} style={{
-                          display: 'flex', alignItems: 'center', gap: '12px',
-                          padding: '10px 12px', borderRadius: '12px', background: styles.cardSubBg,
-                          border: styles.cardBorder,
-                          borderLeft: `3px solid ${badgeColor}`
-                        }}>
-                          <div style={{
-                            width: '42px', height: '42px', borderRadius: '10px',
-                            background: m.color + '18', display: 'flex', flexDirection: 'column',
-                            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          }}>
-                            <span style={{ fontSize: '9px', color: m.color, fontWeight: 700, textTransform: 'uppercase' }}>{m.month || m.day}</span>
-                            <span style={{ fontSize: '14px', color: m.color, fontWeight: 800, lineHeight: 1 }}>{m.date}</span>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
-                              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: styles.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {m.candidateName}
-                              </p>
-                              <span style={{
-                                fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px',
-                                background: badgeBg, color: badgeColor, flexShrink: 0
-                              }}>
-                                {m.status}
-                              </span>
-                            </div>
-                            <p style={{ margin: 0, fontSize: '11px', color: styles.subtext, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {m.jobTitle}
-                            </p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                              <span style={{ fontSize: '10px', color: styles.subtext, fontWeight: 500 }}>
-                                ⏰ {m.time}
-                              </span>
-                              {m.meetingLink && (
-                                <a
-                                  href={m.meetingLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{ fontSize: '10px', color: isUniverse ? '#818CF8' : '#2563EB', textDecoration: 'none', fontWeight: 600 }}
-                                >
-                                  📹 Join Call
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                          <button onClick={() => navigate('/hr-calendar')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: styles.subtext, padding: 4 }}>
-                            <MoreVertical size={14} />
-                          </button>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Quick Action Buttons */}
-                <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => navigate('/hr-calendar')}
-                    style={{
-                      flex: 1, padding: '10px', borderRadius: '10px',
-                      background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#2563EB', color: '#FFFFFF !important', border: 'none',
-                      fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                    }}
-                  >
-                    <Calendar size={14} /> Schedule Meeting
-                  </button>
-                  <button
-                    onClick={() => navigate('/jobs')}
-                    style={{
-                      flex: 1, padding: '10px', borderRadius: '10px',
-                      background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-                      border: styles.cardBorder,
-                      color: styles.heading,
-                      fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                    }}
-                  >
-                    <Plus size={14} /> Post Job
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ══════════ RIGHT SIDEBAR ══════════ */}
-          <aside style={{
-            width: '240px',
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '16px',
-          }}>
-
-            {/* Profile Card */}
-            <div style={{
-              background: styles.cardBg,
-              borderRadius: '16px',
-              padding: '24px 20px',
-              border: styles.cardBorder,
-              boxShadow: styles.cardShadow,
-              backdropFilter: isUniverse ? 'blur(16px)' : 'none',
-              textAlign: 'center',
-            }}>
-              <div style={{
-                width: '72px', height: '72px', borderRadius: '50%',
-                background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '28px', fontWeight: 800, color: '#FFF',
-                margin: '0 auto 12px',
-                boxShadow: isUniverse ? '0 4px 24px rgba(99, 102, 241, 0.45)' : '0 4px 20px rgba(37, 99, 235, 0.35)',
-              }}>
-                {(user?.firstName?.[0] || 'H')}
-              </div>
-              <p style={{ fontWeight: 700, fontSize: '16px', color: styles.heading, margin: '0 0 4px' }}>{hrName}</p>
-              <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>{hrRole}</p>
-            </div>
-
-            {/* Messages */}
-            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: 0 }}>Messages</h4>
-                <button onClick={() => navigate('/hr-messages')} style={{ background: 'none', border: 'none', color: isUniverse ? '#A78BFA' : '#2563EB', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>View All</button>
-              </div>
-              {contacts.length === 0 ? (
-                <div style={{ fontSize: '11px', color: styles.subtext }}>No recent messages</div>
-              ) : (
-                contacts.map((m, i) => (
-                  <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: i < contacts.length - 1 ? '12px' : 0, cursor: 'pointer' }}
-                    onClick={() => navigate('/hr-messages')}>
-                    <div style={{
-                      width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-                      background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#FFF', fontSize: '12px', fontWeight: 700,
-                    }}>{m.name.charAt(0)}</div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: styles.heading }}>{m.name}</p>
-                      <p style={{ margin: 0, fontSize: '11px', color: styles.subtext, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.lastMessage || m.email}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Recent Added Jobs */}
-            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: '0 0 12px' }}>Recent Added Jobs</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {recentJobs.length === 0 ? (
-                  <div style={{ fontSize: '11px', color: styles.subtext }}>No active jobs</div>
-                ) : (
-                  recentJobs.map(job => (
-                    <div key={job.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', cursor: 'pointer' }}
-                      onClick={() => navigate('/jobs')}>
-                      <div style={{
-                        width: '34px', height: '34px', borderRadius: '8px', flexShrink: 0,
-                        background: job.iconBg, display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontSize: '14px', color: '#FFF', fontWeight: 700
-                      }}>{job.icon}</div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: styles.heading, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.title}</p>
-                        <p style={{ margin: 0, fontSize: '10px', color: styles.subtext }}>{job.company}, {job.location}</p>
+                <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: '0 0 12px' }}>Hiring Funnel</h4>
+                {[
+                  { label: 'Applied', val: analytics?.applicationsByStatus['APPLIED'] ?? 0, color: '#38BDF8' },
+                  { label: 'Screened', val: analytics?.applicationsByStatus['SCREENING'] ?? 0, color: '#FBBF24' },
+                  { label: 'Shortlisted', val: analytics?.shortlistedCount ?? 0, color: '#8B5CF6' },
+                  { label: 'Interviewing', val: analytics?.applicationsByStatus['INTERVIEWING'] ?? 0, color: '#A78BFA' },
+                  { label: 'Offered / Hired', val: (analytics?.hiredCandidatesCount ?? 0) + (analytics?.applicationsByStatus['OFFERED'] ?? 0), color: '#34D399' },
+                  { label: 'Rejected', val: analytics?.applicationsByStatus['REJECTED'] ?? 0, color: '#FB7185' },
+                ].map(s => {
+                  const total = Math.max(1, analytics?.totalApplicationsCount || 1);
+                  const pct = Math.round((s.val / total) * 100);
+                  return (
+                    <div key={s.label} style={{ marginBottom: '10px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', color: styles.subtext, fontWeight: 500 }}>{s.label}</span>
+                        <span style={{ fontSize: '11px', color: styles.heading, fontWeight: 700 }}>{s.val}</span>
+                      </div>
+                      <div style={{ height: '5px', background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', background: s.color, borderRadius: '3px', transition: 'width 0.8s ease' }} />
                       </div>
                     </div>
-                  ))
-                )}
+                  );
+                })}
               </div>
-            </div>
-
-            {/* Hiring Funnel Stats */}
-            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-              <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: '0 0 12px' }}>Hiring Funnel</h4>
-              {[
-                { label: 'Applied', val: analytics?.applicationsByStatus['APPLIED'] ?? 0, color: '#38BDF8' },
-                { label: 'Screened', val: analytics?.applicationsByStatus['SCREENING'] ?? 0, color: '#FBBF24' },
-                { label: 'Shortlisted', val: analytics?.shortlistedCount ?? 0, color: '#8B5CF6' },
-                { label: 'Interviewing', val: analytics?.applicationsByStatus['INTERVIEWING'] ?? 0, color: '#A78BFA' },
-                { label: 'Offered / Hired', val: (analytics?.hiredCandidatesCount ?? 0) + (analytics?.applicationsByStatus['OFFERED'] ?? 0), color: '#34D399' },
-                { label: 'Rejected', val: analytics?.applicationsByStatus['REJECTED'] ?? 0, color: '#FB7185' },
-              ].map(s => {
-                const total = Math.max(1, analytics?.totalApplicationsCount || 1);
-                const pct = Math.round((s.val / total) * 100);
-                return (
-                  <div key={s.label} style={{ marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '11px', color: styles.subtext, fontWeight: 500 }}>{s.label}</span>
-                      <span style={{ fontSize: '11px', color: styles.heading, fontWeight: 700 }}>{s.val}</span>
-                    </div>
-                    <div style={{ height: '5px', background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9', borderRadius: '3px', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: s.color, borderRadius: '3px', transition: 'width 0.8s ease' }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </aside>
-        </div>
+            </aside>
+          </div>
+        )}
       </div>
     </div>
   );

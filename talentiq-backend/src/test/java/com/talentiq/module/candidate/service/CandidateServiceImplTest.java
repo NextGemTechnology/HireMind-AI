@@ -98,6 +98,11 @@ class CandidateServiceImplTest {
     @DisplayName("should add skill to candidate profile")
     void shouldAddSkillToProfile() {
         when(candidateRepository.findByUserId(1L)).thenReturn(Optional.of(testCandidate));
+        when(skillRepository.save(any(CandidateSkill.class))).thenAnswer(i -> {
+            CandidateSkill cs = i.getArgument(0);
+            cs.setId(10L);
+            return cs;
+        });
         when(candidateRepository.save(any(Candidate.class))).thenAnswer(i -> i.getArgument(0));
 
         CandidateDto.SkillRequest skillReq = new CandidateDto.SkillRequest();

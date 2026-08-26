@@ -93,9 +93,40 @@ def get_redis_otp(email, prefix="otp:reg:"):
         print(f"{RED}Error reading OTP from Redis: {e}{RESET}")
         return "1234"
 
+def get_redis_2fa_otp(two_factor_token):
+    try:
+        raw = subprocess.check_output(
+            ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"2fa:session:{two_factor_token}"]
+        ).decode().strip().strip('"')
+        if ":" in raw:
+            return raw.split(":")[-1]
+        return raw
+    except Exception as e:
+        print(f"{RED}Error reading 2FA OTP from Redis: {e}{RESET}")
+        return "1234"
+
 def register_user(role, email, first_name, last_name, extra_fields=None):
+    # Determine dedicated endpoint
+    otp_ep = "/v1/auth/register/send-otp"
+    reg_ep = "/v1/auth/register"
+    if role == "ROLE_CANDIDATE":
+        otp_ep = "/v1/auth/candidate/send-otp"
+        reg_ep = "/v1/auth/candidate/register"
+    elif role == "ROLE_HR":
+        otp_ep = "/v1/auth/hr/send-otp"
+        reg_ep = "/v1/auth/hr/register"
+    elif role == "ROLE_COMPANY_ADMIN":
+        otp_ep = "/v1/auth/company/send-otp"
+        reg_ep = "/v1/auth/company/register"
+    elif role == "ROLE_APP_DEVELOPER":
+        otp_ep = "/v1/auth/app-developer/send-otp"
+        reg_ep = "/v1/auth/app-developer/register"
+    elif role == "ROLE_MANAGEMENT_TEAM":
+        otp_ep = "/v1/auth/management/send-otp"
+        reg_ep = "/v1/auth/management/register"
+
     # 1. Send OTP
-    code, _ = request("/v1/auth/register/send-otp", "POST", {
+    code, _ = request(otp_ep, "POST", {
         "email": email,
         "firstName": first_name,
         "role": role
@@ -104,7 +135,7 @@ def register_user(role, email, first_name, last_name, extra_fields=None):
         return None, None, f"send-otp failed with code {code}"
 
     # 2. Fetch OTP from Redis
-    otp = get_redis_otp(email)
+    otp = get_redis_otp(email, prefix="otp:reg:")
 
     # 3. Register
     payload = {
@@ -118,7 +149,7 @@ def register_user(role, email, first_name, last_name, extra_fields=None):
     if extra_fields:
         payload.update(extra_fields)
 
-    code, res = request("/v1/auth/register", "POST", payload)
+    code, res = request(reg_ep, "POST", payload)
     if code in [200, 201]:
         token = res.get("data", {}).get("accessToken")
         user_id = res.get("data", {}).get("userId")
@@ -167,15 +198,23 @@ def run_suite():
     print(f"\n{YELLOW}{BOLD}SUITE 2: Anti-Disposable / Temp-Mail Security Guard{RESET}")
 
     # Negative test 1: Send OTP to temp-mail.org
-    code, res = request("/v1/auth/register/send-otp", "POST", {
+    code, res = request("/v1/auth/candidate/send-otp", "POST", {
         "email": "hacker.temp@temp-mail.org",
         "firstName": "Hacker",
         "role": "ROLE_CANDIDATE"
     })
-    log_test("Security", "POST /v1/auth/register/send-otp (Blocked disposable email temp-mail.org -> 400)", "POST", code, 400)
+    log_test("Security", "POST /v1/auth/candidate/send-otp (Blocked disposable temp-mail.org -> 400)", "POST", code, 400)
 
-    # Negative test 2: Direct registration with 10minutemail.com
-    code, res = request("/v1/auth/register", "POST", {
+    # Negative test 2: Send OTP to temp-mail generator alias (vewku.com)
+    code, res = request("/v1/auth/company/send-otp", "POST", {
+        "email": "attacker@vewku.com",
+        "firstName": "Attacker",
+        "role": "ROLE_COMPANY_ADMIN"
+    })
+    log_test("Security", "POST /v1/auth/company/send-otp (Blocked disposable generator vewku.com -> 400)", "POST", code, 400)
+
+    # Negative test 3: Direct registration with 10minutemail.com
+    code, res = request("/v1/auth/candidate/register", "POST", {
         "email": "fake.user@10minutemail.com",
         "password": "Password@123",
         "firstName": "Fake",
@@ -183,59 +222,109 @@ def run_suite():
         "role": "ROLE_CANDIDATE",
         "otp": "1234"
     })
-    log_test("Security", "POST /v1/auth/register (Blocked disposable email 10minutemail.com -> 400)", "POST", code, 400)
+    log_test("Security", "POST /v1/auth/candidate/register (Blocked disposable 10minutemail.com -> 400)", "POST", code, 400)
 
-    # Negative test 3: Login attempt with non-Gmail domain
-    code, res = request("/v1/auth/login", "POST", {
+    # Negative test 4: Login attempt with non-Gmail domain on candidate login
+    code, res = request("/v1/auth/candidate/login", "POST", {
         "email": "intruder@yahoo.com",
         "password": "Password@123"
     })
-    log_test("Security", "POST /v1/auth/login (Blocked non-Gmail domain -> 400)", "POST", code, 400)
+    log_test("Security", "POST /v1/auth/candidate/login (Blocked non-Gmail domain -> 400)", "POST", code, 400)
 
     # ─────────────────────────────────────────────────────────────
-    # SUITE 3: MULTI-ROLE REGISTRATION & AUTHENTICATION (OFFICIAL GMAIL)
+    # SUITE 3: DEDICATED ROLE REGISTRATION & 2FA AUTHENTICATION
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}SUITE 3: Multi-Role Dropdown Registration & Auth (@gmail.com){RESET}")
+    print(f"\n{YELLOW}{BOLD}SUITE 3: Dedicated Role Registration & 2FA Admin Authentication{RESET}")
 
-    # 1. Candidate Registration
+    # 1. Candidate Registration -> user_credentials table
     cand_token, cand_id, err = register_user("ROLE_CANDIDATE", cand_email, "Alex", "Rivera", {
         "desiredRole": "Senior Full-Stack Engineer",
         "yearsExperience": 4
     })
-    log_test("Auth", f"/v1/auth/register (Candidate: {cand_email})", "POST", 201 if cand_token else 400, 201, f"User ID: {cand_id}")
+    log_test("Auth", f"/v1/auth/candidate/register (user_credentials: {cand_email})", "POST", 201 if cand_token else 400, 201, f"User ID: {cand_id}")
 
-    # 2. HR Recruiter Registration
+    # 2. HR Recruiter Registration -> hr_credentials table
     hr_token, hr_id, err = register_user("ROLE_HR", hr_email, "Megha", "Gupta", {
         "companyName": f"NextGen Corp {ts}",
         "jobTitle": "Head of Technical Hiring"
     })
-    log_test("Auth", f"/v1/auth/register (HR Recruiter: {hr_email})", "POST", 201 if hr_token else 400, 201, f"User ID: {hr_id}")
+    log_test("Auth", f"/v1/auth/hr/register (hr_credentials: {hr_email})", "POST", 201 if hr_token else 400, 201, f"User ID: {hr_id}")
 
-    # 3. Company Executive Registration
+    # 3. Company Executive Registration -> company_credentials table
     comp_token, comp_id, err = register_user("ROLE_COMPANY_ADMIN", comp_email, "Vikram", "Malhotra", {
         "companyName": f"NextGen Corp {ts}",
         "jobTitle": "Managing Director & CEO"
     })
-    log_test("Auth", f"/v1/auth/register (Register Company / CEO: {comp_email})", "POST", 201 if comp_token else 400, 201, f"User ID: {comp_id}")
+    log_test("Auth", f"/v1/auth/company/register (company_credentials: {comp_email})", "POST", 201 if comp_token else 400, 201, f"User ID: {comp_id}")
 
-    # 4. Application Developer Registration
+    # 4. Application Developer Registration -> app_dev_credentials table
     dev_token, dev_id, err = register_user("ROLE_APP_DEVELOPER", dev_email, "Dev", "Architect", {
         "specialization": "Distributed Systems & AI Agents"
     })
-    log_test("Auth", f"/v1/auth/register (Application Developer: {dev_email})", "POST", 201 if dev_token else 400, 201, f"User ID: {dev_id}")
+    log_test("Auth", f"/v1/auth/app-developer/register (app_dev_credentials: {dev_email})", "POST", 201 if dev_token else 400, 201, f"User ID: {dev_id}")
 
-    # 5. HireMind-Management Team Registration
+    # 5. HireMind-Management Team Registration -> management_team_credentials table
     mgmt_token, mgmt_id, err = register_user("ROLE_MANAGEMENT_TEAM", mgmt_email, "Sarah", "Governance", {
         "specialization": "Platform Operations & Compliance"
     })
-    log_test("Auth", f"/v1/auth/register (Management Team: {mgmt_email})", "POST", 201 if mgmt_token else 400, 201, f"User ID: {mgmt_id}")
+    log_test("Auth", f"/v1/auth/management/register (management_team_credentials: {mgmt_email})", "POST", 201 if mgmt_token else 400, 201, f"User ID: {mgmt_id}")
 
-    # 6. Candidate Login Check
-    code, res = request("/v1/auth/login", "POST", {
-        "email": cand_email,
-        "password": "Password123!"
+    # 6. Candidate & HR direct login checks
+    code, res = request("/v1/auth/candidate/login", "POST", {"email": cand_email, "password": "Password123!"})
+    log_test("Auth", "/v1/auth/candidate/login (Direct Candidate Auth)", "POST", code, 200)
+
+    code, res = request("/v1/auth/hr/login", "POST", {"email": hr_email, "password": "Password123!"})
+    log_test("Auth", "/v1/auth/hr/login (Direct HR Auth)", "POST", code, 200)
+
+    # 7. Company Executive 2FA Login Flow
+    code, res = request("/v1/auth/company/login", "POST", {"email": comp_email, "password": "Password123!"})
+    requires_2fa = res.get("data", {}).get("requires2Fa", False) if isinstance(res, dict) else False
+    comp_2fa_token = res.get("data", {}).get("twoFactorToken") if isinstance(res, dict) else None
+    log_test("Auth", "POST /v1/auth/company/login (Password valid -> 2FA Challenge Initiated)", "POST", code, 200, f"Requires 2FA: {requires_2fa}")
+
+    # 8. Negative 2FA test: Invalid 4-digit code
+    code, res = request("/v1/auth/company/2fa-verify", "POST", {
+        "email": comp_email,
+        "twoFactorToken": comp_2fa_token,
+        "otp": "0000"
     })
-    log_test("Auth", "/v1/auth/login (Candidate password auth)", "POST", code, 200)
+    log_test("Auth", "POST /v1/auth/company/2fa-verify (Invalid 2FA code rejected -> 400)", "POST", code, 400)
+
+    # 9. Correct 2FA Verification for Company Admin
+    comp_2fa_otp = get_redis_2fa_otp(comp_2fa_token)
+    code, res = request("/v1/auth/company/2fa-verify", "POST", {
+        "email": comp_email,
+        "twoFactorToken": comp_2fa_token,
+        "otp": comp_2fa_otp
+    })
+    comp_jwt = res.get("data", {}).get("accessToken") if isinstance(res, dict) else None
+    log_test("Auth", f"POST /v1/auth/company/2fa-verify (Verified 2FA code {comp_2fa_otp} -> Access Granted)", "POST", code, 200)
+
+    # 10. App Developer 2FA Login Flow
+    code, res = request("/v1/auth/app-developer/login", "POST", {"email": dev_email, "password": "Password123!"})
+    dev_2fa_token = res.get("data", {}).get("twoFactorToken") if isinstance(res, dict) else None
+    dev_2fa_otp = get_redis_2fa_otp(dev_2fa_token)
+    code, res = request("/v1/auth/app-developer/2fa-verify", "POST", {
+        "email": dev_email,
+        "twoFactorToken": dev_2fa_token,
+        "otp": dev_2fa_otp
+    })
+    log_test("Auth", "POST /v1/auth/app-developer/login + 2FA Verify (App Developer 2FA)", "POST", code, 200)
+
+    # 11. Management Team 2FA Login Flow
+    code, res = request("/v1/auth/management/login", "POST", {"email": mgmt_email, "password": "Password123!"})
+    mgmt_2fa_token = res.get("data", {}).get("twoFactorToken") if isinstance(res, dict) else None
+    mgmt_2fa_otp = get_redis_2fa_otp(mgmt_2fa_token)
+    code, res = request("/v1/auth/management/2fa-verify", "POST", {
+        "email": mgmt_email,
+        "twoFactorToken": mgmt_2fa_token,
+        "otp": mgmt_2fa_otp
+    })
+    log_test("Auth", "POST /v1/auth/management/login + 2FA Verify (Management Team 2FA)", "POST", code, 200)
+
+    # 12. Cross-Table / Cross-Role Isolation Rejections (Candidate attempting HR login -> 401)
+    code, res = request("/v1/auth/hr/login", "POST", {"email": cand_email, "password": "Password123!"})
+    log_test("Auth", "/v1/auth/hr/login (Cross-Table Rejection: Candidate blocked from HR login -> 401)", "POST", code, [401, 400])
 
     # ─────────────────────────────────────────────────────────────
     # SUITE 4: PASSWORD RETRIEVAL & 4-DIGIT OTP RESET LIFECYCLE
@@ -243,8 +332,8 @@ def run_suite():
     print(f"\n{YELLOW}{BOLD}SUITE 4: Password Retrieval & 4-Digit OTP Reset Lifecycle{RESET}")
 
     # 1. Request Password Reset OTP
-    code, res = request("/v1/auth/forgot-password", "POST", {"email": cand_email})
-    log_test("PasswordReset", f"POST /v1/auth/forgot-password (Dispatched 4-digit OTP to {cand_email})", "POST", code, 200)
+    code, res = request("/v1/auth/candidate/forgot-password", "POST", {"email": cand_email})
+    log_test("PasswordReset", f"POST /v1/auth/candidate/forgot-password (Dispatched 4-digit OTP to {cand_email})", "POST", code, 200)
 
     # 2. Extract OTP from Redis
     pwd_otp = get_redis_otp(cand_email, prefix="otp:code:")

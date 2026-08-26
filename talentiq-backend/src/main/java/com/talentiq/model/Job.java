@@ -45,9 +45,13 @@ public class Job extends AuditEntity {
     @JoinColumn(name = "company_id", nullable = false)
     private Company company;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "posted_by", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "posted_by")
     private User postedBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hr_profile_id")
+    private HrProfile hrProfile;
 
     @Column(nullable = false, length = 200)
     private String title;

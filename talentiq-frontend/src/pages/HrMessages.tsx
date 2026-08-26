@@ -6,14 +6,13 @@ import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import {
   Send, Phone, PhoneOff, Mic, MicOff, Search,
-  LayoutDashboard, Calendar,
-  MessageSquare, Users, Briefcase, Settings, LogOut,
+  MessageSquare,
   Circle, Sun, Moon, Trash2, Copy, Paperclip, Image as ImageIcon,
   Check, CheckCheck, Clock, ChevronDown, CheckCircle2, Sparkles, X,
   UserCheck, ShieldCheck, User as UserIcon, Flag, Award
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
-import { HireMindLogo } from '../components/HireMindLogo';
+import { HrSidebar } from '../components/HrSidebar';
 import '../css/hr-messages.css';
 
 /* ─── Types ─── */
@@ -47,7 +46,7 @@ interface Message {
 }
 
 export const HrMessages: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -809,54 +808,11 @@ export const HrMessages: React.FC = () => {
         </div>
       )}
 
-      {/* ── Left Sidebar (High Contrast & High Opacity) ── */}
-      <aside className="msg-sidebar">
-        <div className="msg-sidebar-brand" onClick={() => navigate('/hr-dashboard')}>
-          <HireMindLogo variant="navbar" size="sm" />
-        </div>
-
-        <nav className="msg-nav-list">
-          <button onClick={() => navigate('/hr-dashboard')} className="msg-nav-item">
-            <LayoutDashboard size={17} /> Overview
-          </button>
-          <button onClick={() => navigate('/hr-jobs')} className="msg-nav-item">
-            <Briefcase size={17} /> Job Postings
-          </button>
-          <button onClick={() => navigate('/hr-applications')} className="msg-nav-item">
-            <Users size={17} /> Applications
-          </button>
-
-          {/* Candidate Messages with Blue Dot & Unread Count Badge */}
-          <button onClick={() => {}} className="msg-nav-item active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <MessageSquare size={17} />
-              <span>Candidate Messages</span>
-            </div>
-            {totalUnreadCount > 0 && (
-              <span className="msg-nav-unread-badge" title={`${totalUnreadCount} unread message(s)`}>
-                <span className="msg-pulse-blue-dot" />
-                {totalUnreadCount}
-              </span>
-            )}
-          </button>
-
-          <button onClick={() => navigate('/hr-calendar')} className="msg-nav-item">
-            <Calendar size={17} /> Interviews
-          </button>
-          <div className="msg-nav-divider" />
-          <button onClick={() => navigate('/hr-settings')} className="msg-nav-item">
-            <Settings size={17} /> Settings
-          </button>
-          <button onClick={() => { logout(); navigate('/'); }} className="msg-nav-item sign-out">
-            <LogOut size={17} /> Sign Out
-          </button>
-        </nav>
-
-        <div className="msg-user-badge">
-          <div className="msg-user-name">{user ? `${user.firstName} ${user.lastName}` : 'Recruiter'}</div>
-          <div className="msg-user-email">{user?.email || 'hr.recruiter@gmail.com'}</div>
-        </div>
-      </aside>
+      {/* ── Left Sidebar (Unified Stable HR Sidebar) ── */}
+      <HrSidebar
+        activeNav="Message"
+        unreadCount={totalUnreadCount}
+      />
 
       {/* ── Contacts Directory Panel (Never Overflows) ── */}
       <div className="msg-contacts-panel">

@@ -90,6 +90,25 @@ public class GroupChatController {
         return ResponseEntity.ok(ApiResponse.success("Message sent to group", res));
     }
 
+    @PostMapping("/{groupId}/invite")
+    @Operation(summary = "Generate an invitation link for the group")
+    public ResponseEntity<ApiResponse<GroupChatDto.InviteResponse>> createInvitation(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long groupId,
+            @RequestBody(required = false) GroupChatDto.CreateInviteRequest request) {
+        GroupChatDto.InviteResponse res = groupChatService.createInvitation(principal.getId(), groupId, request != null ? request : new GroupChatDto.CreateInviteRequest());
+        return ResponseEntity.ok(ApiResponse.success("Invitation link generated successfully", res));
+    }
+
+    @PostMapping("/join/{inviteToken}")
+    @Operation(summary = "Join group via verified invitation link")
+    public ResponseEntity<ApiResponse<GroupChatDto.GroupResponse>> joinGroupByInvite(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String inviteToken) {
+        GroupChatDto.GroupResponse res = groupChatService.joinGroupByInvite(principal.getId(), inviteToken);
+        return ResponseEntity.ok(ApiResponse.success("Successfully joined the group", res));
+    }
+
     @PostMapping(value = "/{groupId}/upload", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload and share a document, resume, or image in a group collaboration channel")
     public ResponseEntity<ApiResponse<GroupChatDto.MessageResponse>> uploadGroupFile(

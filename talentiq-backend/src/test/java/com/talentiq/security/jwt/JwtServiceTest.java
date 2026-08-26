@@ -35,7 +35,6 @@ class JwtServiceTest {
         User user = User.builder()
                 .id(42L)
                 .email(email)
-                .passwordHash("$hashed$")
                 .firstName("Test")
                 .lastName("User")
                 .roles(Set.of(Role.ROLE_CANDIDATE))

@@ -12,7 +12,11 @@ public interface HrProfileRepository extends JpaRepository<HrProfile, Long> {
 
     Optional<HrProfile> findByUserId(Long userId);
 
+    Optional<HrProfile> findByEmail(String email);
+
     List<HrProfile> findAllByCompanyId(Long companyId);
 
     boolean existsByUserId(Long userId);
+
+    boolean existsByEmail(String email);
 }

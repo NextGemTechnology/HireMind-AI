@@ -32,4 +32,13 @@ public class AuthResponse {
     private String avatarUrl;
     private Set<Role> roles;
     private boolean emailVerified;
+
+    // Two-Factor Authentication fields for Admin logins
+    private boolean requires2Fa;
+    private String twoFactorToken;
+    private String twoFactorMethod;
+
+    // Company attributes for branded admin portal routing
+    private String companySlug;
+    private String companyName;
 }

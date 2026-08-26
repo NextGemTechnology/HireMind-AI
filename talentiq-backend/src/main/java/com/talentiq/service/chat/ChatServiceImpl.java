@@ -1,12 +1,15 @@
 package com.talentiq.service.chat;
 
+import com.talentiq.common.enums.Role;
 import com.talentiq.dto.chat.ChatMessageDto;
 import com.talentiq.dto.notification.NotificationDto;
 import com.talentiq.infrastructure.storage.FileStorageService;
+import com.talentiq.infrastructure.kafka.KafkaProducerService;
 import com.talentiq.model.ChatMessage;
 import com.talentiq.model.HrProfile;
 import com.talentiq.model.Candidate;
 import com.talentiq.repository.chat.ChatMessageRepository;
+import com.talentiq.repository.company.CompanyCandidateVerificationRepository;
 import com.talentiq.repository.hr.HrProfileRepository;
 import com.talentiq.repository.candidate.CandidateRepository;
 import com.talentiq.model.User;
@@ -40,15 +43,48 @@ public class ChatServiceImpl implements ChatService {
     private final UserRepository userRepository;
     private final HrProfileRepository hrProfileRepository;
     private final CandidateRepository candidateRepository;
+    private final CompanyCandidateVerificationRepository verificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
     private final FileStorageService fileStorageService;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final KafkaProducerService kafkaProducerService;
 
     @Override
     public ChatMessageDto.MessageResponse sendMessage(Long senderId, ChatMessageDto.SendRequest request) {
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new IllegalArgumentException("Sender not found: " + senderId));
+        User sender = userRepository.findById(senderId).orElseGet(() -> {
+            Optional<HrProfile> hrOpt = hrProfileRepository.findById(senderId).or(() -> hrProfileRepository.findByUserId(senderId));
+            if (hrOpt.isPresent()) {
+                HrProfile hr = hrOpt.get();
+                User u = User.builder()
+                        .id(hr.getId())
+                        .email(hr.getEmail())
+                        .firstName(hr.getFirstName())
+                        .lastName(hr.getLastName())
+                        .build();
+                u.addRole(Role.ROLE_HR);
+                return u;
+            }
+            throw new IllegalArgumentException("Sender not found: " + senderId);
+        });
+
+        User receiver = userRepository.findById(request.getReceiverId()).orElseGet(() -> {
+            Optional<HrProfile> hrOpt = hrProfileRepository.findById(request.getReceiverId()).or(() -> hrProfileRepository.findByUserId(request.getReceiverId()));
+            if (hrOpt.isPresent()) {
+                HrProfile hr = hrOpt.get();
+                User u = User.builder()
+                        .id(hr.getId())
+                        .email(hr.getEmail())
+                        .firstName(hr.getFirstName())
+                        .lastName(hr.getLastName())
+                        .build();
+                u.addRole(Role.ROLE_HR);
+                return u;
+            }
+            throw new IllegalArgumentException("Receiver not found: " + request.getReceiverId());
+        });
+
+        validateDirectMessagingPermissions(sender, receiver);
 
         ChatMessage msg = ChatMessage.builder()
                 .senderId(senderId)
@@ -60,6 +96,9 @@ public class ChatServiceImpl implements ChatService {
 
         ChatMessage saved = chatMessageRepository.save(msg);
         ChatMessageDto.MessageResponse response = toResponse(saved);
+
+        // Publish to Kafka message broker for distributed replicas
+        kafkaProducerService.publishDirectMessage(response);
 
         // Push to receiver's personal queue — instant real-time delivery
         messagingTemplate.convertAndSendToUser(
@@ -97,6 +136,10 @@ public class ChatServiceImpl implements ChatService {
     public ChatMessageDto.MessageResponse sendFileMessage(Long senderId, Long receiverId, MultipartFile file) {
         User sender = userRepository.findById(senderId)
                 .orElseThrow(() -> new IllegalArgumentException("Sender not found: " + senderId));
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new IllegalArgumentException("Receiver not found: " + receiverId));
+
+        validateDirectMessagingPermissions(sender, receiver);
 
         // Store the file
         String fileUrl = fileStorageService.storeFile(file, "chat-attachments", senderId);
@@ -231,7 +274,8 @@ public class ChatServiceImpl implements ChatService {
             String companyName = null;
             String jobTitle = null;
 
-            Optional<HrProfile> hrOpt = hrProfileRepository.findByUserId(contactId);
+            Optional<HrProfile> hrOpt = hrProfileRepository.findById(contactId)
+                    .or(() -> hrProfileRepository.findByUserId(contactId));
             if (hrOpt.isPresent()) {
                 HrProfile hr = hrOpt.get();
                 if (hr.getCompany() != null) {
@@ -378,6 +422,65 @@ public class ChatServiceImpl implements ChatService {
         } catch (Exception e) {
             log.warn("Failed to check flag status in Redis: {}", e.getMessage());
             return false;
+        }
+    }
+
+    private void validateDirectMessagingPermissions(User sender, User receiver) {
+        if (sender.getId().equals(receiver.getId())) {
+            throw new IllegalArgumentException("Cannot send messages to yourself");
+        }
+
+        Set<Role> senderRoles = sender.getRoles() != null ? sender.getRoles() : Set.of();
+        Set<Role> receiverRoles = receiver.getRoles() != null ? receiver.getRoles() : Set.of();
+
+        boolean senderIsCandidate = senderRoles.contains(Role.ROLE_CANDIDATE);
+        boolean senderIsCompanyAdmin = senderRoles.contains(Role.ROLE_COMPANY_ADMIN);
+        boolean senderIsHr = senderRoles.contains(Role.ROLE_HR);
+        boolean senderIsSuperAdmin = senderRoles.contains(Role.ROLE_SUPER_ADMIN) || senderRoles.contains(Role.ROLE_PLATFORM_ADMIN);
+
+        boolean receiverIsCandidate = receiverRoles.contains(Role.ROLE_CANDIDATE);
+        boolean receiverIsCompanyAdmin = receiverRoles.contains(Role.ROLE_COMPANY_ADMIN);
+        boolean receiverIsHr = receiverRoles.contains(Role.ROLE_HR);
+
+        if (senderIsSuperAdmin) {
+            return; // Super admins have unrestricted communication
+        }
+
+        // Rule 1: Candidate <-> Company Admin is strictly BLOCKED
+        if (senderIsCandidate && receiverIsCompanyAdmin) {
+            throw new AccessDeniedException("Candidates cannot message Company Executives directly. Please connect through verified company HR recruiters.");
+        }
+        if (senderIsCompanyAdmin && receiverIsCandidate) {
+            throw new AccessDeniedException("Company Executives cannot message candidates directly. Please delegate candidate messaging to your verified HR recruiters.");
+        }
+
+        // Rule 2: HR -> Candidate outreach requires Company-Verified badge or prior conversation
+        if (senderIsHr && receiverIsCandidate) {
+            Optional<HrProfile> hrProfileOpt = hrProfileRepository.findById(sender.getId())
+                    .or(() -> hrProfileRepository.findByUserId(sender.getId()));
+            boolean isVerified = hrProfileOpt.map(HrProfile::isCompanyVerified).orElse(false);
+            if (!isVerified) {
+                // Check if they already have existing chat history
+                boolean hasHistory = !chatMessageRepository.findConversation(sender.getId(), receiver.getId(), PageRequest.of(0, 1)).isEmpty();
+                if (!hasHistory) {
+                    throw new AccessDeniedException("Only Company-Verified HR recruiters can initiate direct outreach with candidates. Please request an official badge from your company dashboard.");
+                }
+            }
+        }
+
+        // Rule 3: Candidate -> HR messaging
+        if (senderIsCandidate && receiverIsHr) {
+            Optional<HrProfile> hrProfileOpt = hrProfileRepository.findById(receiver.getId())
+                    .or(() -> hrProfileRepository.findByUserId(receiver.getId()));
+            boolean hrIsVerified = hrProfileOpt.map(HrProfile::isCompanyVerified).orElse(false);
+            boolean hasHistory = !chatMessageRepository.findConversation(sender.getId(), receiver.getId(), PageRequest.of(0, 1)).isEmpty();
+            boolean hasApprovedBadge = hrProfileOpt.isPresent() && hrProfileOpt.get().getCompany() != null &&
+                    verificationRepository.existsByCompanyIdAndCandidateUserIdAndStatus(
+                            hrProfileOpt.get().getCompany().getId(), sender.getId(), "APPROVED");
+
+            if (!hrIsVerified && !hasHistory && !hasApprovedBadge) {
+                throw new AccessDeniedException("Recruiter is not currently verified by their company for candidate direct messaging.");
+            }
         }
     }
 

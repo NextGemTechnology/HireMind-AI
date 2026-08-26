@@ -46,6 +46,8 @@ public class RegisterRequest {
     private String companyWebsite;
     private String industry;
     private String companySize;
+    private String department;
+    private String specialization;
 
     // Email Verification OTP
     @NotBlank(message = "4-digit email verification code is required")

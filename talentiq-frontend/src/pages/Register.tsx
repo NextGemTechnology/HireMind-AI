@@ -216,7 +216,12 @@ export const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      await apiClient.post('/auth/register/send-otp', {
+      let otpEndpoint = '/auth/register/send-otp';
+      if (selectedRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
+      else if (selectedRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
+      else if (selectedRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+
+      await apiClient.post(otpEndpoint, {
         email: trimmedEmail,
         firstName: form.firstName.trim(),
         role: selectedRole
@@ -238,7 +243,12 @@ export const Register: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      await apiClient.post('/auth/register/send-otp', {
+      let otpEndpoint = '/auth/register/send-otp';
+      if (selectedRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
+      else if (selectedRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
+      else if (selectedRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+
+      await apiClient.post(otpEndpoint, {
         email: form.email.trim().toLowerCase(),
         firstName: form.firstName.trim(),
         role: selectedRole

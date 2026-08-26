@@ -93,4 +93,32 @@ public class GroupChatDto {
         private String fileName;
         private Instant sentAt;
     }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CreateInviteRequest {
+        private Long targetUserId;
+        @Builder.Default
+        private int maxUses = 10;
+        @Builder.Default
+        private int expiryDays = 7;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class InviteResponse {
+        private String inviteToken;
+        private Long groupId;
+        private String groupName;
+        private String companyName;
+        private String createdByName;
+        private Instant expiresAt;
+        private int maxUses;
+        private int currentUses;
+        private String inviteLink;
+    }
 }

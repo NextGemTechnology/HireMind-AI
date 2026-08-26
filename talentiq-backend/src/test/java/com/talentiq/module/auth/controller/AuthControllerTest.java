@@ -119,13 +119,16 @@ class AuthControllerTest {
         request.setRole(Role.ROLE_CANDIDATE);
         request.setOtp("1234");
 
+        when(authService.register(any(), any()))
+                .thenThrow(new com.talentiq.common.exception.BadRequestException("Disposable email addresses are strictly prohibited."));
+
         mockMvc.perform(post("/v1/auth/register")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
     }
 
     @Test

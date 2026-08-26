@@ -1,16 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   Calendar, ChevronLeft, ChevronRight, Clock, Mail,
-  Plus, X, Check, LayoutDashboard, MessageSquare,
-  Users, Briefcase, Settings, LogOut,
+  Plus, X, Check,
   AlertCircle, Sun, Trash2, Video, ExternalLink,
   CheckCircle2, Moon
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
+import { HrSidebar } from '../components/HrSidebar';
 import '../css/hr-calendar.css';
 
 /* ─── Types ─── */
@@ -34,17 +32,6 @@ interface Application {
   status: string;
 }
 
-/* ─── Sidebar NavItem ─── */
-const NavItem: React.FC<{ icon: React.ReactNode; label: string; active?: boolean; isUniverse?: boolean; onClick?: () => void }> =
-  ({ icon, label, active, onClick }) => (
-    <button
-      onClick={onClick}
-      className={`cal-nav-item ${active ? 'active' : ''}`}
-    >
-      {icon}{label}
-    </button>
-  );
-
 const STATUS_COLORS: Record<string, string> = {
   PENDING: '#F59E0B',
   CONFIRMED: '#10B981',
@@ -57,8 +44,6 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
 export const HrCalendar: React.FC = () => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const { theme, toggleTheme, isUniverse } = useTheme();
 
   const [slots, setSlots] = useState<InterviewSlot[]>([]);
@@ -277,29 +262,8 @@ export const HrCalendar: React.FC = () => {
   return (
     <div className={`calendar-page-wrapper ${isUniverse ? 'theme-universe' : 'theme-light'}`}>
       <InteractiveGalaxyBackground theme={theme} />
-      {/* ── Sidebar ── */}
-      <aside className="cal-sidebar">
-        <div className="cal-sidebar-brand" onClick={() => navigate('/')}>
-          <div className="cal-brand-icon cal-avatar-brand">
-            <span style={{ fontSize: 16 }}>🌌</span>
-          </div>
-          <span className="cal-brand-name">HireMind AI</span>
-        </div>
-        <nav className="cal-nav-list">
-          <NavItem icon={<LayoutDashboard size={17} />} label="Dashboard" isUniverse={isUniverse} onClick={() => navigate('/hr-analytics')} />
-          <NavItem icon={<MessageSquare size={17} />} label="Messages" isUniverse={isUniverse} onClick={() => navigate('/hr-messages')} />
-          <NavItem icon={<Calendar size={17} />} label="Calendar" active isUniverse={isUniverse} onClick={() => {}} />
-          <NavItem icon={<Users size={17} />} label="Applications" isUniverse={isUniverse} onClick={() => navigate('/hr-applications')} />
-          <NavItem icon={<Briefcase size={17} />} label="Jobs" isUniverse={isUniverse} onClick={() => navigate('/jobs')} />
-          <div className="cal-nav-divider" />
-          <NavItem icon={<Settings size={17} />} label="Settings" isUniverse={isUniverse} onClick={() => {}} />
-          <NavItem icon={<LogOut size={17} />} label="Sign Out" isUniverse={isUniverse} onClick={() => { logout(); navigate('/'); }} />
-        </nav>
-        <div className="cal-user-badge">
-          <div className="cal-user-name">{user ? `${user.firstName} ${user.lastName}` : 'HR Manager'}</div>
-          <div className="cal-user-email">{user?.email || ''}</div>
-        </div>
-      </aside>
+      {/* ── Left Sidebar (Unified Stable HR Sidebar) ── */}
+      <HrSidebar activeNav="Calendar" />
 
       {/* ── Main Content ── */}
       <main className="cal-main-workspace">

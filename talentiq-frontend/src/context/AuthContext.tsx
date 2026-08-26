@@ -11,6 +11,8 @@ export interface UserProfile {
   avatarUrl?: string;
   status?: string;
   emailVerified?: boolean;
+  companySlug?: string;
+  companyName?: string;
 }
 
 interface AuthContextType {
@@ -20,7 +22,8 @@ interface AuthContextType {
   isCandidate: boolean;
   isHr: boolean;
   isAdmin: boolean;
-  login: (credentials: any) => Promise<void>;
+  login: (credentials: any) => Promise<any>;
+  verify2Fa: (data: { email: string; twoFactorToken: string; otp: string }) => Promise<any>;
   register: (data: any) => Promise<void>;
   googleLogin: (data: any) => Promise<void>;
   logout: () => void;
@@ -40,7 +43,9 @@ const parseUserFromAuthData = (data: any): UserProfile => {
     lastName: data.lastName,
     roles: rolesArray,
     status: data.status || 'ACTIVE',
-    emailVerified: data.emailVerified ?? true
+    emailVerified: data.emailVerified ?? true,
+    companySlug: data.companySlug,
+    companyName: data.companyName
   };
 };
 
@@ -49,7 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const saved = localStorage.getItem('user');
       return saved ? JSON.parse(saved) : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   });
@@ -61,12 +66,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (token) {
         try {
           const res = await apiClient.get('/users/me');
-          const userData = res.data.data;
-          const userObj = parseUserFromAuthData(userData);
-          setUser(userObj);
-          localStorage.setItem('user', JSON.stringify(userObj));
-        } catch (e) {
-          console.warn('Session check warning (using cached user):', e);
+          if (res.data && res.data.data) {
+            const userData = parseUserFromAuthData(res.data.data);
+            setUser(userData);
+            localStorage.setItem('user', JSON.stringify(userData));
+          }
+        } catch {
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          setUser(null);
         }
       }
       setIsLoading(false);
@@ -80,11 +89,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       endpoint = '/auth/candidate/login';
     } else if (credentials.requiredRole === 'ROLE_HR') {
       endpoint = '/auth/hr/login';
-    } else if (credentials.requiredRole === 'ROLE_SUPER_ADMIN') {
+    } else if (credentials.requiredRole === 'ROLE_COMPANY_ADMIN') {
+      endpoint = '/auth/company/login';
+    } else if (credentials.requiredRole === 'ROLE_APP_DEVELOPER') {
+      endpoint = '/auth/app-developer/login';
+    } else if (credentials.requiredRole === 'ROLE_MANAGEMENT_TEAM') {
+      endpoint = '/auth/management/login';
+    } else if (credentials.requiredRole === 'ROLE_SUPER_ADMIN' || credentials.requiredRole === 'ROLE_PLATFORM_ADMIN') {
       endpoint = '/auth/admin/login';
     }
 
     const res = await apiClient.post(endpoint, credentials);
+    const authData = res.data.data;
+    if (authData.requires2Fa) {
+      return authData;
+    }
+    if (authData.accessToken) {
+      localStorage.setItem('accessToken', authData.accessToken);
+    }
+    if (authData.refreshToken) {
+      localStorage.setItem('refreshToken', authData.refreshToken);
+    }
+    const authUser = parseUserFromAuthData(authData);
+    localStorage.setItem('user', JSON.stringify(authUser));
+    setUser(authUser);
+    return authData;
+  };
+
+  const verify2Fa = async (data: { email: string; twoFactorToken: string; otp: string }) => {
+    const res = await apiClient.post('/auth/admin/2fa-verify', data);
     const authData = res.data.data;
     if (authData.accessToken) {
       localStorage.setItem('accessToken', authData.accessToken);
@@ -95,10 +128,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const authUser = parseUserFromAuthData(authData);
     localStorage.setItem('user', JSON.stringify(authUser));
     setUser(authUser);
+    return authData;
   };
 
   const register = async (data: any) => {
-    const res = await apiClient.post('/auth/register', data);
+    let endpoint = '/auth/register';
+    if (data.role === 'ROLE_CANDIDATE') {
+      endpoint = '/auth/candidate/register';
+    } else if (data.role === 'ROLE_HR') {
+      endpoint = '/auth/hr/register';
+    } else if (data.role === 'ROLE_COMPANY_ADMIN') {
+      endpoint = '/auth/company/register';
+    } else if (data.role === 'ROLE_APP_DEVELOPER') {
+      endpoint = '/auth/app-developer/register';
+    } else if (data.role === 'ROLE_MANAGEMENT_TEAM') {
+      endpoint = '/auth/management/register';
+    }
+
+    const res = await apiClient.post(endpoint, data);
     const authData = res.data.data;
     if (authData.accessToken) {
       localStorage.setItem('accessToken', authData.accessToken);
@@ -158,6 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isHr,
       isAdmin,
       login,
+      verify2Fa,
       register,
       googleLogin,
       logout

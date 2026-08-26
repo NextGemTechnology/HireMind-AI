@@ -7,29 +7,21 @@ import com.talentiq.common.exception.ConflictException;
 import com.talentiq.common.exception.ResourceNotFoundException;
 import com.talentiq.common.exception.UnauthorizedException;
 import com.talentiq.config.AppProperties;
-import com.talentiq.infrastructure.mail.MailService;
 import com.talentiq.dto.auth.*;
-import com.talentiq.model.RefreshToken;
-import com.talentiq.repository.auth.RefreshTokenRepository;
-import com.talentiq.model.Candidate;
+import com.talentiq.infrastructure.mail.MailService;
+import com.talentiq.model.*;
+import com.talentiq.model.auth.*;
+import com.talentiq.repository.auth.*;
 import com.talentiq.repository.candidate.CandidateRepository;
-import com.talentiq.model.Company;
 import com.talentiq.repository.company.CompanyRepository;
-import com.talentiq.model.HrProfile;
 import com.talentiq.repository.hr.HrProfileRepository;
-import com.talentiq.model.User;
 import com.talentiq.repository.user.UserRepository;
 import com.talentiq.security.jwt.JwtService;
 import com.talentiq.security.userdetails.UserPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.DisabledException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,21 +29,18 @@ import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * AuthService implementation.
- *
- * Security considerations:
- * - Passwords hashed with BCrypt strength 12
- * - Refresh tokens: opaque UUIDs stored in DB (not JWTs)
- * - Refresh token rotation: one-time-use, old token revoked on each refresh
- * - Lockout: after 5 failed attempts, account locked for 15 minutes
- * - Email enumeration prevention: generic success on forgotPassword
- * - Verification tokens: UUID, expire per config (default 30 min)
+ * Authentication service implementation with completely isolated role storage.
+ * Candidate profiles and credentials live in users & user_credentials.
+ * HR profiles and credentials live strictly in hr_profiles & hr_credentials (zero rows in users table).
+ * Company Admin credentials live in company_credentials.
+ * App Developer credentials live in app_dev_credentials.
+ * Management Team credentials live in management_team_credentials.
  */
 @Service
 @RequiredArgsConstructor
@@ -69,44 +58,33 @@ public class AuthServiceImpl implements AuthService {
     private final HrProfileRepository hrProfileRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final AuthenticationManager authenticationManager;
     private final MailService mailService;
     private final AppProperties appProperties;
     private final com.talentiq.security.jwt.TokenBlacklistService tokenBlacklistService;
     private final RedisOtpService redisOtpService;
+    private final com.talentiq.security.email.EmailSecurityValidator emailSecurityValidator;
 
-    // ── Email Validation & Anti-Disposable Email Security Guard ────────────────
+    // Dedicated credential repositories
+    private final UserCredentialRepository userCredentialRepository;
+    private final HrCredentialRepository hrCredentialRepository;
+    private final CompanyCredentialRepository companyCredentialRepository;
+    private final AppDevCredentialRepository appDevCredentialRepository;
+    private final ManagementTeamCredentialRepository managementTeamCredentialRepository;
+
+    // ── Email Validation & Security Guard ──────────────────────────────────────
     private void validateEmailFormat(String email, Role role) {
-        if (!StringUtils.hasText(email)) {
-            throw new BadRequestException("Email address is required.");
-        }
-        String trimmed = email.trim().toLowerCase();
-        
-        // Strict anti-disposable / temp-mail security enforcement:
-        boolean isAdmin = role != null && (role == Role.ROLE_APP_DEVELOPER || role == Role.ROLE_MANAGEMENT_TEAM || role == Role.ROLE_COMPANY_ADMIN);
-
-        if (isAdmin) {
-            boolean validDomain = trimmed.endsWith(".com") || trimmed.endsWith(".org") || trimmed.endsWith(".net") 
-                               || trimmed.endsWith(".edu") || trimmed.endsWith(".gov") || trimmed.endsWith(".in") 
-                               || trimmed.endsWith(".co.in");
-            if (!validDomain) {
-                log.warn("Security Alert: Blocked unsupported admin email domain attempt: {}", email);
-                throw new BadRequestException("Security Policy: Admins must use .org, .com, .net, .edu, .gov, .in, or .co.in email addresses.");
-            }
-        } else {
-            if (!trimmed.endsWith("@gmail.com")) {
-                log.warn("Security Alert: Blocked non-Gmail / disposable email attempt for HR/Candidate: {}", email);
-                throw new BadRequestException("Security Policy: Only official @gmail.com email addresses are permitted. Disposable, temporary, and non-Gmail addresses (such as temp-mail.org) are strictly blocked.");
-            }
-        }
-
-        String username = trimmed.substring(0, trimmed.lastIndexOf('@'));
-        if (username.isBlank() || username.length() < 3) {
-            throw new BadRequestException("Please provide a valid email address (minimum 3 characters before @).");
-        }
+        emailSecurityValidator.validateEmailSecurity(email, role);
     }
 
-    // ── Register ──────────────────────────────────────────────────────────────
+    private boolean isEmailAlreadyRegistered(String email) {
+        return userRepository.existsByEmail(email)
+                || hrProfileRepository.existsByEmail(email)
+                || userCredentialRepository.existsByEmail(email)
+                || hrCredentialRepository.existsByEmail(email)
+                || companyCredentialRepository.existsByEmail(email)
+                || appDevCredentialRepository.existsByEmail(email)
+                || managementTeamCredentialRepository.existsByEmail(email);
+    }
 
     // ── Registration OTP Flow ──────────────────────────────────────────────────
 
@@ -115,28 +93,23 @@ public class AuthServiceImpl implements AuthService {
         String email = request.getEmail().toLowerCase().trim();
         validateEmailFormat(email, request.getRole());
 
-        // Check if email already registered
-        if (userRepository.existsByEmail(email)) {
-            throw new ConflictException("An account with this email address already exists. Please login instead.");
+        if (isEmailAlreadyRegistered(email)) {
+            throw new ConflictException("An account with this email address already exists.");
         }
 
-        // Validate role
-        if (request.getRole() == null) {
-            throw new BadRequestException("Role is required for registration");
-        }
+        // 1. Enforce Redis sliding-window rate limit
+        String ipAddress = getClientIpAddress(httpRequest);
+        redisOtpService.enforceRateLimit(email, ipAddress);
 
-        // Enforce Redis sliding-window rate limit
-        String clientIp = getClientIpAddress(httpRequest);
-        redisOtpService.enforceRateLimit(email, clientIp);
+        // 2. Generate cryptographically random 4-digit code
+        int randomPin = new java.security.SecureRandom().nextInt(10000);
+        String otp = String.format("%04d", randomPin);
 
-        // Generate 4-digit numeric OTP
-        String otp = String.format("%04d", ThreadLocalRandom.current().nextInt(0, 10000));
-
-        // Store in Redis with 10-minute TTL
+        // 3. Store in Redis with 10-minute automated TTL
         redisOtpService.storeRegistrationOtp(email, otp, 10);
 
-        // Dispatch verification code via Email
-        String firstName = StringUtils.hasText(request.getFirstName()) ? request.getFirstName().trim() : "Future Leader";
+        // 4. Send email asynchronously via non-blocking worker thread
+        String firstName = StringUtils.hasText(request.getFirstName()) ? request.getFirstName().trim() : "User";
         mailService.sendRegistrationOtpEmail(email, firstName, otp);
 
         log.info("4-Digit Registration OTP generated and dispatched to: {} [OTP: {}]", email, otp);
@@ -159,36 +132,18 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 3. Email uniqueness check
-        if (userRepository.existsByEmail(email)) {
+        if (isEmailAlreadyRegistered(email)) {
             throw new ConflictException("An account with this email already exists");
         }
 
-        // 4. Build user entity — ACTIVE & verified status
-        User user = User.builder()
-                .email(email)
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .firstName(request.getFirstName().trim())
-                .lastName(request.getLastName().trim())
-                .phone(request.getPhone())
-                .status(UserStatus.ACTIVE)
-                .emailVerified(true)
-                .build();
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+        String firstName = request.getFirstName() != null ? request.getFirstName().trim() : "HR";
+        String lastName = request.getLastName() != null ? request.getLastName().trim() : "";
+        String phone = request.getPhone();
 
-        user.addRole(request.getRole());
-        User savedUser = userRepository.save(user);
-
-        // Auto-create Candidate, HR, or Company profile
-        if (request.getRole().equals(Role.ROLE_CANDIDATE)) {
-            Candidate candidate = Candidate.builder()
-                    .user(savedUser)
-                    .location(request.getLocation())
-                    .currentTitle(request.getDesiredRole())
-                    .yearsExperience(request.getYearsExperience() != null ? request.getYearsExperience() : 0)
-                    .openToWork(true)
-                    .build();
-            candidateRepository.save(candidate);
-        } else if (request.getRole().equals(Role.ROLE_HR) || request.getRole().equals(Role.ROLE_COMPANY_ADMIN)) {
-            String companyName = StringUtils.hasText(request.getCompanyName()) ? request.getCompanyName().trim() : "Company (" + savedUser.getFirstName() + ")";
+        // ── SPECIAL CASE: HR RECRUITER (Zero rows in users table!) ────────────
+        if (request.getRole().equals(Role.ROLE_HR)) {
+            String companyName = StringUtils.hasText(request.getCompanyName()) ? request.getCompanyName().trim() : "Company (" + firstName + ")";
             String slug = companyName.toLowerCase().replaceAll("[^a-z0-9]", "-") + "-" + System.currentTimeMillis();
             Company company = companyRepository.findByName(companyName).orElseGet(() ->
                     companyRepository.save(Company.builder()
@@ -201,158 +156,485 @@ public class AuthServiceImpl implements AuthService {
                             .active(true)
                             .build())
             );
+
             HrProfile hrProfile = HrProfile.builder()
-                    .user(savedUser)
+                    .email(email)
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .phone(phone)
                     .company(company)
-                    .designation(StringUtils.hasText(request.getJobTitle()) ? request.getJobTitle() : (request.getRole().equals(Role.ROLE_COMPANY_ADMIN) ? "Company Director / CEO" : "HR Recruiter"))
-                    .companyAdmin(request.getRole().equals(Role.ROLE_COMPANY_ADMIN))
+                    .designation(StringUtils.hasText(request.getJobTitle()) ? request.getJobTitle() : "HR Recruiter")
+                    .department(request.getDepartment())
+                    .companyAdmin(false)
                     .companyVerified(true)
                     .companyVerifiedAt(Instant.now())
-                    .companyVerifiedTitle(request.getRole().equals(Role.ROLE_COMPANY_ADMIN) ? "Verified Company Executive" : "Verified Talent Partner")
+                    .companyVerifiedTitle("Verified Talent Partner")
+                    .active(true)
                     .build();
-            hrProfileRepository.save(hrProfile);
+            HrProfile savedHrProfile = hrProfileRepository.save(hrProfile);
+
+            HrCredential credential = HrCredential.builder()
+                    .hrProfile(savedHrProfile)
+                    .email(email)
+                    .passwordHash(passwordHash)
+                    .role(Role.ROLE_HR)
+                    .status(UserStatus.ACTIVE)
+                    .emailVerified(true)
+                    .build();
+            HrCredential savedCred = hrCredentialRepository.save(credential);
+
+            log.info("New HR Recruiter registered strictly in hr_profiles and hr_credentials: {}", email);
+
+            // Dispatch Welcome email with role HR Recruiter
+            mailService.sendAccountCreatedEmail(email, firstName, "ROLE_HR");
+
+            UserPrincipal principal = new UserPrincipal(savedHrProfile, savedCred);
+            String accessToken = jwtService.generateAccessToken(principal, savedHrProfile.getId());
+            RefreshToken refreshToken = createRefreshToken(null, email, httpRequest);
+
+            return buildAuthResponse(savedHrProfile, accessToken, refreshToken.getToken());
         }
 
-        log.info("New user registered and activated: {} [{}]", savedUser.getEmail(), request.getRole());
+        // ── OTHER ROLES (Candidate / Admins) ──────────────────────────────────
+        User user = User.builder()
+                .email(email)
+                .firstName(firstName)
+                .lastName(lastName)
+                .phone(phone)
+                .status(UserStatus.ACTIVE)
+                .emailVerified(true)
+                .build();
+
+        user.addRole(request.getRole());
+        User savedUser = userRepository.save(user);
+        UserPrincipal principal;
+
+        if (request.getRole().equals(Role.ROLE_CANDIDATE)) {
+            UserCredential credential = UserCredential.builder()
+                    .user(savedUser)
+                    .email(email)
+                    .passwordHash(passwordHash)
+                    .role(request.getRole())
+                    .status(UserStatus.ACTIVE)
+                    .emailVerified(true)
+                    .build();
+            userCredentialRepository.save(credential);
+
+            Candidate candidate = Candidate.builder()
+                    .user(savedUser)
+                    .location(request.getLocation())
+                    .currentTitle(request.getDesiredRole())
+                    .yearsExperience(request.getYearsExperience() != null ? request.getYearsExperience() : 0)
+                    .openToWork(true)
+                    .build();
+            candidateRepository.save(candidate);
+            principal = new UserPrincipal(savedUser, credential);
+
+        } else if (request.getRole().equals(Role.ROLE_COMPANY_ADMIN)) {
+            String companyName = StringUtils.hasText(request.getCompanyName()) ? request.getCompanyName().trim() : "Company (" + savedUser.getFirstName() + ")";
+            String baseSlug = companyName.toLowerCase().replaceAll("[^a-z0-9]+", "-").replaceAll("^-|-$", "");
+            if (baseSlug.isEmpty()) baseSlug = "company";
+            String slug = baseSlug;
+            int counter = 2;
+            while (companyRepository.existsBySlug(slug)) {
+                slug = baseSlug + "-" + counter++;
+            }
+            final String finalSlug = slug;
+            Company company = companyRepository.findByName(companyName).orElseGet(() ->
+                    companyRepository.save(Company.builder()
+                            .name(companyName)
+                            .slug(finalSlug)
+                            .website(request.getCompanyWebsite())
+                            .industry(request.getIndustry())
+                            .companySize(request.getCompanySize())
+                            .verified(true)
+                            .active(true)
+                            .build())
+            );
+            HrProfile hrProfile = HrProfile.builder()
+                    .user(savedUser)
+                    .email(email)
+                    .firstName(firstName)
+                    .lastName(lastName)
+                    .phone(phone)
+                    .company(company)
+                    .designation(StringUtils.hasText(request.getJobTitle()) ? request.getJobTitle() : "Company Director / CEO")
+                    .companyAdmin(true)
+                    .companyVerified(true)
+                    .companyVerifiedAt(Instant.now())
+                    .companyVerifiedTitle("Verified Company Executive")
+                    .build();
+            hrProfileRepository.save(hrProfile);
+
+            CompanyCredential credential = CompanyCredential.builder()
+                    .user(savedUser)
+                    .email(email)
+                    .passwordHash(passwordHash)
+                    .role(Role.ROLE_COMPANY_ADMIN)
+                    .status(UserStatus.ACTIVE)
+                    .emailVerified(true)
+                    .build();
+            CompanyCredential savedCred = companyCredentialRepository.save(credential);
+            principal = new UserPrincipal(savedUser, savedCred);
+
+        } else if (request.getRole().equals(Role.ROLE_APP_DEVELOPER)) {
+            AppDevCredential credential = AppDevCredential.builder()
+                    .user(savedUser)
+                    .email(email)
+                    .passwordHash(passwordHash)
+                    .role(Role.ROLE_APP_DEVELOPER)
+                    .status(UserStatus.ACTIVE)
+                    .emailVerified(true)
+                    .build();
+            AppDevCredential savedCred = appDevCredentialRepository.save(credential);
+            principal = new UserPrincipal(savedUser, savedCred);
+
+        } else if (request.getRole().equals(Role.ROLE_MANAGEMENT_TEAM)) {
+            ManagementTeamCredential credential = ManagementTeamCredential.builder()
+                    .user(savedUser)
+                    .email(email)
+                    .passwordHash(passwordHash)
+                    .role(Role.ROLE_MANAGEMENT_TEAM)
+                    .status(UserStatus.ACTIVE)
+                    .emailVerified(true)
+                    .build();
+            ManagementTeamCredential savedCred = managementTeamCredentialRepository.save(credential);
+            principal = new UserPrincipal(savedUser, savedCred);
+
+        } else {
+            UserCredential credential = UserCredential.builder()
+                    .user(savedUser)
+                    .email(email)
+                    .passwordHash(passwordHash)
+                    .role(request.getRole())
+                    .status(UserStatus.ACTIVE)
+                    .emailVerified(true)
+                    .build();
+            userCredentialRepository.save(credential);
+            principal = new UserPrincipal(savedUser, credential);
+        }
+
+        log.info("New user registered and stored in dedicated credential table: {} [{}]", savedUser.getEmail(), request.getRole());
 
         // Dispatch Welcome / Account Created email
         mailService.sendAccountCreatedEmail(savedUser.getEmail(), savedUser.getFirstName(), request.getRole().name());
 
         // Issue tokens for instant authentication upon registration
-        UserPrincipal principal = new UserPrincipal(savedUser);
         String accessToken = jwtService.generateAccessToken(principal, savedUser.getId());
-        RefreshToken refreshToken = createRefreshToken(savedUser, httpRequest);
+        RefreshToken refreshToken = createRefreshToken(savedUser, email, httpRequest);
 
         return buildAuthResponse(savedUser, accessToken, refreshToken.getToken());
     }
 
-    // ── Login ─────────────────────────────────────────────────────────────────
+    @Override
+    public AuthResponse registerCandidate(RegisterRequest request, HttpServletRequest httpRequest) {
+        request.setRole(Role.ROLE_CANDIDATE);
+        return register(request, httpRequest);
+    }
+
+    @Override
+    public AuthResponse registerHr(RegisterRequest request, HttpServletRequest httpRequest) {
+        request.setRole(Role.ROLE_HR);
+        return register(request, httpRequest);
+    }
+
+    @Override
+    public AuthResponse registerCompany(RegisterRequest request, HttpServletRequest httpRequest) {
+        request.setRole(Role.ROLE_COMPANY_ADMIN);
+        return register(request, httpRequest);
+    }
+
+    @Override
+    public AuthResponse registerAppDeveloper(RegisterRequest request, HttpServletRequest httpRequest) {
+        request.setRole(Role.ROLE_APP_DEVELOPER);
+        return register(request, httpRequest);
+    }
+
+    @Override
+    public AuthResponse registerManagementTeam(RegisterRequest request, HttpServletRequest httpRequest) {
+        request.setRole(Role.ROLE_MANAGEMENT_TEAM);
+        return register(request, httpRequest);
+    }
+
+    // ── Dedicated Login Implementation using Role Credential Tables ───────────
 
     @Override
     public AuthResponse loginCandidate(LoginRequest request, HttpServletRequest httpRequest) {
-        request.setRequiredRole(Role.ROLE_CANDIDATE);
-        return login(request, httpRequest);
+        String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email, Role.ROLE_CANDIDATE);
+
+        UserCredential cred = userCredentialRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        checkCredentialLockout(cred.isLocked(), cred.getLockedUntil());
+
+        if (cred.getRole() != Role.ROLE_CANDIDATE && (cred.getUser() == null || !cred.getUser().hasRole(Role.ROLE_CANDIDATE))) {
+            throw new BadCredentialsException("Account is not authorized for Candidate portal.");
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), cred.getPasswordHash())) {
+            throw handleFailedCandidateLogin(cred);
+        }
+
+        userCredentialRepository.recordSuccessfulLogin(cred.getId(), Instant.now());
+
+        User user = cred.getUser();
+        if (user != null && !candidateRepository.existsByUserId(user.getId())) {
+            candidateRepository.save(Candidate.builder().user(user).openToWork(true).build());
+        }
+
+        UserPrincipal principal = new UserPrincipal(user, cred);
+        String accessToken = jwtService.generateAccessToken(principal, user != null ? user.getId() : 1L);
+        RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
+
+        log.info("Candidate logged in successfully: {}", email);
+        return buildAuthResponse(user, accessToken, refreshToken.getToken());
     }
 
     @Override
     public AuthResponse loginHr(LoginRequest request, HttpServletRequest httpRequest) {
-        request.setRequiredRole(Role.ROLE_HR);
-        return login(request, httpRequest);
+        String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email, Role.ROLE_HR);
+
+        HrCredential cred = hrCredentialRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        checkCredentialLockout(cred.isLocked(), cred.getLockedUntil());
+
+        if (cred.getRole() != Role.ROLE_HR) {
+            throw new BadCredentialsException("Account is not authorized for HR Recruiter portal.");
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), cred.getPasswordHash())) {
+            throw handleFailedHrLogin(cred);
+        }
+
+        hrCredentialRepository.recordSuccessfulLogin(cred.getId(), Instant.now());
+
+        HrProfile hrProfile = hrProfileRepository.findByEmail(email).orElseGet(() -> {
+            Company defaultComp = companyRepository.findByName("TalentIQ Enterprise")
+                    .orElseGet(() -> companyRepository.save(Company.builder()
+                            .name("TalentIQ Enterprise")
+                            .slug("talentiq-enterprise-" + System.currentTimeMillis())
+                            .verified(true)
+                            .active(true)
+                            .build()));
+            return hrProfileRepository.save(HrProfile.builder()
+                    .email(email)
+                    .firstName("HR")
+                    .lastName("Recruiter")
+                    .company(defaultComp)
+                    .designation("Talent Partner")
+                    .companyAdmin(false)
+                    .active(true)
+                    .build());
+        });
+
+        UserPrincipal principal = new UserPrincipal(hrProfile, cred);
+        String accessToken = jwtService.generateAccessToken(principal, hrProfile.getId());
+        RefreshToken refreshToken = createRefreshToken(null, email, httpRequest);
+
+        log.info("HR Recruiter logged in successfully strictly from hr_profiles/hr_credentials: {}", email);
+        return buildAuthResponse(hrProfile, accessToken, refreshToken.getToken());
+    }
+
+    @Override
+    public AuthResponse loginCompany(LoginRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email, Role.ROLE_COMPANY_ADMIN);
+
+        CompanyCredential cred = companyCredentialRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        checkCredentialLockout(cred.isLocked(), cred.getLockedUntil());
+
+        if (cred.getRole() != Role.ROLE_COMPANY_ADMIN && (cred.getUser() == null || !cred.getUser().hasRole(Role.ROLE_COMPANY_ADMIN))) {
+            throw new BadCredentialsException("Account is not authorized for Company Director portal.");
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), cred.getPasswordHash())) {
+            throw handleFailedCompanyLogin(cred);
+        }
+
+        return initiateAdmin2FaFlow(cred.getUser(), Role.ROLE_COMPANY_ADMIN, httpRequest);
+    }
+
+    @Override
+    public AuthResponse loginAppDeveloper(LoginRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email, Role.ROLE_APP_DEVELOPER);
+
+        AppDevCredential cred = appDevCredentialRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        checkCredentialLockout(cred.isLocked(), cred.getLockedUntil());
+
+        if (cred.getRole() != Role.ROLE_APP_DEVELOPER && (cred.getUser() == null || !cred.getUser().hasRole(Role.ROLE_APP_DEVELOPER))) {
+            throw new BadCredentialsException("Account is not authorized for Developer portal.");
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), cred.getPasswordHash())) {
+            throw handleFailedAppDevLogin(cred);
+        }
+
+        return initiateAdmin2FaFlow(cred.getUser(), Role.ROLE_APP_DEVELOPER, httpRequest);
+    }
+
+    @Override
+    public AuthResponse loginManagementTeam(LoginRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email, Role.ROLE_MANAGEMENT_TEAM);
+
+        ManagementTeamCredential cred = managementTeamCredentialRepository.findByEmail(email)
+                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+
+        checkCredentialLockout(cred.isLocked(), cred.getLockedUntil());
+
+        if (cred.getRole() != Role.ROLE_MANAGEMENT_TEAM && (cred.getUser() == null || !cred.getUser().hasRole(Role.ROLE_MANAGEMENT_TEAM))) {
+            throw new BadCredentialsException("Account is not authorized for Management portal.");
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), cred.getPasswordHash())) {
+            throw handleFailedManagementLogin(cred);
+        }
+
+        return initiateAdmin2FaFlow(cred.getUser(), Role.ROLE_MANAGEMENT_TEAM, httpRequest);
     }
 
     @Override
     public AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest) {
-        AuthResponse response = login(request, httpRequest);
-        User user = userRepository.findByEmail(request.getEmail().toLowerCase().trim()).orElse(null);
-        if (user != null) {
-            if (request.getRequiredRole() != null) {
-                boolean hasRole = user.getRoles().contains(request.getRequiredRole());
-                if (!hasRole && !user.getRoles().contains(Role.ROLE_SUPER_ADMIN) && !user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN)) {
-                    throw new BadCredentialsException("Selected role does not match this account's authorized designation");
-                }
-            } else {
-                boolean isAdmin = user.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
-                                  user.getRoles().contains(Role.ROLE_PLATFORM_ADMIN) ||
-                                  user.getRoles().contains(Role.ROLE_APP_DEVELOPER) ||
-                                  user.getRoles().contains(Role.ROLE_MANAGEMENT_TEAM) ||
-                                  user.getRoles().contains(Role.ROLE_COMPANY_ADMIN);
-                if (!isAdmin) {
-                    throw new BadCredentialsException("Invalid email, password, or role");
-                }
+        if (request.getRequiredRole() != null) {
+            if (request.getRequiredRole() == Role.ROLE_COMPANY_ADMIN) {
+                return loginCompany(request, httpRequest);
+            } else if (request.getRequiredRole() == Role.ROLE_APP_DEVELOPER) {
+                return loginAppDeveloper(request, httpRequest);
+            } else if (request.getRequiredRole() == Role.ROLE_MANAGEMENT_TEAM) {
+                return loginManagementTeam(request, httpRequest);
             }
         }
-        return response;
+        return login(request, httpRequest);
+    }
+
+    private AuthResponse initiateAdmin2FaFlow(User user, Role role, HttpServletRequest httpRequest) {
+        String email = user.getEmail();
+
+        int randomPin = new java.security.SecureRandom().nextInt(10000);
+        String otp = String.format("%04d", randomPin);
+        String twoFactorToken = "2fa_sess_" + UUID.randomUUID().toString().replace("-", "");
+
+        redisOtpService.store2FaSession(email, twoFactorToken, otp, 5);
+        mailService.sendAdmin2FaOtpEmail(email, user.getFirstName(), role.name(), otp);
+
+        log.info("===============================================================");
+        log.info("🔐 [ADMIN 2FA SECURITY CODE FOR {} ({})]: {}", email, role, otp);
+        log.info("===============================================================");
+
+        return AuthResponse.builder()
+                .requires2Fa(true)
+                .twoFactorToken(twoFactorToken)
+                .twoFactorMethod("EMAIL_OTP")
+                .email(email)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .roles(user.getRoles())
+                .build();
     }
 
     @Override
-    @Transactional(noRollbackFor = {BadCredentialsException.class, UnauthorizedException.class})
+    public AuthResponse verify2FaAdmin(TwoFactorVerifyRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        redisOtpService.verify2FaSession(email, request.getTwoFactorToken(), request.getOtp());
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+
+        Optional<CompanyCredential> compOpt = companyCredentialRepository.findByEmail(email);
+        if (compOpt.isPresent()) {
+            companyCredentialRepository.recordSuccessfulLogin(compOpt.get().getId(), Instant.now());
+            UserPrincipal principal = new UserPrincipal(user, compOpt.get());
+            String accessToken = jwtService.generateAccessToken(principal, user.getId());
+            RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
+            return buildAuthResponse(user, accessToken, refreshToken.getToken());
+        }
+
+        Optional<AppDevCredential> devOpt = appDevCredentialRepository.findByEmail(email);
+        if (devOpt.isPresent()) {
+            appDevCredentialRepository.recordSuccessfulLogin(devOpt.get().getId(), Instant.now());
+            UserPrincipal principal = new UserPrincipal(user, devOpt.get());
+            String accessToken = jwtService.generateAccessToken(principal, user.getId());
+            RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
+            return buildAuthResponse(user, accessToken, refreshToken.getToken());
+        }
+
+        Optional<ManagementTeamCredential> mgmtOpt = managementTeamCredentialRepository.findByEmail(email);
+        if (mgmtOpt.isPresent()) {
+            managementTeamCredentialRepository.recordSuccessfulLogin(mgmtOpt.get().getId(), Instant.now());
+            UserPrincipal principal = new UserPrincipal(user, mgmtOpt.get());
+            String accessToken = jwtService.generateAccessToken(principal, user.getId());
+            RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
+            return buildAuthResponse(user, accessToken, refreshToken.getToken());
+        }
+
+        UserPrincipal principal = new UserPrincipal(user);
+        String accessToken = jwtService.generateAccessToken(principal, user.getId());
+        RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
+
+        log.info("Admin 2FA verification successful for: {}", email);
+        return buildAuthResponse(user, accessToken, refreshToken.getToken());
+    }
+
+    @Override
+    public void resend2FaOtp(TwoFactorResendRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
+
+        Role primaryRole = user.getRoles().isEmpty() ? Role.ROLE_COMPANY_ADMIN : user.getRoles().iterator().next();
+
+        int randomPin = new java.security.SecureRandom().nextInt(10000);
+        String newOtp = String.format("%04d", randomPin);
+
+        redisOtpService.store2FaSession(email, request.getTwoFactorToken(), newOtp, 5);
+        mailService.sendAdmin2FaOtpEmail(email, user.getFirstName(), primaryRole.name(), newOtp);
+        log.info("Admin 2FA OTP re-dispatched to: {} [Session: {}] [OTP: {}]", email, request.getTwoFactorToken(), newOtp);
+    }
+
+    @Override
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
         validateEmailFormat(email, request.getRequiredRole());
 
-        // Find user first for lockout check
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
-
-        // Check if locked out
-        if (user.getLockedUntil() != null) {
-            if (Instant.now().isBefore(user.getLockedUntil())) {
-                long remainingMinutes = ChronoUnit.MINUTES.between(Instant.now(), user.getLockedUntil()) + 1;
-                if (remainingMinutes < 1) remainingMinutes = 1;
-                throw new UnauthorizedException(
-                        String.format("Account is temporarily locked due to %d consecutive failed password attempts. Please try again after %d minute%s or reset your password.",
-                                MAX_LOGIN_ATTEMPTS, remainingMinutes, remainingMinutes == 1 ? "" : "s"));
-            } else {
-                // Lockout has expired! Reset automatically
-                user.setLoginAttempts(0);
-                user.setLockedUntil(null);
-                userRepository.save(user);
-            }
+        // 1. Try HR credentials
+        Optional<HrCredential> hrCredOpt = hrCredentialRepository.findByEmail(email);
+        if (hrCredOpt.isPresent()) {
+            return loginHr(request, httpRequest);
         }
 
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, request.getPassword())
-            );
-
-            UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-            User authenticatedUser = principal.getUser();
-
-            // RBAC Role Verification: Verify user possesses the specific selected role for login
-            if (request.getRequiredRole() != null) {
-                boolean hasRole = authenticatedUser.getRoles().contains(request.getRequiredRole());
-                if (!hasRole) {
-                    boolean isSuperAdmin = authenticatedUser.getRoles().contains(Role.ROLE_SUPER_ADMIN) ||
-                                           authenticatedUser.getRoles().contains(Role.ROLE_PLATFORM_ADMIN);
-                    if (!isSuperAdmin) {
-                        throw new BadCredentialsException("Selected role does not match this account's authorized designation");
-                    }
-                }
-            }
-
-            // Ensure profile entity exists in candidate or hr_profiles table
-            if (authenticatedUser.getRoles().contains(Role.ROLE_CANDIDATE)) {
-                if (!candidateRepository.existsByUserId(authenticatedUser.getId())) {
-                    candidateRepository.save(Candidate.builder()
-                            .user(authenticatedUser)
-                            .openToWork(true)
-                            .build());
-                }
-            }
-            if (authenticatedUser.getRoles().contains(Role.ROLE_HR)) {
-                if (!hrProfileRepository.existsByUserId(authenticatedUser.getId())) {
-                    Company defaultComp = companyRepository.findByName("TalentIQ Enterprise")
-                            .orElseGet(() -> companyRepository.save(Company.builder()
-                                    .name("TalentIQ Enterprise")
-                                    .slug("talentiq-enterprise-" + System.currentTimeMillis())
-                                    .verified(true)
-                                    .active(true)
-                                    .build()));
-                    hrProfileRepository.save(HrProfile.builder()
-                            .user(authenticatedUser)
-                            .company(defaultComp)
-                            .designation("Talent Partner")
-                            .companyAdmin(true)
-                            .build());
-                }
-            }
-
-            // Reset failed attempts on success
-            userRepository.recordSuccessfulLogin(authenticatedUser.getId(), Instant.now());
-
-            // Issue tokens
-            String accessToken = jwtService.generateAccessToken(principal, authenticatedUser.getId());
-            RefreshToken refreshToken = createRefreshToken(authenticatedUser, httpRequest);
-
-            log.info("User logged in successfully: {} [{}]", email, authenticatedUser.getRoles());
-
-            return buildAuthResponse(authenticatedUser, accessToken, refreshToken.getToken());
-
-        } catch (BadCredentialsException e) {
-            throw handleFailedLogin(user);
-        } catch (DisabledException ex) {
-            throw new UnauthorizedException("Please verify your email address before logging in");
+        // 2. Try User / Candidate credentials
+        Optional<UserCredential> userCredOpt = userCredentialRepository.findByEmail(email);
+        if (userCredOpt.isPresent()) {
+            return loginCandidate(request, httpRequest);
         }
+
+        // 3. Try Company Admin credentials
+        Optional<CompanyCredential> compCredOpt = companyCredentialRepository.findByEmail(email);
+        if (compCredOpt.isPresent()) {
+            return loginCompany(request, httpRequest);
+        }
+
+        // 4. Try App Developer credentials
+        Optional<AppDevCredential> devCredOpt = appDevCredentialRepository.findByEmail(email);
+        if (devCredOpt.isPresent()) {
+            return loginAppDeveloper(request, httpRequest);
+        }
+
+        // 5. Try Management Team credentials
+        Optional<ManagementTeamCredential> mgmtCredOpt = managementTeamCredentialRepository.findByEmail(email);
+        if (mgmtCredOpt.isPresent()) {
+            return loginManagementTeam(request, httpRequest);
+        }
+
+        throw new BadCredentialsException("Invalid email or password");
     }
 
     // ── Google OAuth Login / Registration ─────────────────────────────────────
@@ -362,18 +644,78 @@ public class AuthServiceImpl implements AuthService {
         String email = request.getEmail().toLowerCase().trim();
         validateEmailFormat(email, request.getRole());
 
+        Role role = request.getRole() != null ? request.getRole() : Role.ROLE_CANDIDATE;
+        String[] nameParts = request.getName() != null ? request.getName().split(" ", 2) : new String[]{"User", ""};
+        String firstName = nameParts[0];
+        String lastName = nameParts.length > 1 ? nameParts[1] : "";
+        String passwordHash = passwordEncoder.encode(UUID.randomUUID().toString());
+
+        // ── HR GOOGLE SIGN-IN (Zero rows in users table!) ────────────────────
+        if (role.equals(Role.ROLE_HR)) {
+            Optional<HrCredential> existingHrCred = hrCredentialRepository.findByEmail(email);
+            HrProfile hrProfile;
+            HrCredential credential;
+
+            if (existingHrCred.isEmpty()) {
+                String companyName = "Company (" + firstName + ")";
+                String slug = companyName.toLowerCase().replaceAll("[^a-z0-9]", "-") + "-" + System.currentTimeMillis();
+                Company company = companyRepository.findByName(companyName).orElseGet(() ->
+                        companyRepository.save(Company.builder()
+                                .name(companyName)
+                                .slug(slug)
+                                .verified(true)
+                                .active(true)
+                                .build())
+                );
+
+                hrProfile = HrProfile.builder()
+                        .email(email)
+                        .firstName(firstName)
+                        .lastName(lastName)
+                        .avatarUrl(request.getPicture())
+                        .company(company)
+                        .designation("HR Recruiter")
+                        .companyAdmin(false)
+                        .companyVerified(true)
+                        .companyVerifiedAt(Instant.now())
+                        .companyVerifiedTitle("Verified Talent Partner")
+                        .active(true)
+                        .build();
+                hrProfile = hrProfileRepository.save(hrProfile);
+
+                credential = HrCredential.builder()
+                        .hrProfile(hrProfile)
+                        .email(email)
+                        .passwordHash(passwordHash)
+                        .role(Role.ROLE_HR)
+                        .status(UserStatus.ACTIVE)
+                        .emailVerified(true)
+                        .build();
+                credential = hrCredentialRepository.save(credential);
+
+                mailService.sendAccountCreatedEmail(email, firstName, "ROLE_HR");
+            } else {
+                credential = existingHrCred.get();
+                hrProfile = hrProfileRepository.findByEmail(email).orElseGet(() ->
+                        hrProfileRepository.save(HrProfile.builder().email(email).firstName(firstName).lastName(lastName).build()));
+                hrCredentialRepository.recordSuccessfulLogin(credential.getId(), Instant.now());
+            }
+
+            UserPrincipal principal = new UserPrincipal(hrProfile, credential);
+            String accessToken = jwtService.generateAccessToken(principal, hrProfile.getId());
+            RefreshToken refreshToken = createRefreshToken(null, email, httpRequest);
+
+            return buildAuthResponse(hrProfile, accessToken, refreshToken.getToken());
+        }
+
+        // ── OTHER ROLES (Candidate, Company Admin, Developers) ────────────────
         Optional<User> existingUser = userRepository.findByEmail(email);
         User user;
+        UserPrincipal principal;
 
         if (existingUser.isEmpty()) {
-            Role role = request.getRole() != null ? request.getRole() : Role.ROLE_CANDIDATE;
-            String[] nameParts = request.getName() != null ? request.getName().split(" ", 2) : new String[]{"User", ""};
-            String firstName = nameParts[0];
-            String lastName = nameParts.length > 1 ? nameParts[1] : "";
-
             user = User.builder()
                     .email(email)
-                    .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
                     .firstName(firstName)
                     .lastName(lastName)
                     .avatarUrl(request.getPicture())
@@ -384,136 +726,217 @@ public class AuthServiceImpl implements AuthService {
             user.addRole(role);
             user = userRepository.save(user);
 
-            if (role == Role.ROLE_CANDIDATE) {
-                candidateRepository.save(Candidate.builder()
+            if (role.equals(Role.ROLE_CANDIDATE)) {
+                UserCredential cred = UserCredential.builder()
                         .user(user)
-                        .openToWork(true)
-                        .build());
-            } else if (role == Role.ROLE_HR) {
-                Company defaultComp = companyRepository.findByName("TalentIQ Enterprise")
-                        .orElseGet(() -> companyRepository.save(Company.builder()
-                                .name("TalentIQ Enterprise")
-                                .slug("talentiq-enterprise-" + System.currentTimeMillis())
+                        .email(email)
+                        .passwordHash(passwordHash)
+                        .role(role)
+                        .status(UserStatus.ACTIVE)
+                        .emailVerified(true)
+                        .build();
+                userCredentialRepository.save(cred);
+                candidateRepository.save(Candidate.builder().user(user).openToWork(true).build());
+                principal = new UserPrincipal(user, cred);
+
+            } else if (role.equals(Role.ROLE_COMPANY_ADMIN)) {
+                String companyName = "Company (" + user.getFirstName() + ")";
+                String slug = companyName.toLowerCase().replaceAll("[^a-z0-9]", "-") + "-" + System.currentTimeMillis();
+                Company company = companyRepository.findByName(companyName).orElseGet(() ->
+                        companyRepository.save(Company.builder()
+                                .name(companyName)
+                                .slug(slug)
                                 .verified(true)
                                 .active(true)
-                                .build()));
-                hrProfileRepository.save(HrProfile.builder()
+                                .build())
+                );
+
+                HrProfile hrProfile = HrProfile.builder()
                         .user(user)
-                        .company(defaultComp)
-                        .designation("Talent Partner")
+                        .email(email)
+                        .firstName(firstName)
+                        .lastName(lastName)
+                        .company(company)
+                        .designation("Company Director / CEO")
                         .companyAdmin(true)
-                        .build());
+                        .companyVerified(true)
+                        .companyVerifiedAt(Instant.now())
+                        .companyVerifiedTitle("Verified Company Executive")
+                        .build();
+                hrProfileRepository.save(hrProfile);
+
+                CompanyCredential cred = CompanyCredential.builder()
+                        .user(user)
+                        .email(email)
+                        .passwordHash(passwordHash)
+                        .role(Role.ROLE_COMPANY_ADMIN)
+                        .status(UserStatus.ACTIVE)
+                        .emailVerified(true)
+                        .build();
+                companyCredentialRepository.save(cred);
+                principal = new UserPrincipal(user, cred);
+
+            } else if (role.equals(Role.ROLE_APP_DEVELOPER)) {
+                AppDevCredential cred = AppDevCredential.builder()
+                        .user(user)
+                        .email(email)
+                        .passwordHash(passwordHash)
+                        .role(Role.ROLE_APP_DEVELOPER)
+                        .status(UserStatus.ACTIVE)
+                        .emailVerified(true)
+                        .build();
+                appDevCredentialRepository.save(cred);
+                principal = new UserPrincipal(user, cred);
+
+            } else if (role.equals(Role.ROLE_MANAGEMENT_TEAM)) {
+                ManagementTeamCredential cred = ManagementTeamCredential.builder()
+                        .user(user)
+                        .email(email)
+                        .passwordHash(passwordHash)
+                        .role(Role.ROLE_MANAGEMENT_TEAM)
+                        .status(UserStatus.ACTIVE)
+                        .emailVerified(true)
+                        .build();
+                managementTeamCredentialRepository.save(cred);
+                principal = new UserPrincipal(user, cred);
+
+            } else {
+                UserCredential cred = UserCredential.builder()
+                        .user(user)
+                        .email(email)
+                        .passwordHash(passwordHash)
+                        .role(role)
+                        .status(UserStatus.ACTIVE)
+                        .emailVerified(true)
+                        .build();
+                userCredentialRepository.save(cred);
+                principal = new UserPrincipal(user, cred);
             }
 
             mailService.sendAccountCreatedEmail(user.getEmail(), user.getFirstName(), role.name());
-            log.info("New user registered via Google OAuth: {} [{}]", email, role);
         } else {
             user = existingUser.get();
-            if (user.isLocked()) {
-                throw new UnauthorizedException("Account temporarily locked. Try again later.");
-            }
-            if (user.getStatus() != UserStatus.ACTIVE) {
-                user.setStatus(UserStatus.ACTIVE);
-                user.setEmailVerified(true);
-                userRepository.save(user);
-            }
+            principal = loadUserPrincipal(user);
         }
 
-        UserPrincipal principal = new UserPrincipal(user);
-        String accessToken = jwtService.generateAccessToken(principal, user.getId());
-        RefreshToken refreshToken = createRefreshToken(user, httpRequest);
+        recordSuccessfulLogin(user);
 
-        log.info("Google OAuth login successful: {}", email);
+        String accessToken = jwtService.generateAccessToken(principal, user.getId());
+        RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
+
         return buildAuthResponse(user, accessToken, refreshToken.getToken());
     }
 
-    // ── Refresh Token ─────────────────────────────────────────────────────────
+    // ── Token Refresh ─────────────────────────────────────────────────────────
 
     @Override
     public AuthResponse refreshToken(RefreshTokenRequest request, HttpServletRequest httpRequest) {
-        RefreshToken existing = refreshTokenRepository.findByToken(request.getRefreshToken())
-                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token. Please log in again."));
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(request.getRefreshToken())
+                .orElseThrow(() -> new UnauthorizedException("Invalid refresh token"));
 
-        if (!existing.isValid()) {
-            // Token is expired or revoked — invalidate ALL user tokens (possible token theft)
-            refreshTokenRepository.revokeAllUserTokens(existing.getUser().getId());
-            throw new UnauthorizedException("Refresh token expired or revoked. Please log in again.");
+        if (refreshToken.isRevoked()) {
+            if (refreshToken.getUser() != null) {
+                refreshTokenRepository.revokeAllUserTokens(refreshToken.getUser().getId());
+            } else if (refreshToken.getUserEmail() != null) {
+                refreshTokenRepository.revokeAllTokensByEmail(refreshToken.getUserEmail());
+            }
+            throw new UnauthorizedException("Refresh token was revoked. Please log in again.");
         }
 
-        // Rotate: revoke old token, issue new pair
-        refreshTokenRepository.revokeByToken(existing.getToken());
+        if (refreshToken.isExpired()) {
+            throw new UnauthorizedException("Refresh token expired. Please log in again.");
+        }
 
-        User user = existing.getUser();
-        UserPrincipal principal = new UserPrincipal(user);
+        refreshToken.setRevoked(true);
+        refreshTokenRepository.save(refreshToken);
 
-        String newAccessToken = jwtService.generateAccessToken(principal, user.getId());
-        RefreshToken newRefreshToken = createRefreshToken(user, httpRequest);
+        if (refreshToken.getUser() != null) {
+            User user = refreshToken.getUser();
+            UserCredential cred = userCredentialRepository.findByUserId(user.getId()).orElse(null);
+            UserPrincipal principal = new UserPrincipal(user, cred);
+            String newAccessToken = jwtService.generateAccessToken(principal, user.getId());
+            RefreshToken newRefreshToken = createRefreshToken(user, user.getEmail(), httpRequest);
+            return buildAuthResponse(user, newAccessToken, newRefreshToken.getToken());
+        } else if (refreshToken.getUserEmail() != null) {
+            String email = refreshToken.getUserEmail();
+            Optional<HrProfile> hrProfileOpt = hrProfileRepository.findByEmail(email);
+            if (hrProfileOpt.isPresent()) {
+                HrProfile profile = hrProfileOpt.get();
+                Optional<HrCredential> credOpt = hrCredentialRepository.findByEmail(email);
+                UserPrincipal principal = new UserPrincipal(profile, credOpt.orElse(null));
+                String newAccessToken = jwtService.generateAccessToken(principal, profile.getId());
+                RefreshToken newRefreshToken = createRefreshToken(null, email, httpRequest);
+                return buildAuthResponse(profile, newAccessToken, newRefreshToken.getToken());
+            }
+        }
 
-        log.debug("Token refreshed for user: {}", user.getEmail());
-
-        return buildAuthResponse(user, newAccessToken, newRefreshToken.getToken());
+        throw new UnauthorizedException("Invalid user session");
     }
 
-    // ── Logout with Instant Token Blacklisting / Destruction ──────────────────
+    // ── Logout ────────────────────────────────────────────────────────────────
 
     @Override
     public void logout(Long userId, String accessToken) {
-        if (userId != null) {
-            refreshTokenRepository.revokeAllUserTokens(userId);
-        }
         if (StringUtils.hasText(accessToken)) {
-            long remainingMs = jwtService.getRemainingExpiryMs(accessToken);
-            tokenBlacklistService.blacklistToken(accessToken, remainingMs);
+            tokenBlacklistService.blacklistToken(accessToken, appProperties.getJwt().getAccessTokenExpiryMs());
         }
-        log.info("User logged out (all refresh tokens revoked & access token blacklisted): userId={}", userId);
+        if (userId != null) {
+            logout(userId);
+        }
     }
 
     @Override
     public void logout(Long userId) {
-        logout(userId, null);
+        refreshTokenRepository.revokeAllUserTokens(userId);
+        log.info("User {} logged out, all refresh tokens revoked", userId);
     }
 
     // ── Email Verification ────────────────────────────────────────────────────
 
     @Override
     public void verifyEmail(VerifyEmailRequest request) {
-        User user = userRepository.findByEmailVerificationToken(request.getToken())
-                .orElseThrow(() -> new BadRequestException("Invalid or expired verification token"));
-
-        if (user.isEmailVerified()) {
-            throw new BadRequestException("Email is already verified");
+        String tokenEmail = request.getToken().trim().toLowerCase();
+        Optional<User> userOpt = userRepository.findByEmail(tokenEmail);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            userRepository.verifyEmail(user.getId());
+            userCredentialRepository.findByUserId(user.getId()).ifPresent(c -> {
+                c.setEmailVerified(true);
+                c.setStatus(UserStatus.ACTIVE);
+                userCredentialRepository.save(c);
+            });
         }
 
-        if (user.getEmailVerificationTokenExpiresAt() != null
-                && Instant.now().isAfter(user.getEmailVerificationTokenExpiresAt())) {
-            throw new BadRequestException("Verification token has expired. Please request a new one.");
-        }
+        hrCredentialRepository.findByEmail(tokenEmail).ifPresent(c -> {
+            c.setEmailVerified(true);
+            c.setStatus(UserStatus.ACTIVE);
+            hrCredentialRepository.save(c);
+        });
 
-        userRepository.verifyEmail(user.getId());
-
-        // Send welcome email
-        mailService.sendWelcomeEmail(user.getEmail(), user.getFirstName());
-
-        log.info("Email verified for user: {}", user.getEmail());
+        log.info("Email verified successfully for user: {}", tokenEmail);
     }
 
     @Override
     public void resendVerificationEmail(String email) {
-        User user = userRepository.findByEmail(email.toLowerCase().trim())
-                .orElseThrow(() -> new ResourceNotFoundException("User", "email", email));
-
-        if (user.isEmailVerified()) {
-            throw new BadRequestException("Email is already verified");
+        String cleanEmail = email.toLowerCase().trim();
+        Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (user.isEmailVerified()) {
+                throw new BadRequestException("Email is already verified");
+            }
+            mailService.sendEmailVerification(user.getEmail(), user.getFirstName(), user.getEmail());
+            return;
         }
 
-        // Generate a new token
-        user.setEmailVerificationToken(UUID.randomUUID().toString());
-        user.setEmailVerificationTokenExpiresAt(
-                Instant.now().plus(appProperties.getMail().getVerificationExpiryMinutes(), ChronoUnit.MINUTES));
-        userRepository.save(user);
+        Optional<HrProfile> hrOpt = hrProfileRepository.findByEmail(cleanEmail);
+        if (hrOpt.isPresent()) {
+            HrProfile hr = hrOpt.get();
+            mailService.sendEmailVerification(hr.getEmail(), hr.getFirstName(), hr.getEmail());
+            return;
+        }
 
-        mailService.sendEmailVerification(user.getEmail(), user.getFirstName(), user.getEmailVerificationToken());
-        log.info("Verification email resent to: {}", email);
+        throw new ResourceNotFoundException("User", "email", email);
     }
 
     // ── Password Reset with 4-Digit OTP ───────────────────────────────────────
@@ -521,32 +944,41 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email, null);
 
-        // 1. Enforce Redis sliding rate limit (handles 10,000+ users & prevents brute-force / DDoS)
         redisOtpService.enforceRateLimit(email, null);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadRequestException("No registered account found with email: " + email));
+        String firstName = "User";
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isPresent()) {
+            firstName = userOpt.get().getFirstName();
+        } else {
+            Optional<HrProfile> hrOpt = hrProfileRepository.findByEmail(email);
+            if (hrOpt.isPresent()) {
+                firstName = hrOpt.get().getFirstName();
+            } else {
+                throw new BadRequestException("No registered account found with email: " + email);
+            }
+        }
 
-        Role primaryRole = user.getRoles().isEmpty() ? null : user.getRoles().iterator().next();
-        validateEmailFormat(email, primaryRole);
-
-        // 2. Generate 4-digit numeric OTP
         int randomPin = new java.security.SecureRandom().nextInt(10000);
         String otp = String.format("%04d", randomPin);
+        Instant expiresAt = Instant.now().plus(10, ChronoUnit.MINUTES);
 
-        // 3. Store in Redis with O(1) in-memory TTL (10 minutes)
         redisOtpService.storeOtp(email, otp, 10);
 
-        // 4. Also persist in DB as fallback
-        user.setPasswordResetOtp(otp);
-        user.setPasswordResetOtpExpiresAt(Instant.now().plus(10, ChronoUnit.MINUTES));
-        user.setPasswordResetToken(otp);
-        user.setPasswordResetTokenExpiresAt(Instant.now().plus(10, ChronoUnit.MINUTES));
-        userRepository.save(user);
+        userCredentialRepository.findByEmail(email)
+                .ifPresent(c -> userCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
+        hrCredentialRepository.findByEmail(email)
+                .ifPresent(c -> hrCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
+        companyCredentialRepository.findByEmail(email)
+                .ifPresent(c -> companyCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
+        appDevCredentialRepository.findByEmail(email)
+                .ifPresent(c -> appDevCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
+        managementTeamCredentialRepository.findByEmail(email)
+                .ifPresent(c -> managementTeamCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
 
-        // 5. Fire async email
-        mailService.sendPasswordResetOtpEmail(user.getEmail(), user.getFirstName(), otp);
+        mailService.sendPasswordResetOtpEmail(email, firstName, otp);
         log.info("===============================================================");
         log.info("🔑 [HIREMIND AI - 4-DIGIT OTP FOR {}]: {}", email, otp);
         log.info("===============================================================");
@@ -555,7 +987,6 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void verifyPasswordResetOtp(VerifyOtpRequest request) {
         String email = request.getEmail().toLowerCase().trim();
-        // Redis-backed O(1) atomic verification with brute-force defense
         redisOtpService.verifyOtp(email, request.getOtp());
         log.info("4-Digit OTP verified successfully in Redis for email: {}", email);
     }
@@ -563,29 +994,21 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void resetPassword(ResetPasswordRequest request) {
         String email = request.getEmail() != null ? request.getEmail().toLowerCase().trim() : null;
-        User user = null;
-        if (StringUtils.hasText(email)) {
-            user = userRepository.findByEmail(email).orElse(null);
-        }
-        if (user == null && StringUtils.hasText(request.getToken())) {
-            user = userRepository.findByPasswordResetToken(request.getToken()).orElse(null);
-        }
-
-        if (user == null) {
-            throw new BadRequestException("Invalid password reset request. User not found.");
+        if (!StringUtils.hasText(email)) {
+            throw new BadRequestException("Email is required for password reset.");
         }
 
         String providedOtpOrToken = StringUtils.hasText(request.getOtp()) ? request.getOtp().trim() : request.getToken();
-        
-        // Check Redis verification ticket first
-        boolean verified = redisOtpService.isOtpVerified(user.getEmail());
+        boolean verified = redisOtpService.isOtpVerified(email);
+
         if (!verified) {
-            // Check fallback in MySQL
-            if (user.getPasswordResetOtp() != null && user.getPasswordResetOtp().equals(providedOtpOrToken)) {
-                verified = user.getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetOtpExpiresAt());
+            Optional<UserCredential> userCred = userCredentialRepository.findByEmail(email);
+            if (userCred.isPresent() && providedOtpOrToken.equals(userCred.get().getPasswordResetOtp())) {
+                verified = userCred.get().getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(userCred.get().getPasswordResetOtpExpiresAt());
             }
-            if (!verified && user.getPasswordResetToken() != null && user.getPasswordResetToken().equals(providedOtpOrToken)) {
-                verified = user.getPasswordResetTokenExpiresAt() != null && Instant.now().isBefore(user.getPasswordResetTokenExpiresAt());
+            Optional<HrCredential> hrCred = hrCredentialRepository.findByEmail(email);
+            if (!verified && hrCred.isPresent() && providedOtpOrToken.equals(hrCred.get().getPasswordResetOtp())) {
+                verified = hrCred.get().getPasswordResetOtpExpiresAt() != null && Instant.now().isBefore(hrCred.get().getPasswordResetOtpExpiresAt());
             }
         }
 
@@ -593,22 +1016,96 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Invalid or expired 4-digit OTP. Please request a new code.");
         }
 
-        userRepository.updatePassword(user.getId(), passwordEncoder.encode(request.getNewPassword()));
-        
-        // Consume Redis verified ticket
-        redisOtpService.consumeVerifiedTicket(user.getEmail());
+        String newHash = passwordEncoder.encode(request.getNewPassword());
+        userCredentialRepository.findByEmail(email).ifPresent(c -> userCredentialRepository.updatePassword(c.getId(), newHash));
+        hrCredentialRepository.findByEmail(email).ifPresent(c -> hrCredentialRepository.updatePassword(c.getId(), newHash));
+        companyCredentialRepository.findByEmail(email).ifPresent(c -> companyCredentialRepository.updatePassword(c.getId(), newHash));
+        appDevCredentialRepository.findByEmail(email).ifPresent(c -> appDevCredentialRepository.updatePassword(c.getId(), newHash));
+        managementTeamCredentialRepository.findByEmail(email).ifPresent(c -> managementTeamCredentialRepository.updatePassword(c.getId(), newHash));
 
-        // Revoke all refresh tokens & active sessions for security
-        refreshTokenRepository.revokeAllUserTokens(user.getId());
+        redisOtpService.consumeVerifiedTicket(email);
+        userRepository.findByEmail(email).ifPresent(u -> refreshTokenRepository.revokeAllUserTokens(u.getId()));
+        refreshTokenRepository.revokeAllTokensByEmail(email);
 
-        log.info("Password reset successfully updated for user: {}", user.getEmail());
+        log.info("Password reset successfully updated in credentials table for: {}", email);
     }
 
     // ── Private Helpers ───────────────────────────────────────────────────────
 
-    private RefreshToken createRefreshToken(User user, HttpServletRequest httpRequest) {
+    private void checkCredentialLockout(boolean isLocked, Instant lockedUntil) {
+        if (isLocked && lockedUntil != null) {
+            long remainingMinutes = ChronoUnit.MINUTES.between(Instant.now(), lockedUntil) + 1;
+            if (remainingMinutes < 1) remainingMinutes = 1;
+            throw new UnauthorizedException(
+                    String.format("Account is temporarily locked due to %d consecutive failed password attempts. Please try again after %d minute%s or reset your password.",
+                            MAX_LOGIN_ATTEMPTS, remainingMinutes, remainingMinutes == 1 ? "" : "s"));
+        }
+    }
+
+    private RuntimeException handleFailedCandidateLogin(UserCredential cred) {
+        int attempts = cred.getLoginAttempts() + 1;
+        if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            userCredentialRepository.lockAccount(cred.getId(), Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            return new UnauthorizedException(String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts.", LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS));
+        } else {
+            userCredentialRepository.incrementLoginAttempts(cred.getId());
+            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            return new BadCredentialsException(String.format("Invalid password. %d attempt%s remaining before account is temporarily locked.", remaining, remaining == 1 ? "" : "s"));
+        }
+    }
+
+    private RuntimeException handleFailedHrLogin(HrCredential cred) {
+        int attempts = cred.getLoginAttempts() + 1;
+        if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            hrCredentialRepository.lockAccount(cred.getId(), Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            return new UnauthorizedException(String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts.", LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS));
+        } else {
+            hrCredentialRepository.incrementLoginAttempts(cred.getId());
+            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            return new BadCredentialsException(String.format("Invalid password. %d attempt%s remaining before account is temporarily locked.", remaining, remaining == 1 ? "" : "s"));
+        }
+    }
+
+    private RuntimeException handleFailedCompanyLogin(CompanyCredential cred) {
+        int attempts = cred.getLoginAttempts() + 1;
+        if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            companyCredentialRepository.lockAccount(cred.getId(), Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            return new UnauthorizedException(String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts.", LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS));
+        } else {
+            companyCredentialRepository.incrementLoginAttempts(cred.getId());
+            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            return new BadCredentialsException(String.format("Invalid password. %d attempt%s remaining before account is temporarily locked.", remaining, remaining == 1 ? "" : "s"));
+        }
+    }
+
+    private RuntimeException handleFailedAppDevLogin(AppDevCredential cred) {
+        int attempts = cred.getLoginAttempts() + 1;
+        if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            appDevCredentialRepository.lockAccount(cred.getId(), Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            return new UnauthorizedException(String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts.", LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS));
+        } else {
+            appDevCredentialRepository.incrementLoginAttempts(cred.getId());
+            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            return new BadCredentialsException(String.format("Invalid password. %d attempt%s remaining before account is temporarily locked.", remaining, remaining == 1 ? "" : "s"));
+        }
+    }
+
+    private RuntimeException handleFailedManagementLogin(ManagementTeamCredential cred) {
+        int attempts = cred.getLoginAttempts() + 1;
+        if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            managementTeamCredentialRepository.lockAccount(cred.getId(), Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            return new UnauthorizedException(String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts.", LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS));
+        } else {
+            managementTeamCredentialRepository.incrementLoginAttempts(cred.getId());
+            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            return new BadCredentialsException(String.format("Invalid password. %d attempt%s remaining before account is temporarily locked.", remaining, remaining == 1 ? "" : "s"));
+        }
+    }
+
+    private RefreshToken createRefreshToken(User user, String email, HttpServletRequest httpRequest) {
         RefreshToken token = RefreshToken.builder()
                 .user(user)
+                .userEmail(email)
                 .token(UUID.randomUUID().toString())
                 .expiresAt(Instant.now().plus(appProperties.getJwt().getRefreshTokenExpiryDays(), ChronoUnit.DAYS))
                 .userAgent(getClientUserAgent(httpRequest))
@@ -618,42 +1115,52 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {
+        String companySlug = null;
+        String companyName = null;
+        if (user != null && user.getRoles() != null && (user.getRoles().contains(Role.ROLE_COMPANY_ADMIN) || user.getRoles().contains(Role.ROLE_HR))) {
+            Optional<HrProfile> hrOpt = hrProfileRepository.findByUserId(user.getId());
+            if (hrOpt.isPresent() && hrOpt.get().getCompany() != null) {
+                companySlug = hrOpt.get().getCompany().getSlug();
+                companyName = hrOpt.get().getCompany().getName();
+            }
+        }
+
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(appProperties.getJwt().getAccessTokenExpiryMs() / 1000)
-                .userId(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .avatarUrl(user.getAvatarUrl())
-                .roles(user.getRoles())
-                .emailVerified(user.isEmailVerified())
+                .userId(user != null ? user.getId() : 1L)
+                .email(user != null ? user.getEmail() : "")
+                .firstName(user != null ? user.getFirstName() : "")
+                .lastName(user != null ? user.getLastName() : "")
+                .avatarUrl(user != null ? user.getAvatarUrl() : null)
+                .roles(user != null ? user.getRoles() : Collections.emptySet())
+                .emailVerified(user != null && user.isEmailVerified())
+                .companySlug(companySlug)
+                .companyName(companyName)
                 .build();
     }
 
-    private RuntimeException handleFailedLogin(User user) {
-        int attempts = user.getLoginAttempts() + 1;
-        user.setLoginAttempts(attempts);
+    private AuthResponse buildAuthResponse(HrProfile hrProfile, String accessToken, String refreshToken) {
+        String companySlug = hrProfile.getCompany() != null ? hrProfile.getCompany().getSlug() : null;
+        String companyName = hrProfile.getCompany() != null ? hrProfile.getCompany().getName() : null;
 
-        if (attempts >= MAX_LOGIN_ATTEMPTS) {
-            user.setLockedUntil(Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
-            userRepository.saveAndFlush(user);
-            log.warn("Account temporarily locked for {} minutes due to {} failed login attempts: {}", LOCKOUT_MINUTES, attempts, user.getEmail());
-            return new UnauthorizedException(
-                    String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts. Please try again after %d minutes or reset your password.",
-                            LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS, LOCKOUT_MINUTES)
-            );
-        } else {
-            userRepository.saveAndFlush(user);
-            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
-            if (remaining < 0) remaining = 0;
-            return new BadCredentialsException(
-                    String.format("Invalid password. %d attempt%s remaining before account is temporarily locked for %d minutes.",
-                            remaining, remaining == 1 ? "" : "s", LOCKOUT_MINUTES)
-            );
-        }
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken)
+                .tokenType("Bearer")
+                .expiresIn(appProperties.getJwt().getAccessTokenExpiryMs() / 1000)
+                .userId(hrProfile.getId())
+                .email(hrProfile.getEmail())
+                .firstName(hrProfile.getFirstName())
+                .lastName(hrProfile.getLastName())
+                .avatarUrl(hrProfile.getAvatarUrl())
+                .roles(Set.of(Role.ROLE_HR))
+                .emailVerified(true)
+                .companySlug(companySlug)
+                .companyName(companyName)
+                .build();
     }
 
     private String getClientIpAddress(HttpServletRequest request) {
@@ -669,5 +1176,40 @@ public class AuthServiceImpl implements AuthService {
         if (request == null) return null;
         String ua = request.getHeader("User-Agent");
         return ua != null && ua.length() > 500 ? ua.substring(0, 500) : ua;
+    }
+
+    private UserPrincipal loadUserPrincipal(User user) {
+        Optional<HrCredential> hrCred = hrCredentialRepository.findByUserId(user.getId());
+        if (hrCred.isPresent()) {
+            return new UserPrincipal(user, hrCred.get());
+        }
+        Optional<CompanyCredential> compCred = companyCredentialRepository.findByUserId(user.getId());
+        if (compCred.isPresent()) {
+            return new UserPrincipal(user, compCred.get());
+        }
+        Optional<AppDevCredential> devCred = appDevCredentialRepository.findByUserId(user.getId());
+        if (devCred.isPresent()) {
+            return new UserPrincipal(user, devCred.get());
+        }
+        Optional<ManagementTeamCredential> mgmtCred = managementTeamCredentialRepository.findByUserId(user.getId());
+        if (mgmtCred.isPresent()) {
+            return new UserPrincipal(user, mgmtCred.get());
+        }
+        Optional<UserCredential> userCred = userCredentialRepository.findByUserId(user.getId());
+        return userCred.map(cred -> new UserPrincipal(user, cred)).orElseGet(() -> new UserPrincipal(user));
+    }
+
+    private void recordSuccessfulLogin(User user) {
+        if (user == null) return;
+        hrCredentialRepository.findByUserId(user.getId())
+                .ifPresent(c -> hrCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
+        companyCredentialRepository.findByUserId(user.getId())
+                .ifPresent(c -> companyCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
+        appDevCredentialRepository.findByUserId(user.getId())
+                .ifPresent(c -> appDevCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
+        managementTeamCredentialRepository.findByUserId(user.getId())
+                .ifPresent(c -> managementTeamCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
+        userCredentialRepository.findByUserId(user.getId())
+                .ifPresent(c -> userCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
     }
 }
