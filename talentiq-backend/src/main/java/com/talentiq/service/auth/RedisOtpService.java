@@ -37,6 +37,7 @@ public class RedisOtpService {
     private static final String OTP_RATE_IP_PREFIX = "otp:rate:ip:";
     private static final String OTP_FAIL_PREFIX = "otp:fail:";
     private static final String OTP_VERIFIED_PREFIX = "otp:verified:";
+    private static final String EMAIL_VERIFY_TOKEN_PREFIX = "email:verify:";
 
     // In-memory fallback caches in case Redis is temporarily unreachable
     private final ConcurrentHashMap<String, String> inMemoryOtpCodes = new ConcurrentHashMap<>();
@@ -115,26 +116,37 @@ public class RedisOtpService {
 
     /**
      * Store 4-digit Registration Verification OTP in Redis with automatic TTL expiration.
+     * OTP is stored as "ROLE:OTP" (e.g., "ROLE_HR:4829") to bind OTP to the registration role.
      */
-    public void storeRegistrationOtp(String email, String otp, long ttlMinutes) {
+    public void storeRegistrationOtp(String email, String otp, long ttlMinutes, String roleName) {
         validateSafeEmail(email);
         String normalizedEmail = email.toLowerCase().trim();
         String key = OTP_REG_PREFIX + normalizedEmail;
+        String value = roleName + ":" + otp;
 
         try {
-            redisTemplate.opsForValue().set(key, otp, ttlMinutes, TimeUnit.MINUTES);
-            log.info("Redis Registration OTP stored successfully for [{}], expires in {} min", normalizedEmail, ttlMinutes);
+            redisTemplate.opsForValue().set(key, value, ttlMinutes, TimeUnit.MINUTES);
+            log.info("Redis Registration OTP stored for [{}] with role [{}], expires in {} min", normalizedEmail, roleName, ttlMinutes);
         } catch (Exception e) {
             log.warn("Redis unavailable, storing registration OTP in in-memory fallback: {}", e.getMessage());
-            inMemoryRegOtpCodes.put(normalizedEmail, otp);
+            inMemoryRegOtpCodes.put(normalizedEmail, value);
             inMemoryRegOtpExpiries.put(normalizedEmail, System.currentTimeMillis() + (ttlMinutes * 60 * 1000));
         }
     }
 
     /**
-     * Verify 4-digit Registration OTP and invalidate it immediately upon success.
+     * Verify 4-digit Registration OTP without role requirement (backwards compatibility).
      */
     public void verifyRegistrationOtp(String email, String providedOtp) {
+        verifyRegistrationOtpWithRole(email, providedOtp, null);
+    }
+
+    /**
+     * Verify 4-digit Registration OTP with role binding enforcement.
+     * Ensures the OTP was originally generated for the exact same role being registered.
+     * Prevents privilege escalation (e.g., requesting OTP as Candidate, registering as Admin).
+     */
+    public void verifyRegistrationOtpWithRole(String email, String providedOtp, String expectedRole) {
         String normalizedEmail = email.toLowerCase().trim();
         String codeKey = OTP_REG_PREFIX + normalizedEmail;
         String failKey = OTP_FAIL_PREFIX + normalizedEmail;
@@ -153,18 +165,37 @@ public class RedisOtpService {
                 throw new BadRequestException("Too many failed attempts. Try again in " + (ttl != null && ttl > 0 ? ttl : 15) + " minutes.");
             }
 
-            Object storedOtpObj = redisTemplate.opsForValue().get(codeKey);
-            String storedOtp = storedOtpObj != null ? storedOtpObj.toString() : null;
+            Object storedValueObj = redisTemplate.opsForValue().get(codeKey);
+            String storedValue = storedValueObj != null ? storedValueObj.toString() : null;
 
-            if (storedOtp == null) {
+            if (storedValue == null) {
                 Long exp = inMemoryRegOtpExpiries.get(normalizedEmail);
                 if (exp != null && System.currentTimeMillis() < exp) {
-                    storedOtp = inMemoryRegOtpCodes.get(normalizedEmail);
+                    storedValue = inMemoryRegOtpCodes.get(normalizedEmail);
                 }
             }
 
-            if (storedOtp == null) {
+            if (storedValue == null) {
                 throw new BadRequestException("Email verification code has expired or was not requested. Please request a new verification code.");
+            }
+
+            // Parse stored "ROLE:OTP" format
+            String storedRole;
+            String storedOtp;
+            int colonIndex = storedValue.indexOf(':');
+            if (colonIndex > 0) {
+                storedRole = storedValue.substring(0, colonIndex);
+                storedOtp = storedValue.substring(colonIndex + 1);
+            } else {
+                // Legacy fallback: stored value is just the OTP (no role binding)
+                storedRole = null;
+                storedOtp = storedValue;
+            }
+
+            // Enforce role binding — reject if OTP was generated for a different role
+            if (storedRole != null && expectedRole != null && !storedRole.equals(expectedRole)) {
+                log.warn("SECURITY: OTP role mismatch for [{}]. OTP was for [{}], registration attempted as [{}]", normalizedEmail, storedRole, expectedRole);
+                throw new BadRequestException("Security violation: This verification code was issued for a different account type. Please request a new code for " + expectedRole + " registration.");
             }
 
             if (!storedOtp.equals(targetOtp)) {
@@ -182,7 +213,7 @@ public class RedisOtpService {
             inMemoryRegOtpCodes.remove(normalizedEmail);
             inMemoryRegOtpExpiries.remove(normalizedEmail);
 
-            log.info("4-Digit Registration OTP verified and consumed for: {}", normalizedEmail);
+            log.info("Registration OTP verified and consumed for: {} [role: {}]", normalizedEmail, expectedRole);
         } catch (BadRequestException e) {
             throw e;
         } catch (Exception e) {
@@ -190,10 +221,19 @@ public class RedisOtpService {
             Long exp = inMemoryRegOtpExpiries.get(normalizedEmail);
             if (exp != null && System.currentTimeMillis() < exp) {
                 String stored = inMemoryRegOtpCodes.get(normalizedEmail);
-                if (targetOtp.equals(stored)) {
-                    inMemoryRegOtpCodes.remove(normalizedEmail);
-                    inMemoryRegOtpExpiries.remove(normalizedEmail);
-                    return;
+                if (stored != null) {
+                    // Parse role:otp from fallback
+                    int ci = stored.indexOf(':');
+                    String fbRole = ci > 0 ? stored.substring(0, ci) : null;
+                    String fbOtp = ci > 0 ? stored.substring(ci + 1) : stored;
+                    if (fbRole != null && expectedRole != null && !fbRole.equals(expectedRole)) {
+                        throw new BadRequestException("Security violation: This verification code was issued for a different account type.");
+                    }
+                    if (targetOtp.equals(fbOtp)) {
+                        inMemoryRegOtpCodes.remove(normalizedEmail);
+                        inMemoryRegOtpExpiries.remove(normalizedEmail);
+                        return;
+                    }
                 }
             }
             throw new BadRequestException("Invalid or expired verification code.");
@@ -293,6 +333,49 @@ public class RedisOtpService {
         } catch (Exception e) {
             log.debug("Redis verified ticket cleanup error: {}", e.getMessage());
         }
+    }
+
+    /**
+     * Store high-entropy cryptographic email verification token in Redis.
+     */
+    public void storeEmailVerificationToken(String token, String email, long ttlHours) {
+        validateSafeEmail(email);
+        String key = EMAIL_VERIFY_TOKEN_PREFIX + token;
+        try {
+            redisTemplate.opsForValue().set(key, email.toLowerCase().trim(), ttlHours, TimeUnit.HOURS);
+            log.info("Email verification token stored for [{}] (TTL: {}h)", email, ttlHours);
+        } catch (Exception e) {
+            log.warn("Redis unavailable, email token stored in local memory: {}", e.getMessage());
+            inMemoryOtpCodes.put(key, email.toLowerCase().trim());
+            inMemoryOtpExpiries.put(key, System.currentTimeMillis() + (ttlHours * 3600 * 1000));
+        }
+    }
+
+    /**
+     * Consume and validate email verification token from Redis.
+     * Prevents token reuse and verifies authenticity.
+     */
+    public String consumeEmailVerificationToken(String token) {
+        if (token == null || token.isBlank()) {
+            throw new BadRequestException("Verification token is required");
+        }
+        String key = EMAIL_VERIFY_TOKEN_PREFIX + token.trim();
+        try {
+            Object emailObj = redisTemplate.opsForValue().get(key);
+            if (emailObj != null) {
+                redisTemplate.delete(key);
+                return emailObj.toString().toLowerCase().trim();
+            }
+        } catch (Exception e) {
+            log.warn("Redis token lookup error: {}", e.getMessage());
+            Long exp = inMemoryOtpExpiries.get(key);
+            if (exp != null && System.currentTimeMillis() < exp) {
+                String email = inMemoryOtpCodes.remove(key);
+                inMemoryOtpExpiries.remove(key);
+                return email;
+            }
+        }
+        throw new BadRequestException("Invalid or expired email verification token. Please request a new verification email.");
     }
 
     private String getFromFallback(String email) {

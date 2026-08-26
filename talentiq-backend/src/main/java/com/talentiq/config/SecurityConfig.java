@@ -64,8 +64,6 @@ public class SecurityConfig {
             // WebSocket SockJS handshake endpoints
             "/ws/**",
             "/ws/info/**",
-            // Chat file attachments (images, PDFs)
-            "/v1/chat/files/**",
             // Public candidate verification certificate endpoints
             "/v1/company/verifications/candidate/**",
             "/v1/company/verifications/certificate/**"

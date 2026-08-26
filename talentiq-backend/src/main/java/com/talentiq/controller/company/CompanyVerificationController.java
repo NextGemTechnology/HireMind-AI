@@ -92,7 +92,7 @@ public class CompanyVerificationController {
     public ResponseEntity<ApiResponse<CompanyVerificationDto.HrMemberResponse>> verifyHr(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id,
-            @RequestBody CompanyVerificationDto.VerifyHrRequest request) {
+            @Valid @RequestBody CompanyVerificationDto.VerifyHrRequest request) {
         CompanyVerificationDto.HrMemberResponse res = verificationService.verifyHrRecruiter(principal.getId(), id, request);
         String msg = request.isVerified() ? "HR Recruiter verified with official company badge" : "HR Recruiter verification revoked";
         return ResponseEntity.ok(ApiResponse.success(msg, res));

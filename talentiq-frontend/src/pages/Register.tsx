@@ -7,7 +7,7 @@ import {
   RefreshCw, Code2, Users2, ChevronDown
 } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
-import { GoogleAuthButton } from '../components/GoogleAuthButton';
+// import { GoogleAuthButton } from '../components/GoogleAuthButton'; // Disabled for security hardening
 import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/register.css';
 
@@ -115,6 +115,7 @@ export const Register: React.FC = () => {
   const navigate = useNavigate();
 
   const [selectedRole, setSelectedRole] = useState<RoleOption>('ROLE_APP_DEVELOPER');
+  const [lockedRole, setLockedRole] = useState<RoleOption | null>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -227,6 +228,7 @@ export const Register: React.FC = () => {
         role: selectedRole
       });
 
+      setLockedRole(selectedRole);
       setSuccessMsg(`A 4-digit verification code has been dispatched to ${form.email}`);
       setResendCountdown(60);
       setStep(3);
@@ -243,15 +245,16 @@ export const Register: React.FC = () => {
     setError('');
     setLoading(true);
     try {
+      const roleToUse = lockedRole || selectedRole;
       let otpEndpoint = '/auth/register/send-otp';
-      if (selectedRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
-      else if (selectedRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
-      else if (selectedRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+      if (roleToUse === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
+      else if (roleToUse === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
+      else if (roleToUse === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
 
       await apiClient.post(otpEndpoint, {
         email: form.email.trim().toLowerCase(),
         firstName: form.firstName.trim(),
-        role: selectedRole
+        role: roleToUse
       });
       setSuccessMsg(`New 4-digit code dispatched to ${form.email}`);
       setResendCountdown(60);
@@ -278,7 +281,7 @@ export const Register: React.FC = () => {
         lastName: form.lastName.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        role: selectedRole,
+        role: lockedRole || selectedRole,
         otp: otpCode,
         phone: form.phone,
         location: form.location
@@ -335,6 +338,7 @@ export const Register: React.FC = () => {
               <div style={{ position: 'relative' }}>
                 <select
                   value={selectedRole}
+                  disabled={lockedRole !== null}
                   onChange={(e) => {
                     setSelectedRole(e.target.value as RoleOption);
                     setError('');
@@ -473,11 +477,11 @@ export const Register: React.FC = () => {
                 <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
               </div>
 
-              <GoogleAuthButton
+              {/* <GoogleAuthButton
                 role={(selectedRole === 'ROLE_COMPANY_ADMIN' ? 'ROLE_HR' : 'ROLE_CANDIDATE')}
                 label={`Fast Register with Google as ${currentRoleInfo.label}`}
                 onError={setError}
-              />
+              /> Disabled for security hardening */}
             </form>
           )}
 
@@ -604,9 +608,6 @@ export const Register: React.FC = () => {
               </div>
 
               <div className="register-btn-row" style={{ marginTop: 24 }}>
-                <button type="button" onClick={() => setStep(2)} className="register-btn-back">
-                  ← Back
-                </button>
                 <button
                   type="submit"
                   disabled={loading || otpDigits.some(d => !d)}

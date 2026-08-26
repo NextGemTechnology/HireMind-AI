@@ -88,6 +88,8 @@ def get_redis_otp(email, prefix="otp:reg:"):
         raw = subprocess.check_output(
             ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"{prefix}{email}"]
         ).decode().strip().strip('"')
+        if ":" in raw:
+            return raw.split(":")[-1]
         return raw
     except Exception as e:
         print(f"{RED}Error reading OTP from Redis: {e}{RESET}")

@@ -21,7 +21,7 @@ import {
   Loader2
 } from 'lucide-react';
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
-import { GoogleAuthButton } from '../components/GoogleAuthButton';
+// import { GoogleAuthButton } from '../components/GoogleAuthButton'; // Disabled for security hardening
 import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/login.css';
 
@@ -1290,11 +1290,11 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                       <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.15)' }} />
                     </div>
 
-                    <GoogleAuthButton
+                    {/* <GoogleAuthButton
                       role={selectedRole === 'HR' ? 'ROLE_HR' : 'ROLE_CANDIDATE'}
                       label={`Continue with Google as ${selectedRole === 'HR' ? 'HR' : 'Candidate'}`}
                       onError={setError}
-                    />
+                    /> Disabled for security hardening */}
                   </form>
                 )}
 

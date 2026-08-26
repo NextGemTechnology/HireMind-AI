@@ -201,9 +201,10 @@ public class ChatController {
     }
 
     /**
-     * Serve uploaded chat files/images.
+     * Serve uploaded chat files/images (authenticated users only).
      */
     @GetMapping("/files/**")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Retrieve a chat attachment file or image")
     public ResponseEntity<byte[]> getChatFile(jakarta.servlet.http.HttpServletRequest request) {
         String fullPath = request.getRequestURI();

@@ -40,7 +40,7 @@ public class CandidateController {
     @Operation(summary = "Update candidate profile")
     public ResponseEntity<ApiResponse<CandidateDto.Response>> updateProfile(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody CandidateDto.ProfileUpdateRequest request) {
+            @Valid @RequestBody CandidateDto.ProfileUpdateRequest request) {
         CandidateDto.Response updated = candidateService.updateProfile(principal.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", updated));
     }

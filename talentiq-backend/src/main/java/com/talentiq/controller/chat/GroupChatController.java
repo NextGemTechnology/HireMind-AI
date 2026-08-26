@@ -95,7 +95,7 @@ public class GroupChatController {
     public ResponseEntity<ApiResponse<GroupChatDto.InviteResponse>> createInvitation(
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long groupId,
-            @RequestBody(required = false) GroupChatDto.CreateInviteRequest request) {
+            @Valid @RequestBody(required = false) GroupChatDto.CreateInviteRequest request) {
         GroupChatDto.InviteResponse res = groupChatService.createInvitation(principal.getId(), groupId, request != null ? request : new GroupChatDto.CreateInviteRequest());
         return ResponseEntity.ok(ApiResponse.success("Invitation link generated successfully", res));
     }

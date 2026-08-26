@@ -63,8 +63,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String clientIp = resolveClientIp(request);
         String path = request.getServletPath();
 
-        boolean isLoginPath = path.startsWith(LOGIN_PATH) || path.startsWith(REGISTER_PATH);
-        Bucket bucket = isLoginPath
+        boolean isLoginEndpoint = path.contains("/login");
+        Bucket bucket = isLoginEndpoint
                 ? getLoginBucket(clientIp)
                 : getDefaultBucket(clientIp);
 
@@ -95,8 +95,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         String path = request.getServletPath();
         return path.startsWith("/actuator")
                 || path.startsWith("/swagger-ui")
-                || path.startsWith("/api-docs")
-                || "true".equalsIgnoreCase(request.getHeader("X-Internal-Test"));
+                || path.startsWith("/api-docs");
     }
 
     private Bucket getDefaultBucket(String ip) {

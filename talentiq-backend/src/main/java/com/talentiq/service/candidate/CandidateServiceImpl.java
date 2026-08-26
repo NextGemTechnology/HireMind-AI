@@ -1,6 +1,7 @@
 package com.talentiq.service.candidate;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.talentiq.common.exception.ForbiddenException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.talentiq.common.exception.ResourceNotFoundException;
@@ -157,6 +158,11 @@ public class CandidateServiceImpl implements CandidateService {
     @Override
     public void deleteSkill(Long userId, Long skillId) {
         Candidate candidate = getOrCreateCandidate(userId);
+        CandidateSkill skill = skillRepository.findById(skillId)
+                .orElseThrow(() -> new ResourceNotFoundException("CandidateSkill", "id", skillId));
+        if (!skill.getCandidate().getId().equals(candidate.getId())) {
+            throw new ForbiddenException("Unauthorized to delete this skill");
+        }
         candidate.getSkills().removeIf(s -> s.getId() != null && s.getId().equals(skillId));
         try {
             skillRepository.deleteById(skillId);
@@ -194,6 +200,11 @@ public class CandidateServiceImpl implements CandidateService {
     @Override
     public void deleteExperience(Long userId, Long experienceId) {
         Candidate candidate = getOrCreateCandidate(userId);
+        CandidateExperience exp = experienceRepository.findById(experienceId)
+                .orElseThrow(() -> new ResourceNotFoundException("CandidateExperience", "id", experienceId));
+        if (!exp.getCandidate().getId().equals(candidate.getId())) {
+            throw new ForbiddenException("Unauthorized to delete this experience");
+        }
         candidate.getExperiences().removeIf(e -> e.getId() != null && e.getId().equals(experienceId));
         try {
             experienceRepository.deleteById(experienceId);
@@ -260,6 +271,11 @@ public class CandidateServiceImpl implements CandidateService {
     @Override
     public void deleteEducation(Long userId, Long educationId) {
         Candidate candidate = getOrCreateCandidate(userId);
+        CandidateEducation edu = educationRepository.findById(educationId)
+                .orElseThrow(() -> new ResourceNotFoundException("CandidateEducation", "id", educationId));
+        if (!edu.getCandidate().getId().equals(candidate.getId())) {
+            throw new ForbiddenException("Unauthorized to delete this education");
+        }
         candidate.getEducations().removeIf(e -> e.getId() != null && e.getId().equals(educationId));
         try {
             educationRepository.deleteById(educationId);
@@ -332,6 +348,11 @@ public class CandidateServiceImpl implements CandidateService {
     @Override
     public void deleteProject(Long userId, Long projectId) {
         Candidate candidate = getOrCreateCandidate(userId);
+        CandidateProject proj = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ResourceNotFoundException("CandidateProject", "id", projectId));
+        if (!proj.getCandidate().getId().equals(candidate.getId())) {
+            throw new ForbiddenException("Unauthorized to delete this project");
+        }
         candidate.getProjects().removeIf(p -> p.getId() != null && p.getId().equals(projectId));
         try {
             projectRepository.deleteById(projectId);

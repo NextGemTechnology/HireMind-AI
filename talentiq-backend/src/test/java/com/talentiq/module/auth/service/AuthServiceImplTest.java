@@ -143,7 +143,7 @@ class AuthServiceImplTest {
             assertThat(response.getRefreshToken()).isEqualTo("refresh-token-xyz");
             assertThat(response.getEmail()).isEqualTo("john@example.com");
 
-            verify(redisOtpService).verifyRegistrationOtp("john@example.com", "1234");
+            verify(redisOtpService).verifyRegistrationOtpWithRole("john@example.com", "1234", "ROLE_CANDIDATE");
             verify(userCredentialRepository).save(any(UserCredential.class));
             verify(candidateRepository).save(any());
         }

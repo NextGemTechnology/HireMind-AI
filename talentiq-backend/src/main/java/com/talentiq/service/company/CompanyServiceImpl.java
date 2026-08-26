@@ -1,6 +1,8 @@
 package com.talentiq.service.company;
 
 import com.talentiq.common.exception.BadRequestException;
+import com.talentiq.common.exception.ForbiddenException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.talentiq.common.exception.ConflictException;
 import com.talentiq.common.exception.ResourceNotFoundException;
 import com.talentiq.common.response.PagedResponse;
@@ -91,6 +93,13 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public CompanyDto.Response updateCompany(Long companyId, CompanyDto.UpdateRequest request) {
+        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
+        HrProfile hrProfile = hrProfileRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new ForbiddenException("Only HR profiles can update companies"));
+        if (!hrProfile.getCompany().getId().equals(companyId)) {
+            throw new ForbiddenException("You do not have permission to update this company's profile");
+        }
+
         Company company = companyRepository.findById(companyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Company", "id", companyId));
 

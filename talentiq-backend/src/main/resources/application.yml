@@ -183,10 +183,10 @@ app:
   # Rate Limiting
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
-    default-capacity: 60
-    default-refill-per-minute: 60
-    login-capacity: 10
-    login-refill-per-minute: 10
+    default-capacity: 200
+    default-refill-per-minute: 200
+    login-capacity: 60
+    login-refill-per-minute: 60
 
   # Admin
   admin:

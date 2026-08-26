@@ -271,6 +271,16 @@ export const JobMap: React.FC<JobMapProps> = ({
     tileLayerRef.current = newLayer;
   };
 
+function escapeHtml(unsafe: any): string {
+  if (unsafe == null) return '';
+  return String(unsafe)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
   // ── Render State-wise Flags & Markers ───────────────────────────────────
   useEffect(() => {
     const markersLayer = markersLayerRef.current;
@@ -291,7 +301,7 @@ export const JobMap: React.FC<JobMapProps> = ({
             <div class="flag-pin-pulse"></div>
             <div class="flag-pin-body">
               <span class="flag-pin-icon">${coord.flag}</span>
-              <span style="font-size:11px;font-weight:700;">${coord.state}</span>
+              <span style="font-size:11px;font-weight:700;">${escapeHtml(coord.state)}</span>
               <span class="flag-pin-count">${count}</span>
             </div>
             <div class="flag-pin-pointer"></div>
@@ -309,26 +319,26 @@ export const JobMap: React.FC<JobMapProps> = ({
         : 'Competitive Salary';
 
       const skillsHtml = primaryJob.requiredSkills
-        ? primaryJob.requiredSkills.slice(0, 3).map(s => `<span class="map-popup-skill-chip">⚡ ${s.skillName}</span>`).join('')
+        ? primaryJob.requiredSkills.slice(0, 3).map(s => `<span class="map-popup-skill-chip">⚡ ${escapeHtml(s.skillName)}</span>`).join('')
         : '';
 
       const moreJobsNote = count > 1
-        ? `<div style="font-size:11px;color:#A78BFA;font-weight:600;margin-top:2px;">+ ${count - 1} other active role${count > 2 ? 's' : ''} in ${coord.state}</div>`
+        ? `<div style="font-size:11px;color:#A78BFA;font-weight:600;margin-top:2px;">+ ${count - 1} other active role${count > 2 ? 's' : ''} in ${escapeHtml(coord.state)}</div>`
         : '';
 
       const popupHtml = `
         <div class="map-popup-card">
           <div class="map-popup-header">
             <div>
-              <div class="map-popup-location-tag">${coord.flag} ${coord.city}, ${coord.state}</div>
-              <h4 class="map-popup-title">${primaryJob.title}</h4>
+              <div class="map-popup-location-tag">${coord.flag} ${escapeHtml(coord.city)}, ${escapeHtml(coord.state)}</div>
+              <h4 class="map-popup-title">${escapeHtml(primaryJob.title)}</h4>
             </div>
           </div>
           <div class="map-popup-company">
-            🏢 ${primaryJob.company.name} ${primaryJob.company.verified ? '✓' : ''}
+            🏢 ${escapeHtml(primaryJob.company.name)} ${primaryJob.company.verified ? '✓' : ''}
           </div>
           <div class="map-popup-salary">
-            💰 ${salaryText}
+            💰 ${escapeHtml(salaryText)}
           </div>
           <div class="map-popup-skills">
             ${skillsHtml}

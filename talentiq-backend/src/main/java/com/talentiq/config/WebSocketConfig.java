@@ -22,6 +22,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final WebSocketAuthInterceptor webSocketAuthInterceptor;
 
+    @org.springframework.beans.factory.annotation.Value("${app.cors.allowed-origins}")
+    private String allowedOrigins;
+
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
         // Enable simple in-memory broker for topics and queues
@@ -35,7 +38,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")   // Fine-tuned in SecurityConfig CORS
+                .setAllowedOriginPatterns(allowedOrigins.split(","))   // Fine-tuned in SecurityConfig CORS
                 .withSockJS();                    // SockJS fallback for older clients
     }
 

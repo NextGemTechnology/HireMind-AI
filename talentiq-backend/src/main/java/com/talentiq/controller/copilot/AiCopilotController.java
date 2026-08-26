@@ -28,7 +28,7 @@ public class AiCopilotController {
     @Operation(summary = "Start a new AI copilot conversation session (HR only)")
     public ResponseEntity<ApiResponse<AiCopilotDto.ConversationResponse>> createConversation(
             @AuthenticationPrincipal UserPrincipal principal,
-            @RequestBody AiCopilotDto.ConversationRequest request) {
+            @Valid @RequestBody AiCopilotDto.ConversationRequest request) {
         AiCopilotDto.ConversationResponse response = copilotService.createConversation(principal.getId(), request);
         return ResponseEntity.ok(ApiResponse.success("Conversation session initialized", response));
     }
