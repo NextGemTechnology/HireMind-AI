@@ -4,12 +4,12 @@ import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { CompanyTagApprovalQueue } from './CompanyTagApprovalQueue';
 import {
-  Building2, CheckSquare, Calendar, Users, Award, MessageSquare,
-  Settings, Plus, Trash2, Video, DollarSign, Wallet,
-  ShieldCheck, LogOut, Menu, X,
-  Send, Edit3, CreditCard, ChevronRight,
-  Clock
+  Building2, Calendar, Users, Settings, Plus, Trash2,
+  DollarSign, Wallet, ShieldCheck, LogOut, Send,
+  Clock, Search, Bell, ChevronDown, CheckCircle2,
+  FolderKanban, BarChart3, Activity
 } from 'lucide-react';
+import '../css/company-executive-dashboard.css';
 
 interface CompanyTask {
   id: number;
@@ -29,25 +29,6 @@ interface CompanyTask {
   createdAt: string;
 }
 
-interface TaskStats {
-  totalTasks: number;
-  completedTasks: number;
-  inProgressTasks: number;
-  todoTasks: number;
-  completionRate: number;
-}
-
-interface MeetingSlot {
-  id: number;
-  candidateName: string;
-  candidateEmail: string;
-  jobTitle: string;
-  scheduledAt: string;
-  durationMinutes: number;
-  meetingLink?: string;
-  status: string;
-}
-
 interface HrMember {
   hrProfileId: number;
   userId: number;
@@ -55,6 +36,16 @@ interface HrMember {
   email: string;
   designation?: string;
   companyVerified: boolean;
+}
+
+interface PendingApprovalItem {
+  id: number;
+  candidateName: string;
+  jobTitle: string;
+  department: string;
+  hrName: string;
+  status: string;
+  createdAt: string;
 }
 
 interface SalaryPayrollRecord {
@@ -76,25 +67,20 @@ export const CompanyExecutiveDashboard: React.FC = () => {
   const navigate = useNavigate();
 
   // Navigation state
-  const [activeTab, setActiveTab] = useState<
-    'OVERVIEW' | 'TASKS' | 'MEETINGS' | 'HR_TEAM' | 'VERIFICATIONS' | 'SALARY' | 'SETTINGS' | 'EDIT_PROFILE' | 'BILLING'
-  >('OVERVIEW');
+  const [activeNav, setActiveNav] = useState<'OVERVIEW' | 'ANALYTICS' | 'SALARY' | 'PROJECTS' | 'TEAM' | 'SETTINGS'>('OVERVIEW');
 
-  // Left slide-over panel drawer state
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  // Filter & quarter state
+  const [selectedQuarter, setSelectedQuarter] = useState('Q3 Goals');
+  const [showQuarterMenu, setShowQuarterMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  // Core data states
+  // Core API data states
   const [tasks, setTasks] = useState<CompanyTask[]>([]);
-  const [taskStats, setTaskStats] = useState<TaskStats | null>(null);
-  const [meetings, setMeetings] = useState<MeetingSlot[]>([]);
   const [hrTeam, setHrTeam] = useState<HrMember[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [pendingApprovals, setPendingApprovals] = useState<PendingApprovalItem[]>([]);
   const [msg, setMsg] = useState('');
 
-  // Task Filter
-  const [taskFilter, setTaskFilter] = useState<'ALL' | 'TODO' | 'IN_PROGRESS' | 'COMPLETED'>('ALL');
-
-  // Create Task Modal State
+  // Modals
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDesc, setTaskDesc] = useState('');
@@ -103,22 +89,12 @@ export const CompanyExecutiveDashboard: React.FC = () => {
   const [taskAssigneeId, setTaskAssigneeId] = useState<string>('');
   const [taskDueDate, setTaskDueDate] = useState('');
 
-  // Schedule Meeting Modal State
-  const [showMeetingModal, setShowMeetingModal] = useState(false);
-  const [meetingCandidateName, setMeetingCandidateName] = useState('');
-  const [meetingCandidateEmail, setMeetingCandidateEmail] = useState('');
-  const [meetingJobTitle, setMeetingJobTitle] = useState('');
-  const [meetingDate, setMeetingDate] = useState('');
-  const [meetingDuration, setMeetingDuration] = useState('45');
-  const [meetingLink, setMeetingLink] = useState('');
-
-  // Company Profile Settings State
-  const [companyName, setCompanyName] = useState('HireMind Enterprise');
-  const [companyWebsite, setCompanyWebsite] = useState('https://hiremind.ai');
-  const [companyIndustry, setCompanyIndustry] = useState('Artificial Intelligence & Autonomous Recruitment');
-  const [companyLocation, setCompanyLocation] = useState('Bangalore, India & San Francisco, CA');
-  const [companyHeadcount, setCompanyHeadcount] = useState('150-500 Employees');
-  const [companyAbout, setCompanyAbout] = useState('Enterprise talent screening, autonomous interview orchestration, and verified candidate credential issuer.');
+  // Profile Editor State
+  const [companyName, setCompanyName] = useState('AURAFLOW TECHNOLOGIES');
+  const companyTagline = 'Executive Dashboard | Q3 2026';
+  const [companyWebsite, setCompanyWebsite] = useState('https://auraflow.ai');
+  const [companyIndustry, setCompanyIndustry] = useState('Autonomous AI & Enterprise Solutions');
+  const [companyAbout, setCompanyAbout] = useState('Enterprise autonomous AI hiring workflows, candidate credential authentication, and talent cloud.');
 
   // Salary Disbursal / Payroll State (salary-disbuss)
   const [payrollRoster, setPayrollRoster] = useState<SalaryPayrollRecord[]>([
@@ -174,40 +150,35 @@ export const CompanyExecutiveDashboard: React.FC = () => {
     }
   ]);
 
-  // Disbursal receipt modal
   const [activeReceipt, setActiveReceipt] = useState<SalaryPayrollRecord | null>(null);
-
-  // Close panel on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsPanelOpen(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
-    setLoading(true);
     try {
-      const [tasksRes, statsRes, meetingsRes, hrRes] = await Promise.all([
+      const [tasksRes, hrRes, pendingRes] = await Promise.all([
         apiClient.get('/company/tasks').catch(() => ({ data: { data: [] } })),
-        apiClient.get('/company/tasks/stats').catch(() => ({ data: { data: null } })),
-        apiClient.get('/interviews/calendar').catch(() => ({ data: { data: [] } })),
-        apiClient.get('/company/verifications/hrs').catch(() => ({ data: { data: [] } }))
+        apiClient.get('/company/verifications/hrs').catch(() => ({ data: { data: [] } })),
+        apiClient.get('/company/verifications/pending?status=PENDING').catch(() => ({ data: { content: [] } }))
       ]);
 
       setTasks(tasksRes.data?.data || []);
-      setTaskStats(statsRes.data?.data || null);
-      setMeetings(meetingsRes.data?.data || []);
       setHrTeam(hrRes.data?.data || []);
+
+      const pendingList = pendingRes.data?.content || pendingRes.data?.data || [];
+      setPendingApprovals(pendingList.map((item: any) => ({
+        id: item.id,
+        candidateName: item.candidateName || 'Candidate',
+        jobTitle: item.jobTitle || 'Senior Engineer',
+        department: item.department || 'Engineering',
+        hrName: item.hrName || 'HR Lead',
+        status: item.status || 'PENDING',
+        createdAt: item.createdAt || new Date().toISOString()
+      })));
     } catch (e) {
       console.warn('Dashboard data fetch error', e);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -232,8 +203,7 @@ export const CompanyExecutiveDashboard: React.FC = () => {
         setTaskDesc('');
         setTaskAssigneeId('');
         setTaskDueDate('');
-        setMsg('✅ Task created and assigned successfully!');
-        refreshStats();
+        setMsg('✅ Goal / Project task successfully created and delegated!');
       }
     } catch (e: any) {
       setMsg(`❌ Failed to create task: ${e?.response?.data?.message || 'Error'}`);
@@ -246,7 +216,6 @@ export const CompanyExecutiveDashboard: React.FC = () => {
       const res = await apiClient.put(`/company/tasks/${task.id}/status`, { status: nextStatus });
       if (res.data?.data) {
         setTasks(prev => prev.map(t => t.id === task.id ? res.data.data : t));
-        refreshStats();
       }
     } catch (e: any) {
       setMsg(`❌ Failed to update task: ${e?.response?.data?.message || 'Error'}`);
@@ -257,55 +226,29 @@ export const CompanyExecutiveDashboard: React.FC = () => {
     try {
       await apiClient.delete(`/company/tasks/${taskId}`);
       setTasks(prev => prev.filter(t => t.id !== taskId));
-      refreshStats();
       setMsg('🗑️ Task removed.');
     } catch (e: any) {
       setMsg(`❌ Failed to delete task: ${e?.response?.data?.message || 'Error'}`);
     }
   };
 
-  const refreshStats = async () => {
+  const handleToggleHrBadge = async (hr: HrMember) => {
     try {
-      const res = await apiClient.get('/company/tasks/stats');
-      setTaskStats(res.data?.data || null);
-    } catch (ignored) {}
-  };
-
-  const handleScheduleMeeting = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!meetingCandidateName.trim() || !meetingDate) return;
-
-    try {
-      const res = await apiClient.post('/interviews/schedule', {
-        applicationId: 0,
-        candidateUserId: user?.id || 1,
-        candidateName: meetingCandidateName.trim(),
-        candidateEmail: meetingCandidateEmail.trim() || 'candidate@hiremind.ai',
-        jobTitle: meetingJobTitle.trim() || 'Executive Leadership Review',
-        scheduledAt: new Date(meetingDate).toISOString(),
-        durationMinutes: Number(meetingDuration) || 45,
-        meetingLink: meetingLink.trim() || 'https://meet.google.com/hmd-exec-sync',
-        notes: 'Company Executive Meeting & Candidate Interview'
+      const nextVerified = !hr.companyVerified;
+      await apiClient.put(`/company/verifications/hrs/${hr.hrProfileId}/verify`, {
+        verified: nextVerified,
+        badgeTitle: nextVerified ? 'Official Company Verified Recruiter' : null
       });
 
-      if (res.data?.data) {
-        setMeetings(prev => [res.data.data, ...prev]);
-        setShowMeetingModal(false);
-        setMeetingCandidateName('');
-        setMeetingCandidateEmail('');
-        setMeetingJobTitle('');
-        setMeetingDate('');
-        setMeetingLink('');
-        setMsg('📅 Meeting scheduled & reminder created successfully!');
-      }
+      setHrTeam(prev => prev.map(h => h.hrProfileId === hr.hrProfileId ? { ...h, companyVerified: nextVerified } : h));
+      setMsg(nextVerified ? `🛡️ Verified Recruiter badge awarded to ${hr.name}!` : `Revoked verified badge for ${hr.name}.`);
     } catch (e: any) {
-      setMsg(`❌ Failed to schedule meeting: ${e?.response?.data?.message || 'Error'}`);
+      setMsg(`❌ Failed to update badge: ${e?.response?.data?.message || 'Error'}`);
     }
   };
 
-  // Salary Disbursal Handler
   const handleDisburseSingle = (id: string) => {
-    const txnRef = `TXN-HMD-${Math.floor(100000 + Math.random() * 900000)}`;
+    const txnRef = `TXN-AURA-${Math.floor(100000 + Math.random() * 900000)}`;
     const today = new Date().toISOString().split('T')[0];
 
     setPayrollRoster(prev => prev.map(rec => {
@@ -335,31 +278,16 @@ export const CompanyExecutiveDashboard: React.FC = () => {
           ...rec,
           status: 'DISBURSED',
           payoutDate: today,
-          transactionRef: `TXN-HMD-${Math.floor(100000 + Math.random() * 900000)}`
+          transactionRef: `TXN-AURA-${Math.floor(100000 + Math.random() * 900000)}`
         };
       }
       return rec;
     }));
 
     if (count > 0) {
-      setMsg(`🚀 Batch Disbursal Complete! ${count} pending payouts successfully transferred to HR & team accounts.`);
+      setMsg(`🚀 Batch Disbursal Complete! ${count} payouts successfully transferred to accounts.`);
     } else {
-      setMsg('ℹ️ All payroll payouts are already up-to-date and disbursed.');
-    }
-  };
-
-  const handleToggleHrBadge = async (hr: HrMember) => {
-    try {
-      const nextVerified = !hr.companyVerified;
-      await apiClient.put(`/company/verifications/hrs/${hr.hrProfileId}/verify`, {
-        verified: nextVerified,
-        badgeTitle: nextVerified ? 'Official Company Verified Recruiter' : null
-      });
-
-      setHrTeam(prev => prev.map(h => h.hrProfileId === hr.hrProfileId ? { ...h, companyVerified: nextVerified } : h));
-      setMsg(nextVerified ? `🛡️ Verified Badge awarded to ${hr.name}!` : `Revoked verified badge for ${hr.name}.`);
-    } catch (e: any) {
-      setMsg(`❌ Failed to update badge: ${e?.response?.data?.message || 'Error'}`);
+      setMsg('ℹ️ All payroll payouts are already disbursed and up-to-date.');
     }
   };
 
@@ -368,892 +296,730 @@ export const CompanyExecutiveDashboard: React.FC = () => {
     navigate('/admin-login');
   };
 
-  const filteredTasks = tasks.filter(t => {
-    if (taskFilter === 'ALL') return true;
-    return t.status === taskFilter;
-  });
-
-  // Payroll Metrics Calculations
-  const totalPayrollBudget = payrollRoster.reduce((acc, curr) => acc + curr.baseSalary + curr.incentive, 0);
-  const totalDisbursed = payrollRoster
-    .filter(r => r.status === 'DISBURSED')
-    .reduce((acc, curr) => acc + curr.baseSalary + curr.incentive, 0);
-  const totalPending = totalPayrollBudget - totalDisbursed;
+  const directorName = user ? `${user.firstName} ${user.lastName}` : 'Olivia Chen';
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="exec-dashboard-layout">
 
       {/* ────────────────────────────────────────────────────────
-          FLOATING QUICK TRIGGER FOR LEFT PANEL
+          LEFT VERTICAL DOCK SIDEBAR (Matching Reference Image)
           ──────────────────────────────────────────────────────── */}
-      <button
-        onClick={() => setIsPanelOpen(true)}
-        style={{
-          position: 'fixed',
-          left: 0,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          zIndex: 9000,
-          background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)',
-          color: '#FFFFFF',
-          border: 'none',
-          borderTopRightRadius: 12,
-          borderBottomRightRadius: 12,
-          padding: '14px 10px',
-          boxShadow: '0 8px 24px rgba(2, 132, 199, 0.45)',
-          cursor: 'pointer',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 6,
-          transition: 'all 0.2s ease'
-        }}
-        title="Open Company Executive Side Panel"
-      >
-        <Menu size={18} />
-        <span style={{ fontSize: 10, fontWeight: 900, writingMode: 'vertical-rl', letterSpacing: 1 }}>MENU</span>
-      </button>
-
-      {/* ────────────────────────────────────────────────────────
-          SLIDE-OVER LEFT SIDE PANEL / DRAWER
-          ──────────────────────────────────────────────────────── */}
-      {isPanelOpen && (
+      <aside className="exec-sidebar">
+        {/* Top Logo Glyph */}
         <div
-          onClick={() => setIsPanelOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(15, 23, 42, 0.7)',
-            backdropFilter: 'blur(6px)',
-            zIndex: 99999,
-            display: 'flex',
-            transition: 'all 0.3s ease'
-          }}
+          className="exec-logo-glyph"
+          onClick={() => setActiveNav('OVERVIEW')}
+          title="Auraflow Technologies Executive Hub"
         >
-          {/* Drawer Container (Stops propagation so clicks inside don't close) */}
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: 330,
-              maxWidth: '85vw',
-              height: '100vh',
-              background: 'var(--admin-surface)',
-              borderRight: '1px solid var(--admin-border)',
-              display: 'flex',
-              flexDirection: 'column',
-              boxShadow: '8px 0 32px rgba(0, 0, 0, 0.5)',
-              overflowY: 'auto'
-            }}
-          >
-            {/* Drawer Header */}
-            <div style={{
-              padding: '20px 22px',
-              borderBottom: '1px solid var(--admin-border)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'linear-gradient(180deg, var(--admin-surface) 0%, var(--admin-surface-subtle) 100%)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 18,
-                  color: '#fff',
-                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-                }}>
-                  🏢
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: 'var(--admin-text-primary)' }}>
-                    {companyName}
-                  </h3>
-                  <span style={{ fontSize: 11, color: '#10B981', fontWeight: 800 }}>✓ Verified Enterprise</span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsPanelOpen(false)}
-                style={{
-                  background: 'var(--admin-surface-subtle)',
-                  border: '1px solid var(--admin-border)',
-                  color: 'var(--admin-text-muted)',
-                  borderRadius: 8,
-                  width: 32,
-                  height: 32,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer'
-                }}
-                title="Close Panel (Esc)"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Executive Profile Card */}
-            <div style={{ padding: '14px 20px', background: 'var(--admin-surface-subtle)', borderBottom: '1px solid var(--admin-border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                Logged-In Executive
-              </div>
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--admin-text-primary)', marginTop: 2 }}>
-                {user?.firstName} {user?.lastName}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--admin-text-secondary)' }}>
-                {user?.email}
-              </div>
-              <div style={{ display: 'inline-block', marginTop: 6, background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', padding: '2px 8px', borderRadius: 999, fontSize: 10.5, fontWeight: 800 }}>
-                ROLE_COMPANY_ADMIN
-              </div>
-            </div>
-
-            {/* Navigation Menu List */}
-            <div style={{ padding: '16px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 900, color: 'var(--admin-text-muted)', padding: '6px 10px', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                Executive Navigation
-              </div>
-
-              {[
-                { id: 'OVERVIEW', label: 'Overview & KPIs', icon: Building2, count: null },
-                { id: 'HR_TEAM', label: 'HR Team', icon: Users, count: hrTeam.length },
-                { id: 'SALARY', label: 'Salary Disbursal', icon: DollarSign, count: `${payrollRoster.filter(r => r.status === 'PENDING').length} Due` },
-                { id: 'EDIT_PROFILE', label: 'Edit Profile', icon: Edit3, count: null },
-                { id: 'SETTINGS', label: 'Settings', icon: Settings, count: null },
-                { id: 'TASKS', label: 'Goals & Task Roster', icon: CheckSquare, count: tasks.length },
-                { id: 'MEETINGS', label: 'Meeting Reminders', icon: Calendar, count: meetings.length },
-                { id: 'VERIFICATIONS', label: 'Candidate Approvals', icon: Award, count: null },
-                { id: 'BILLING', label: 'Invoices & Billing', icon: CreditCard, count: null }
-              ].map(item => {
-                const Icon = item.icon;
-                const isSelected = activeTab === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id as any);
-                      setIsPanelOpen(false);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderRadius: 10,
-                      border: isSelected ? '1px solid rgba(2, 132, 199, 0.4)' : 'none',
-                      background: isSelected ? 'linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%)' : 'transparent',
-                      color: isSelected ? '#38BDF8' : 'var(--admin-text-primary)',
-                      fontSize: 13.5,
-                      fontWeight: isSelected ? 800 : 600,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.15s ease'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Icon size={16} color={isSelected ? '#38BDF8' : 'var(--admin-text-secondary)'} />
-                      <span>{item.label}</span>
-                    </div>
-
-                    {item.count && (
-                      <span style={{
-                        fontSize: 11,
-                        background: isSelected ? '#38BDF8' : 'var(--admin-surface-subtle)',
-                        color: isSelected ? '#0F172A' : 'var(--admin-text-secondary)',
-                        padding: '2px 8px',
-                        borderRadius: 999,
-                        fontWeight: 800
-                      }}>
-                        {item.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-
-              <div style={{ fontSize: 10.5, fontWeight: 900, color: 'var(--admin-text-muted)', padding: '12px 10px 4px', textTransform: 'uppercase', letterSpacing: 0.8 }}>
-                External Collaboration
-              </div>
-
-              <button
-                onClick={() => {
-                  navigate('/team-chat');
-                  setIsPanelOpen(false);
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '10px 14px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--admin-text-primary)',
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  textAlign: 'left'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <MessageSquare size={16} color="var(--admin-text-secondary)" />
-                  <span>Team Messages & Files</span>
-                </div>
-                <ChevronRight size={14} color="var(--admin-text-muted)" />
-              </button>
-            </div>
-
-            {/* Drawer Footer with Logout Button */}
-            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)' }}>
-              <button
-                onClick={handleLogoutSession}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  padding: '10px 16px',
-                  borderRadius: 10,
-                  background: 'rgba(239, 68, 68, 0.15)',
-                  border: '1px solid rgba(239, 68, 68, 0.3)',
-                  color: '#EF4444',
-                  fontWeight: 800,
-                  fontSize: 13,
-                  cursor: 'pointer'
-                }}
-              >
-                <LogOut size={16} /> Log Out from Company
-              </button>
-            </div>
-          </div>
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 22H7L12 12L17 22H22L12 2Z" fill="#FFFFFF" />
+            <path d="M12 12L8.5 19H15.5L12 12Z" fill="#38BDF8" />
+          </svg>
         </div>
-      )}
 
-      {/* ── COMPANY PROFILE BANNER & QUICK STATS ── */}
-      <div style={{
-        background: 'linear-gradient(135deg, var(--admin-surface) 0%, var(--admin-surface-subtle) 100%)',
-        border: '1px solid var(--admin-border)',
-        borderRadius: 18,
-        padding: '24px 28px',
-        marginBottom: 24,
-        boxShadow: 'var(--admin-card-shadow)',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: 20
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {/* Left Panel Menu Trigger Button */}
-          <button
-            onClick={() => setIsPanelOpen(true)}
-            style={{
-              background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: 12,
-              padding: '12px 16px',
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)'
-            }}
-            title="Open Executive Control Menu"
-          >
-            <Menu size={18} /> Company Menu
-          </button>
+        {/* Sidebar Dock Nav Items */}
+        <nav className="exec-nav-list">
+          {[
+            { id: 'OVERVIEW', label: 'Overview', icon: Building2 },
+            { id: 'ANALYTICS', label: 'Analytics', icon: BarChart3 },
+            { id: 'SALARY', label: 'Sales', icon: DollarSign },
+            { id: 'PROJECTS', label: 'Projects', icon: FolderKanban },
+            { id: 'TEAM', label: 'Team', icon: Users },
+            { id: 'SETTINGS', label: 'Settings', icon: Settings }
+          ].map(item => {
+            const Icon = item.icon;
+            const isSelected = activeNav === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveNav(item.id as any)}
+                className={`exec-nav-btn ${isSelected ? 'active' : ''}`}
+                title={item.label}
+              >
+                <Icon size={20} color={isSelected ? '#38BDF8' : '#94A3B8'} />
+                <span className="exec-nav-btn-label">
+                  {item.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
 
-          <div style={{
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            background: 'var(--admin-surface-subtle)',
-            border: '1px solid var(--admin-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 22
-          }}>
-            🏢
-          </div>
+        {/* Bottom Profile Avatar Thumbnail */}
+        <div
+          className="exec-sidebar-avatar"
+          onClick={() => setShowProfileMenu(!showProfileMenu)}
+          title={`${directorName} (CEO)`}
+        >
+          {directorName.charAt(0)}
+        </div>
+      </aside>
 
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 900, color: 'var(--admin-text-primary)' }}>
-                {companyName}
-              </h2>
-              <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', padding: '2px 8px', borderRadius: 999, fontSize: 11.5, fontWeight: 800 }}>
-                ✓ Verified Enterprise
-              </span>
+      {/* ────────────────────────────────────────────────────────
+          MAIN DASHBOARD VIEWPORT
+          ──────────────────────────────────────────────────────── */}
+      <main className="exec-viewport">
+
+        {/* ── TOP HEADER BAR (Matching Reference Image) ── */}
+        <header className="exec-header">
+          <div className="exec-header-left">
+            <div className="exec-header-title-row">
+              <div className="exec-header-logo-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 22H7L12 12L17 22H22L12 2Z" fill="#FFFFFF" />
+                </svg>
+              </div>
+              <h1 className="exec-header-title">
+                {companyName} <span className="exec-header-tagline">— {companyTagline}</span>
+              </h1>
             </div>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--admin-text-secondary)' }}>
-              {companyIndustry} • {companyWebsite} • Director: <strong>{user?.firstName} {user?.lastName}</strong>
+            <p className="exec-header-subtitle">
+              Agii: <span className="exec-header-subtitle-strong">{directorName}, CEO</span>
             </p>
           </div>
-        </div>
 
-        {/* Top Quick Actions */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setShowTaskModal(true)}
-            style={{
-              background: '#38BDF8',
-              color: '#0F172A',
-              border: 'none',
-              borderRadius: 10,
-              padding: '9px 16px',
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <Plus size={16} /> Add Task
-          </button>
-          <button
-            onClick={() => setShowMeetingModal(true)}
-            style={{
-              background: 'var(--admin-surface-subtle)',
-              color: 'var(--admin-text-primary)',
-              border: '1px solid var(--admin-border)',
-              borderRadius: 10,
-              padding: '9px 16px',
-              fontSize: 13,
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <Calendar size={16} /> Schedule Meeting
-          </button>
-          <button
-            onClick={() => setActiveTab('SALARY')}
-            style={{
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%)',
-              color: '#10B981',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: 10,
-              padding: '9px 16px',
-              fontSize: 13,
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-          >
-            <DollarSign size={16} /> Disburse Salaries
-          </button>
-        </div>
-      </div>
+          {/* Right Header Action Items */}
+          <div className="exec-header-actions">
+            {/* Quarter Filter Selector */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowQuarterMenu(!showQuarterMenu)}
+                className="exec-dropdown-trigger"
+              >
+                <Clock size={13} color="#94A3B8" />
+                <span>{selectedQuarter}</span>
+                <ChevronDown size={13} />
+              </button>
 
-      {/* Global Message Banner */}
-      {msg && (
-        <div style={{ marginBottom: 20, padding: '12px 18px', borderRadius: 12, background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', fontSize: '13.5px', color: 'var(--admin-text-primary)' }}>
-          {msg}
-        </div>
-      )}
-
-      {loading && (
-        <div style={{ marginBottom: 16, fontSize: 12.5, color: 'var(--admin-text-muted)', textAlign: 'center' }}>
-          Syncing executive tasks & meeting reminders...
-        </div>
-      )}
-
-      {/* ── SEGMENTED NAVIGATION TABS BAR ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }}>
-        {[
-          { id: 'OVERVIEW', label: 'Overview & KPIs', icon: Building2 },
-          { id: 'HR_TEAM', label: `HR Team (${hrTeam.length})`, icon: Users },
-          { id: 'SALARY', label: 'Salary Disbursal', icon: DollarSign },
-          { id: 'TASKS', label: `Goals & Tasks (${tasks.length})`, icon: CheckSquare },
-          { id: 'MEETINGS', label: `Meeting Reminders (${meetings.length})`, icon: Calendar },
-          { id: 'VERIFICATIONS', label: 'Candidate Approvals', icon: Award },
-          { id: 'EDIT_PROFILE', label: 'Edit Profile', icon: Edit3 },
-          { id: 'SETTINGS', label: 'Settings', icon: Settings }
-        ].map(tab => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 7,
-                padding: '9px 16px',
-                borderRadius: 12,
-                border: isActive ? 'none' : '1px solid var(--admin-border)',
-                background: isActive ? 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)' : 'var(--admin-surface)',
-                color: isActive ? '#FFFFFF' : 'var(--admin-text-secondary)',
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease',
-                boxShadow: isActive ? '0 4px 14px rgba(2, 132, 199, 0.3)' : 'none'
-              }}
-            >
-              <Icon size={15} /> {tab.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ────────────────────────────────────────────────────────
-          TAB 1: EXECUTIVE OVERVIEW & KPIS
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'OVERVIEW' && (
-        <div>
-          {/* KPI Cards Grid */}
-          <div className="temporal-metrics-grid" style={{ marginBottom: 20 }}>
-            <div className="temporal-card">
-              <div className="temporal-label"><CheckSquare size={13} /> Task Completion Rate</div>
-              <div className="temporal-val highlight">{taskStats?.completionRate ?? 0}%</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                {taskStats?.completedTasks ?? 0} of {taskStats?.totalTasks ?? 0} Completed
-              </div>
-            </div>
-
-            <div className="temporal-card">
-              <div className="temporal-label"><Calendar size={13} /> Upcoming Meetings</div>
-              <div className="temporal-val">{meetings.length}</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                Executive Sync & Candidate Interviews
-              </div>
-            </div>
-
-            <div className="temporal-card">
-              <div className="temporal-label"><DollarSign size={13} /> Monthly Payroll</div>
-              <div className="temporal-val" style={{ color: '#10B981' }}>${totalPayrollBudget.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                ${totalDisbursed.toLocaleString()} Disbursed • ${totalPending.toLocaleString()} Pending
-              </div>
-            </div>
-
-            <div className="temporal-card">
-              <div className="temporal-label"><Users size={13} /> HR Recruiters</div>
-              <div className="temporal-val highlight">{hrTeam.length}</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                {hrTeam.filter(h => h.companyVerified).length} Verified Badges Awarded
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Tasks & Meetings split grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
-            {/* Recent Tasks */}
-            <div className="admin-card-section" style={{ margin: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <h3 className="admin-section-heading" style={{ margin: 0 }}>
-                  <CheckSquare size={18} color="var(--admin-primary)" /> Goals & Task Roster
-                </h3>
-                <button
-                  onClick={() => setActiveTab('TASKS')}
-                  style={{ background: 'transparent', border: 'none', color: '#38BDF8', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  View All &rarr;
-                </button>
-              </div>
-
-              {tasks.length === 0 ? (
-                <div style={{ padding: 20, textAlign: 'center', color: 'var(--admin-text-muted)', fontSize: 13 }}>
-                  No tasks created yet. Click "+ Add Task" to assign work to your HR team.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {tasks.slice(0, 4).map(task => (
-                    <div
-                      key={task.id}
-                      onClick={() => handleToggleTaskStatus(task)}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: 12,
-                        background: 'var(--admin-surface-subtle)',
-                        border: '1px solid var(--admin-border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                      }}
+              {showQuarterMenu && (
+                <div className="exec-dropdown-menu">
+                  {['Q1 Goals', 'Q2 Goals', 'Q3 Goals', 'Q4 Goals', 'Annual 2026'].map(q => (
+                    <button
+                      key={q}
+                      onClick={() => { setSelectedQuarter(q); setShowQuarterMenu(false); }}
+                      className={`exec-dropdown-item ${selectedQuarter === q ? 'active' : ''}`}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 6,
-                          border: task.status === 'COMPLETED' ? 'none' : '2px solid var(--admin-border)',
-                          background: task.status === 'COMPLETED' ? '#10B981' : 'transparent',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#FFFFFF',
-                          fontSize: 12
-                        }}>
-                          {task.status === 'COMPLETED' && '✓'}
-                        </div>
-                        <div>
-                          <div style={{
-                            fontSize: 13,
-                            fontWeight: 700,
-                            color: task.status === 'COMPLETED' ? 'var(--admin-text-muted)' : 'var(--admin-text-primary)',
-                            textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none'
-                          }}>
-                            {task.title}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 2 }}>
-                            Assigned to: <strong>{task.assignedToName}</strong> • {task.category}
-                          </div>
-                        </div>
-                      </div>
-
-                      <span style={{
-                        fontSize: 10.5,
-                        padding: '2px 8px',
-                        borderRadius: 999,
-                        fontWeight: 800,
-                        background: task.priority === 'HIGH' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(56, 189, 248, 0.15)',
-                        color: task.priority === 'HIGH' ? '#EF4444' : '#38BDF8'
-                      }}>
-                        {task.priority}
-                      </span>
-                    </div>
+                      {q}
+                    </button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Upcoming Meetings */}
-            <div className="admin-card-section" style={{ margin: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <h3 className="admin-section-heading" style={{ margin: 0 }}>
-                  <Calendar size={18} color="var(--admin-accent)" /> Meeting & Interview Reminders
-                </h3>
-                <button
-                  onClick={() => setActiveTab('MEETINGS')}
-                  style={{ background: 'transparent', border: 'none', color: '#38BDF8', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-                >
-                  View All &rarr;
-                </button>
+            {/* Date Display */}
+            <div className="exec-date-badge">
+              <Calendar size={13} color="#94A3B8" />
+              <span>25/08/2026 14:00</span>
+            </div>
+
+            {/* Notification Bell with Badge */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setMsg('🔔 1 Pending Candidate verification approval requires your signature.')}
+                className="exec-notification-btn"
+                title="Notifications"
+              >
+                <Bell size={15} />
+              </button>
+              <span className="exec-notification-badge">
+                1
+              </span>
+            </div>
+
+            {/* User Profile Pill with Avatar & Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <div
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="exec-profile-chip"
+              >
+                <div className="exec-profile-avatar-sm">
+                  {directorName.charAt(0)}
+                </div>
+                <div className="exec-profile-info">
+                  <div className="exec-profile-name">
+                    {directorName}
+                  </div>
+                  <div className="exec-profile-role">CEO</div>
+                </div>
+                <ChevronDown size={12} color="#94A3B8" />
               </div>
 
-              {meetings.length === 0 ? (
-                <div style={{ padding: 20, textAlign: 'center', color: 'var(--admin-text-muted)', fontSize: 13 }}>
-                  No upcoming meetings. Click "Schedule Meeting" to create one.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {meetings.slice(0, 3).map(m => (
-                    <div
-                      key={m.id}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: 12,
-                        background: 'var(--admin-surface-subtle)',
-                        border: '1px solid var(--admin-border)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--admin-text-primary)' }}>
-                          {m.candidateName} — {m.jobTitle}
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 2 }}>
-                          ⏰ {new Date(m.scheduledAt).toLocaleString()} ({m.durationMinutes} mins)
-                        </div>
-                      </div>
-
-                      {m.meetingLink && (
-                        <a
-                          href={m.meetingLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{
-                            background: 'rgba(56, 189, 248, 0.15)',
-                            color: '#38BDF8',
-                            padding: '6px 12px',
-                            borderRadius: 8,
-                            fontSize: 12,
-                            fontWeight: 700,
-                            textDecoration: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4
-                          }}
-                        >
-                          <Video size={13} /> Join Call
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ────────────────────────────────────────────────────────
-          TAB 2: HR TEAM MANAGEMENT & VERIFIED RECRUITER BADGES
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'HR_TEAM' && (
-        <div className="admin-card-section">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-            <div>
-              <h3 className="admin-section-heading" style={{ margin: 0 }}>
-                <Users size={18} color="var(--admin-primary)" /> Company HR Recruiter Roster & Verified Badges
-              </h3>
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--admin-text-secondary)' }}>
-                Authorize HR recruiters with official Company Verified Badges so candidates can authenticate their identity.
-              </p>
-            </div>
-          </div>
-
-          {hrTeam.length === 0 ? (
-            <div style={{ padding: 36, textAlign: 'center', background: 'var(--admin-surface-subtle)', borderRadius: 14, border: '1px dashed var(--admin-border)' }}>
-              <Users size={36} color="#38BDF8" style={{ margin: '0 auto 8px', display: 'block' }} />
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--admin-text-primary)' }}>No HR recruiters registered under {companyName}.</p>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--admin-text-secondary)' }}>HRs registering with your company domain will appear here automatically.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
-              {hrTeam.map(hr => (
-                <div
-                  key={hr.hrProfileId}
-                  style={{
-                    padding: '18px 20px',
-                    borderRadius: 14,
-                    background: 'var(--admin-surface-subtle)',
-                    border: '1px solid var(--admin-border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    gap: 14
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                    <div style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 12,
-                      background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)',
-                      color: '#fff',
+              {showProfileMenu && (
+                <div className="exec-profile-dropdown">
+                  <div style={{ padding: '6px 10px', borderBottom: '1px solid rgba(255,255,255,0.07)', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#F1F5F9' }}>{directorName}</div>
+                    <div style={{ fontSize: 11, color: '#94A3B8' }}>{user?.email || 'director@auraflow.ai'}</div>
+                  </div>
+                  <button
+                    onClick={() => { setActiveNav('SETTINGS'); setShowProfileMenu(false); }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 10px',
+                      background: 'transparent',
+                      color: '#CBD5E1',
+                      border: 'none',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      borderRadius: 6,
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: 16
-                    }}>
-                      {hr.name.charAt(0)}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--admin-text-primary)' }}>{hr.name}</span>
-                        {hr.companyVerified && (
-                          <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 800 }}>
-                            ✓ Verified Recruiter
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: 'var(--admin-text-secondary)', marginTop: 2 }}>{hr.email}</div>
-                      <div style={{ fontSize: 12, color: 'var(--admin-text-muted)', marginTop: 2 }}>Role: {hr.designation || 'Talent Acquisition Specialist'}</div>
-                    </div>
-                  </div>
+                      gap: 6
+                    }}
+                  >
+                    <Settings size={13} /> Settings & Profile
+                  </button>
+                  <button
+                    onClick={handleLogoutSession}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '8px 10px',
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      color: '#EF4444',
+                      border: 'none',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      borderRadius: 6,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 4
+                    }}
+                  >
+                    <LogOut size={13} /> Log Out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
 
-                  <div style={{ display: 'flex', gap: 8, borderTop: '1px solid var(--admin-border)', paddingTop: 12 }}>
-                    <button
-                      onClick={() => handleToggleHrBadge(hr)}
-                      style={{
-                        flex: 1,
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: 'none',
-                        fontWeight: 700,
-                        fontSize: 12.5,
-                        cursor: 'pointer',
-                        background: hr.companyVerified ? 'rgba(239, 68, 68, 0.15)' : 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-                        color: hr.companyVerified ? '#EF4444' : '#FFFFFF'
-                      }}
-                    >
-                      {hr.companyVerified ? 'Revoke Verified Badge' : '🛡️ Award Verified Badge'}
-                    </button>
-                    <button
-                      onClick={() => navigate('/team-chat')}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: 8,
-                        border: '1px solid var(--admin-border)',
-                        background: 'var(--admin-surface)',
-                        color: 'var(--admin-text-primary)',
-                        fontWeight: 700,
-                        fontSize: 12.5,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Message
-                    </button>
+        {/* Global Feedback Banner */}
+        {msg && (
+          <div className="exec-banner-msg">
+            <span>{msg}</span>
+            <button onClick={() => setMsg('')} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', fontSize: 15 }}>✕</button>
+          </div>
+        )}
+
+        {/* ────────────────────────────────────────────────────────
+            VIEW 1: OVERVIEW (EXACT REPLICA OF THE REFERENCE IMAGE)
+            ──────────────────────────────────────────────────────── */}
+        {activeNav === 'OVERVIEW' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* ── ROW 1: 4 TOP KPI METRIC CARDS ── */}
+            <div className="exec-kpi-grid">
+              {/* Card 1: Revenue */}
+              <div className="exec-kpi-card">
+                <div className="exec-kpi-header">
+                  <span className="exec-kpi-title">Revenue</span>
+                  <div style={{ color: '#0284C7', opacity: 0.8 }}><BarChart3 size={15} /></div>
+                </div>
+                <div className="exec-kpi-val-row">
+                  <span className="exec-kpi-value">$2,850,000</span>
+                  <span className="exec-kpi-badge positive">
+                    +14%
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 2: Active Users */}
+              <div className="exec-kpi-card">
+                <div className="exec-kpi-header">
+                  <span className="exec-kpi-title">Active Users</span>
+                  <div style={{ color: '#0284C7', opacity: 0.8 }}><Users size={15} /></div>
+                </div>
+                <div className="exec-kpi-val-row">
+                  <span className="exec-kpi-value">142,500</span>
+                  <span className="exec-kpi-badge positive">
+                    +9%
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 3: MRR */}
+              <div className="exec-kpi-card">
+                <div className="exec-kpi-header">
+                  <span className="exec-kpi-title">MRR</span>
+                  <div style={{ color: '#10B981', opacity: 0.8 }}><Wallet size={15} /></div>
+                </div>
+                <div className="exec-kpi-val-row">
+                  <span className="exec-kpi-value">$450k</span>
+                  <span className="exec-kpi-badge positive">
+                    +11%
+                  </span>
+                </div>
+              </div>
+
+              {/* Card 4: Churn Rate */}
+              <div className="exec-kpi-card">
+                <div className="exec-kpi-header">
+                  <span className="exec-kpi-title">Churn Rate</span>
+                  <div style={{ color: '#EF4444', opacity: 0.8 }}><Activity size={15} /></div>
+                </div>
+                <div className="exec-kpi-val-row">
+                  <span className="exec-kpi-value">3.2%</span>
+                  <span className="exec-kpi-badge negative">
+                    -0.5%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── ROW 2: 3 CORE ANALYTICS & VISUALIZATION PANELS ── */}
+            <div className="exec-charts-grid">
+
+              {/* Chart 1: Monthly Revenue Growth 2026 (Smooth Wave Spline Chart) */}
+              <div className="exec-chart-card">
+                <div className="exec-chart-header">
+                  <h3 className="exec-chart-title">
+                    Monthly Revenue Growth 2026
+                  </h3>
+                  <div className="exec-chart-legend">
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#38BDF8' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#38BDF8' }} /> Current
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#2563EB' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563EB' }} /> Target
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#0EA5E9' }}>
+                      <span style={{ width: 12, height: 2, background: '#0EA5E9' }} /> STM goal
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* ────────────────────────────────────────────────────────
-          TAB 3: SALARY DISBURSAL & PAYROLL SUITE (salary-disbuss)
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'SALARY' && (
-        <div>
-          {/* Executive Payroll Summary */}
-          <div className="temporal-metrics-grid" style={{ marginBottom: 20 }}>
-            <div className="temporal-card">
-              <div className="temporal-label"><Wallet size={13} /> Total Monthly Liability</div>
-              <div className="temporal-val highlight">${totalPayrollBudget.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                Full-time HR staff & executive compensation
+                {/* SVG Spline Wave Visualization */}
+                <div style={{ position: 'relative', width: '100%', height: 160, marginTop: 'auto' }}>
+                  <svg width="100%" height="160" viewBox="0 0 460 160" preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+                    <defs>
+                      <linearGradient id="cyanAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.35" />
+                        <stop offset="100%" stopColor="#06B6D4" stopOpacity="0.0" />
+                      </linearGradient>
+                      <linearGradient id="blueAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#2563EB" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="#2563EB" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+
+                    {/* Horizontal Grid lines */}
+                    <line x1="30" y1="20" x2="450" y2="20" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                    <line x1="30" y1="60" x2="450" y2="60" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                    <line x1="30" y1="100" x2="450" y2="100" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                    <line x1="30" y1="140" x2="450" y2="140" stroke="rgba(255,255,255,0.08)" />
+
+                    {/* Y-axis Labels */}
+                    <text x="0" y="24" fill="#64748B" fontSize="9.5" fontWeight="600">$3M</text>
+                    <text x="0" y="64" fill="#64748B" fontSize="9.5" fontWeight="600">$2M</text>
+                    <text x="0" y="104" fill="#64748B" fontSize="9.5" fontWeight="600">$1M</text>
+                    <text x="0" y="144" fill="#64748B" fontSize="9.5" fontWeight="600">$0</text>
+
+                    {/* Target Blue Wave Area + Path */}
+                    <path
+                      d="M30,135 C80,80 120,105 170,95 C220,85 260,35 310,40 C360,45 400,100 450,45 L450,140 L30,140 Z"
+                      fill="url(#blueAreaGrad)"
+                    />
+                    <path
+                      d="M30,135 C80,80 120,105 170,95 C220,85 260,35 310,40 C360,45 400,100 450,45"
+                      fill="none"
+                      stroke="#2563EB"
+                      strokeWidth="2.5"
+                    />
+
+                    {/* Current Cyan Wave Area + Path */}
+                    <path
+                      d="M30,140 C80,120 120,130 170,115 C220,100 260,65 310,75 C360,85 400,60 450,20 L450,140 L30,140 Z"
+                      fill="url(#cyanAreaGrad)"
+                    />
+                    <path
+                      d="M30,140 C80,120 120,130 170,115 C220,100 260,65 310,75 C360,85 400,60 450,20"
+                      fill="none"
+                      stroke="#06B6D4"
+                      strokeWidth="3"
+                    />
+
+                    {/* STM Goal Dashed Top Indicator */}
+                    <path
+                      d="M30,135 C150,90 280,40 450,20"
+                      fill="none"
+                      stroke="#38BDF8"
+                      strokeWidth="1.5"
+                      strokeDasharray="4 4"
+                    />
+                  </svg>
+                </div>
+
+                {/* X-Axis Month Labels */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingLeft: 30, marginTop: 8, fontSize: 10, color: '#64748B', fontWeight: 600 }}>
+                  <span>Jan</span>
+                  <span>Mar</span>
+                  <span>May</span>
+                  <span>Jul</span>
+                  <span>Sep</span>
+                  <span>Nov</span>
+                </div>
               </div>
-            </div>
 
-            <div className="temporal-card">
-              <div className="temporal-label"><ShieldCheck size={13} /> Disbursed to Date</div>
-              <div className="temporal-val" style={{ color: '#10B981' }}>${totalDisbursed.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                {payrollRoster.filter(r => r.status === 'DISBURSED').length} of {payrollRoster.length} Accounts Transferred
+              {/* Chart 2: Quarterly Sales by Region (Grouped Multi-bar Chart) */}
+              <div className="exec-chart-card">
+                <div className="exec-chart-header">
+                  <h3 className="exec-chart-title">
+                    Quarterly Sales by Region
+                  </h3>
+                  <div style={{ display: 'flex', gap: 8, fontSize: 10.5, fontWeight: 600 }}>
+                    <span style={{ color: '#38BDF8' }}>● NA</span>
+                    <span style={{ color: '#10B981' }}>● EU</span>
+                    <span style={{ color: '#F97316' }}>● APAC</span>
+                  </div>
+                </div>
+
+                {/* Grouped Bars Container */}
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: 155, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 6 }}>
+                  {/* Region 1: NA */}
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end' }}>
+                    <div style={{ width: 14, height: 95, background: '#38BDF8', borderRadius: '4px 4px 0 0' }} title="NA: 260k" />
+                    <div style={{ width: 14, height: 65, background: '#10B981', borderRadius: '4px 4px 0 0' }} title="EU: 180k" />
+                    <div style={{ width: 14, height: 110, background: '#F97316', borderRadius: '4px 4px 0 0' }} title="APAC: 310k" />
+                  </div>
+
+                  {/* Region 2: EU */}
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end' }}>
+                    <div style={{ width: 14, height: 85, background: '#38BDF8', borderRadius: '4px 4px 0 0' }} title="NA: 240k" />
+                    <div style={{ width: 14, height: 60, background: '#10B981', borderRadius: '4px 4px 0 0' }} title="EU: 170k" />
+                    <div style={{ width: 14, height: 90, background: '#F97316', borderRadius: '4px 4px 0 0' }} title="APAC: 250k" />
+                  </div>
+
+                  {/* Region 3: APAC */}
+                  <div style={{ display: 'flex', gap: 5, alignItems: 'flex-end' }}>
+                    <div style={{ width: 14, height: 135, background: '#38BDF8', borderRadius: '4px 4px 0 0' }} title="NA: 380k" />
+                    <div style={{ width: 14, height: 75, background: '#10B981', borderRadius: '4px 4px 0 0' }} title="EU: 210k" />
+                    <div style={{ width: 14, height: 85, background: '#F97316', borderRadius: '4px 4px 0 0' }} title="APAC: 240k" />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8, fontSize: 10.5, color: '#64748B', fontWeight: 700 }}>
+                  <span>NA</span>
+                  <span>EU</span>
+                  <span>APAC</span>
+                </div>
               </div>
-            </div>
 
-            <div className="temporal-card">
-              <div className="temporal-label"><Clock size={13} /> Pending Disbursals</div>
-              <div className="temporal-val" style={{ color: totalPending > 0 ? '#F59E0B' : '#10B981' }}>${totalPending.toLocaleString()}</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                {payrollRoster.filter(r => r.status === 'PENDING').length} Payouts Awaiting Execution
+              {/* Chart 3: User Acquisition Channel (Doughnut Ring Chart) */}
+              <div className="exec-chart-card" style={{ alignItems: 'center' }}>
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <h3 className="exec-chart-title">
+                    User Acquisition Channel
+                  </h3>
+                  <span style={{ color: '#64748B', fontSize: 14, cursor: 'pointer' }}>···</span>
+                </div>
+
+                {/* SVG Doughnut Ring */}
+                <div style={{ position: 'relative', width: 130, height: 130 }}>
+                  <svg width="130" height="130" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#1E293B" strokeWidth="14" />
+                    {/* Slices */}
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#0284C7" strokeWidth="14" strokeDasharray="95 144" strokeDashoffset="0" />
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#10B981" strokeWidth="14" strokeDasharray="55 184" strokeDashoffset="-95" />
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#F59E0B" strokeWidth="14" strokeDasharray="45 194" strokeDashoffset="-150" />
+                    <circle cx="50" cy="50" r="38" fill="none" stroke="#EF4444" strokeWidth="14" strokeDasharray="44 195" strokeDashoffset="-195" />
+                  </svg>
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'none'
+                  }}>
+                    <span style={{ fontSize: 10, color: '#94A3B8', fontWeight: 600 }}>Total</span>
+                    <span style={{ fontSize: 15, fontWeight: 900, color: '#F8FAFC' }}>100%</span>
+                  </div>
+                </div>
+
+                {/* Doughnut Legend */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 12px', justifyContent: 'center', marginTop: 12, fontSize: 10.5, fontWeight: 600, color: '#94A3B8' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#0284C7' }} /> Organic
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981' }} /> Paid
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B' }} /> Referral
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#EF4444' }} /> Social
+                  </span>
+                </div>
               </div>
+
             </div>
 
-            <div className="temporal-card">
-              <div className="temporal-label"><Calendar size={13} /> Next Auto Payout Cycle</div>
-              <div className="temporal-val">1st Sept 2026</div>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                Direct ACH / Wire / UPI Settlement
+            {/* ── ROW 3: 3 OPERATIONAL & GOVERNANCE PANELS ── */}
+            <div className="exec-ops-grid">
+
+              {/* Panel 1: Project Progress Tracker */}
+              <div className="exec-ops-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#F1F5F9' }}>Project Alpha</h3>
+                    <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontSize: 10.5, padding: '1px 6px', borderRadius: 4, fontWeight: 800 }}>
+                      Active
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowTaskModal(true)}
+                    style={{ background: 'transparent', border: 'none', color: '#38BDF8', cursor: 'pointer', fontSize: 16, padding: 0 }}
+                    title="Add Goal"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Task 1 */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>
+                      <span style={{ color: '#E2E8F0' }}>Project Alpha</span>
+                      <span style={{ color: '#38BDF8' }}>In Progress 86%</span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, background: '#1E293B', borderRadius: 999, overflow: 'hidden' }}>
+                      <div style={{ width: '86%', height: '100%', background: 'linear-gradient(90deg, #0EA5E9, #38BDF8)', borderRadius: 999 }} />
+                    </div>
+                  </div>
+
+                  {/* Task 2 */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>
+                      <span style={{ color: '#E2E8F0' }}>Beta Launch</span>
+                      <span style={{ color: '#10B981' }}>On Track 100%</span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, background: '#1E293B', borderRadius: 999, overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: '100%', background: 'linear-gradient(90deg, #059669, #10B981)', borderRadius: 999 }} />
+                    </div>
+                  </div>
+
+                  {/* Task 3 */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700, marginBottom: 5 }}>
+                      <span style={{ color: '#E2E8F0' }}>Marketing Campaign</span>
+                      <span style={{ color: '#EF4444' }}>Delayed 45%</span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, background: '#1E293B', borderRadius: 999, overflow: 'hidden' }}>
+                      <div style={{ width: '45%', height: '100%', background: 'linear-gradient(90deg, #DC2626, #EF4444)', borderRadius: 999 }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Panel 2: Pending Approvals & Team Updates */}
+              <div className="exec-ops-card" style={{ gap: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#F1F5F9' }}>Pending Approvals</h3>
+                  <span style={{ color: '#64748B', fontSize: 14, cursor: 'pointer' }}>···</span>
+                </div>
+
+                {/* Subcard: Pending Approvals */}
+                <div
+                  onClick={() => setActiveNav('PROJECTS')}
+                  className="exec-subcard"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <CheckCircle2 size={16} color="#F59E0B" />
+                    <div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F1F5F9' }}>
+                        Pending Approvals: Candidate Tags
+                      </div>
+                      <div style={{ fontSize: 10.5, color: '#94A3B8' }}>
+                        {pendingApprovals.length > 0 ? `${pendingApprovals.length} candidates pending endorsement` : 'All candidate tags reviewed'}
+                      </div>
+                    </div>
+                  </div>
+                  <Search size={14} color="#64748B" />
+                </div>
+
+                {/* Subcard: Team Updates */}
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#F1F5F9', marginTop: 2 }}>
+                  Team Updates
+                </div>
+
+                <div
+                  onClick={() => setActiveNav('TEAM')}
+                  className="exec-subcard"
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <Users size={16} color="#38BDF8" />
+                    <div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#F1F5F9' }}>
+                        HR Recruiter Team Pulse
+                      </div>
+                      <div style={{ fontSize: 10.5, color: '#94A3B8' }}>
+                        {hrTeam.length} active recruiters registered
+                      </div>
+                    </div>
+                  </div>
+                  <Search size={14} color="#64748B" />
+                </div>
+              </div>
+
+              {/* Panel 3: Top Performing Products / Hiring Squads */}
+              <div className="exec-ops-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: '#F1F5F9' }}>Top Performing Products</h3>
+                  <span style={{ color: '#64748B', fontSize: 14, cursor: 'pointer' }}>···</span>
+                </div>
+
+                {/* Bar Graph */}
+                <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: 110, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 6 }}>
+                  {/* Category 1 */}
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end' }}>
+                    <div style={{ width: 12, height: 75, background: '#0284C7', borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ width: 12, height: 50, background: '#10B981', borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ width: 12, height: 65, background: '#EF4444', borderRadius: '3px 3px 0 0' }} />
+                  </div>
+
+                  {/* Category 2 */}
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end' }}>
+                    <div style={{ width: 12, height: 95, background: '#0284C7', borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ width: 12, height: 60, background: '#10B981', borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ width: 12, height: 45, background: '#EF4444', borderRadius: '3px 3px 0 0' }} />
+                  </div>
+
+                  {/* Category 3 */}
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end' }}>
+                    <div style={{ width: 12, height: 85, background: '#0284C7', borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ width: 12, height: 45, background: '#10B981', borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ width: 12, height: 40, background: '#EF4444', borderRadius: '3px 3px 0 0' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: 8, fontSize: 10, color: '#64748B', fontWeight: 600 }}>
+                  <span>AI Core Engine</span>
+                  <span>Talent Cloud</span>
+                  <span>Analytics Pro</span>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* ────────────────────────────────────────────────────────
+            VIEW 2: ANALYTICS & TELEMETRY
+            ──────────────────────────────────────────────────────── */}
+        {activeNav === 'ANALYTICS' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="exec-card-section">
+              <h2 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 900, color: '#F8FAFC' }}>
+                📊 Comprehensive Hiring & Placement Telemetry
+              </h2>
+              <p style={{ margin: 0, fontSize: 13, color: '#94A3B8' }}>
+                Deep-dive performance telemetry for technical screening, interview velocity, and candidate verification.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              <div className="exec-card-section" style={{ padding: 20 }}>
+                <div style={{ fontSize: 12, color: '#94A3B8', fontWeight: 700 }}>AVG. INTERVIEW VELOCITY</div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: '#38BDF8', marginTop: 4 }}>3.4 Days</div>
+                <div style={{ fontSize: 11, color: '#10B981', marginTop: 2 }}>↓ 28% Faster than industry benchmark</div>
+              </div>
+
+              <div className="exec-card-section" style={{ padding: 20 }}>
+                <div style={{ fontSize: 12, color: '#94A3B8', fontWeight: 700 }}>CREDENTIAL VERIFICATION ACCURACY</div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: '#10B981', marginTop: 4 }}>99.98%</div>
+                <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>Zero fraudulent tag leakage</div>
+              </div>
+
+              <div className="exec-card-section" style={{ padding: 20 }}>
+                <div style={{ fontSize: 12, color: '#94A3B8', fontWeight: 700 }}>OFFER ACCEPTANCE RATE</div>
+                <div style={{ fontSize: 24, fontWeight: 900, color: '#F59E0B', marginTop: 4 }}>94.2%</div>
+                <div style={{ fontSize: 11, color: '#10B981', marginTop: 2 }}>↑ 6.4% YoY Increase</div>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Salary Table Section */}
-          <div className="admin-card-section">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+        {/* ────────────────────────────────────────────────────────
+            VIEW 3: SALES / SALARY DISBURSAL (salary-disbuss)
+            ──────────────────────────────────────────────────────── */}
+        {activeNav === 'SALARY' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Header + Action */}
+            <div className="exec-card-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
               <div>
-                <h3 className="admin-section-heading" style={{ margin: 0 }}>
-                  <DollarSign size={18} color="#10B981" /> HR & Employee Salary Disbursal Management
-                </h3>
-                <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--admin-text-secondary)' }}>
+                <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: '#F8FAFC' }}>
+                  💰 HR & Staff Salary Disbursal Management
+                </h2>
+                <p style={{ margin: 0, fontSize: 13, color: '#94A3B8' }}>
                   Execute one-click instant salary disbursements, review transaction references, and manage payroll accounts.
                 </p>
               </div>
 
               <button
                 onClick={handleDisburseAllPending}
-                style={{
-                  background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-                  color: '#FFFFFF',
-                  border: 'none',
-                  borderRadius: 10,
-                  padding: '9px 18px',
-                  fontSize: 13,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.35)'
-                }}
+                className="exec-success-btn"
               >
                 <Send size={15} /> 🚀 Disburse All Pending Salaries
               </button>
             </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            {/* Roster Table */}
+            <div className="exec-card-section" style={{ padding: '20px', overflowX: 'auto' }}>
+              <table className="exec-table">
                 <thead>
-                  <tr style={{ borderBottom: '2px solid var(--admin-border)', fontSize: 12, color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>
-                    <th style={{ padding: '12px 14px' }}>Employee & Designation</th>
-                    <th style={{ padding: '12px 14px' }}>Account / UPI Ref</th>
-                    <th style={{ padding: '12px 14px' }}>Base Salary</th>
-                    <th style={{ padding: '12px 14px' }}>Incentive</th>
-                    <th style={{ padding: '12px 14px' }}>Total Payout</th>
-                    <th style={{ padding: '12px 14px' }}>Status</th>
-                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
+                  <tr>
+                    <th>Employee & Role</th>
+                    <th>Account / UPI Ref</th>
+                    <th>Base Salary</th>
+                    <th>Incentive</th>
+                    <th>Total Payout</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payrollRoster.map(rec => (
-                    <tr key={rec.id} style={{ borderBottom: '1px solid var(--admin-border)', fontSize: 13 }}>
-                      <td style={{ padding: '14px' }}>
-                        <div style={{ fontWeight: 800, color: 'var(--admin-text-primary)' }}>{rec.employeeName}</div>
-                        <div style={{ fontSize: 11.5, color: 'var(--admin-text-muted)' }}>{rec.role}</div>
+                    <tr key={rec.id}>
+                      <td>
+                        <div style={{ fontWeight: 800, color: '#F8FAFC' }}>{rec.employeeName}</div>
+                        <div style={{ fontSize: 11.5, color: '#94A3B8' }}>{rec.role}</div>
                       </td>
-                      <td style={{ padding: '14px' }}>
-                        <div style={{ fontWeight: 700, color: 'var(--admin-text-primary)' }}>{rec.accountMasked}</div>
-                        <div style={{ fontSize: 11, color: 'var(--admin-text-muted)' }}>{rec.paymentMethod}</div>
+                      <td>
+                        <div style={{ fontWeight: 700, color: '#E2E8F0' }}>{rec.accountMasked}</div>
+                        <div style={{ fontSize: 11, color: '#94A3B8' }}>{rec.paymentMethod}</div>
                       </td>
-                      <td style={{ padding: '14px', color: 'var(--admin-text-primary)' }}>
+                      <td style={{ color: '#CBD5E1' }}>
                         ${rec.baseSalary.toLocaleString()}
                       </td>
-                      <td style={{ padding: '14px', color: '#10B981', fontWeight: 700 }}>
+                      <td style={{ color: '#10B981', fontWeight: 700 }}>
                         +${rec.incentive.toLocaleString()}
                       </td>
-                      <td style={{ padding: '14px', fontWeight: 900, color: 'var(--admin-text-primary)' }}>
+                      <td style={{ fontWeight: 900, color: '#FFFFFF' }}>
                         ${(rec.baseSalary + rec.incentive).toLocaleString()}
                       </td>
-                      <td style={{ padding: '14px' }}>
-                        <span style={{
-                          padding: '3px 9px',
-                          borderRadius: 999,
-                          fontSize: 11,
-                          fontWeight: 800,
-                          background: rec.status === 'DISBURSED' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                          color: rec.status === 'DISBURSED' ? '#10B981' : '#F59E0B'
-                        }}>
+                      <td>
+                        <span className={`exec-kpi-badge ${rec.status === 'DISBURSED' ? 'positive' : 'negative'}`} style={{ color: rec.status === 'DISBURSED' ? '#10B981' : '#F59E0B' }}>
                           {rec.status === 'DISBURSED' ? '✓ DISBURSED' : '⏳ PENDING'}
                         </span>
                         {rec.transactionRef && (
-                          <div style={{ fontSize: 10, color: 'var(--admin-text-muted)', marginTop: 3 }}>
+                          <div style={{ fontSize: 10, color: '#64748B', marginTop: 3 }}>
                             {rec.transactionRef}
                           </div>
                         )}
                       </td>
-                      <td style={{ padding: '14px', textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right' }}>
                         {rec.status === 'PENDING' ? (
                           <button
                             onClick={() => handleDisburseSingle(rec.id)}
-                            style={{
-                              background: 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
-                              color: '#FFFFFF',
-                              border: 'none',
-                              borderRadius: 8,
-                              padding: '6px 14px',
-                              fontSize: 12,
-                              fontWeight: 800,
-                              cursor: 'pointer'
-                            }}
+                            className="exec-success-btn"
+                            style={{ padding: '6px 14px', fontSize: 12 }}
                           >
                             ⚡ Disburse Payout
                           </button>
@@ -1261,9 +1027,9 @@ export const CompanyExecutiveDashboard: React.FC = () => {
                           <button
                             onClick={() => setActiveReceipt(rec)}
                             style={{
-                              background: 'var(--admin-surface-subtle)',
+                              background: '#1E293B',
                               color: '#38BDF8',
-                              border: '1px solid var(--admin-border)',
+                              border: '1px solid rgba(56, 189, 248, 0.3)',
                               borderRadius: 8,
                               padding: '6px 12px',
                               fontSize: 12,
@@ -1281,645 +1047,350 @@ export const CompanyExecutiveDashboard: React.FC = () => {
               </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ────────────────────────────────────────────────────────
-          TAB 4: GOALS & TASK MANAGEMENT HUB (ASSIGN & TRACK)
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'TASKS' && (
-        <div className="admin-card-section">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-            <div>
-              <h3 className="admin-section-heading" style={{ margin: 0 }}>
-                <CheckSquare size={18} color="var(--admin-primary)" /> Task & Goal Delegation Center
-              </h3>
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--admin-text-secondary)' }}>
-                Create goals, assign tasks to HR recruiters, and track live progress to completion.
-              </p>
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {/* Filter Pills */}
-              <div style={{ display: 'flex', gap: 4, background: 'var(--admin-surface-subtle)', padding: 4, borderRadius: 8, border: '1px solid var(--admin-border)' }}>
-                {(['ALL', 'TODO', 'IN_PROGRESS', 'COMPLETED'] as const).map(filter => (
-                  <button
-                    key={filter}
-                    onClick={() => setTaskFilter(filter)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 6,
-                      border: 'none',
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      background: taskFilter === filter ? '#38BDF8' : 'transparent',
-                      color: taskFilter === filter ? '#0F172A' : 'var(--admin-text-secondary)'
-                    }}
-                  >
-                    {filter === 'ALL' ? 'All' : filter === 'TODO' ? 'To-Do' : filter === 'IN_PROGRESS' ? 'In Progress' : 'Completed'}
-                  </button>
-                ))}
+        {/* ────────────────────────────────────────────────────────
+            VIEW 4: PROJECTS / TASKS & CANDIDATE APPROVALS
+            ──────────────────────────────────────────────────────── */}
+        {activeNav === 'PROJECTS' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Header with Add Button */}
+            <div className="exec-card-section" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: '#F8FAFC' }}>
+                  📁 Corporate Projects, Goals & Task Delegation
+                </h2>
+                <p style={{ margin: 0, fontSize: 13, color: '#94A3B8' }}>
+                  Create and assign strategic hiring deliverables to your HR recruiters.
+                </p>
               </div>
 
               <button
                 onClick={() => setShowTaskModal(true)}
-                style={{
-                  background: '#38BDF8',
-                  color: '#0F172A',
-                  border: 'none',
-                  borderRadius: 8,
-                  padding: '6px 14px',
-                  fontSize: 12.5,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6
-                }}
+                className="exec-primary-btn"
+                style={{ fontSize: 13, padding: '9px 18px' }}
               >
-                <Plus size={14} /> Add Task
+                <Plus size={15} /> Add New Goal / Task
               </button>
             </div>
-          </div>
 
-          {filteredTasks.length === 0 ? (
-            <div style={{ padding: 36, textAlign: 'center', background: 'var(--admin-surface-subtle)', borderRadius: 14, border: '1px dashed var(--admin-border)' }}>
-              <CheckSquare size={36} color="#38BDF8" style={{ margin: '0 auto 8px', display: 'block' }} />
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--admin-text-primary)' }}>No tasks found in this view.</p>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--admin-text-secondary)' }}>Click "+ Add Task" to create a new goal or assignment.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {filteredTasks.map(task => (
+            {/* Task Cards List */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 14 }}>
+              {tasks.map(task => (
                 <div
                   key={task.id}
+                  className="exec-card-section"
                   style={{
-                    padding: '14px 18px',
-                    borderRadius: 14,
-                    background: 'var(--admin-surface-subtle)',
-                    border: '1px solid var(--admin-border)',
+                    padding: '16px 20px',
                     display: 'flex',
-                    alignItems: 'center',
+                    flexDirection: 'column',
                     justifyContent: 'space-between',
-                    gap: 14,
-                    flexWrap: 'wrap'
+                    gap: 12
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                    <button
-                      onClick={() => handleToggleTaskStatus(task)}
-                      style={{
-                        marginTop: 2,
-                        width: 22,
-                        height: 22,
-                        borderRadius: 6,
-                        border: task.status === 'COMPLETED' ? 'none' : '2px solid var(--admin-border)',
-                        background: task.status === 'COMPLETED' ? '#10B981' : 'transparent',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#FFFFFF',
-                        fontSize: 13,
-                        cursor: 'pointer'
-                      }}
-                      title="Toggle Status (TODO -> IN_PROGRESS -> COMPLETED)"
-                    >
-                      {task.status === 'COMPLETED' && '✓'}
-                    </button>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <div>
-                      <div style={{
-                        fontSize: 14,
-                        fontWeight: 800,
-                        color: task.status === 'COMPLETED' ? 'var(--admin-text-muted)' : 'var(--admin-text-primary)',
-                        textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none'
-                      }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: task.status === 'COMPLETED' ? '#94A3B8' : '#F8FAFC', textDecoration: task.status === 'COMPLETED' ? 'line-through' : 'none' }}>
                         {task.title}
                       </div>
                       {task.description && (
-                        <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--admin-text-secondary)' }}>
-                          {task.description}
-                        </p>
+                        <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94A3B8' }}>{task.description}</p>
                       )}
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, fontSize: 11.5, color: 'var(--admin-text-muted)', flexWrap: 'wrap' }}>
-                        <span>👤 Assigned to: <strong>{task.assignedToName}</strong></span>
-                        <span>• 📂 Category: <strong>{task.category}</strong></span>
-                        {task.dueDate && (
-                          <span>• ⏰ Due: <strong>{new Date(task.dueDate).toLocaleDateString()}</strong></span>
-                        )}
-                      </div>
                     </div>
+                    <span className={`exec-kpi-badge ${task.priority === 'HIGH' ? 'negative' : 'positive'}`} style={{ color: task.priority === 'HIGH' ? '#EF4444' : '#38BDF8' }}>
+                      {task.priority}
+                    </span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <button
-                      onClick={() => handleToggleTaskStatus(task)}
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: 800,
-                        padding: '4px 10px',
-                        borderRadius: 8,
-                        border: 'none',
-                        cursor: 'pointer',
-                        background: task.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.15)' : task.status === 'IN_PROGRESS' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(56, 189, 248, 0.15)',
-                        color: task.status === 'COMPLETED' ? '#10B981' : task.status === 'IN_PROGRESS' ? '#F59E0B' : '#38BDF8'
-                      }}
-                    >
-                      {task.status}
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteTask(task.id)}
-                      style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: 6 }}
-                      title="Delete Task"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ────────────────────────────────────────────────────────
-          TAB 5: MEETINGS & CALENDAR REMINDERS
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'MEETINGS' && (
-        <div className="admin-card-section">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-            <div>
-              <h3 className="admin-section-heading" style={{ margin: 0 }}>
-                <Calendar size={18} color="var(--admin-accent)" /> Executive Meeting & Interview Reminder Hub
-              </h3>
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--admin-text-secondary)' }}>
-                Coordinate executive interviews, team syncs, and candidate final rounds with automatic reminder triggers.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowMeetingModal(true)}
-              style={{
-                background: '#38BDF8',
-                color: '#0F172A',
-                border: 'none',
-                borderRadius: 8,
-                padding: '7px 16px',
-                fontSize: 12.5,
-                fontWeight: 800,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6
-              }}
-            >
-              <Plus size={14} /> Schedule Meeting
-            </button>
-          </div>
-
-          {meetings.length === 0 ? (
-            <div style={{ padding: 36, textAlign: 'center', background: 'var(--admin-surface-subtle)', borderRadius: 14, border: '1px dashed var(--admin-border)' }}>
-              <Calendar size={36} color="#38BDF8" style={{ margin: '0 auto 8px', display: 'block' }} />
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--admin-text-primary)' }}>No meetings scheduled.</p>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--admin-text-secondary)' }}>Click "Schedule Meeting" to create an interview slot with automated reminders.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {meetings.map(m => (
-                <div
-                  key={m.id}
-                  style={{
-                    padding: '16px 20px',
-                    borderRadius: 14,
-                    background: 'var(--admin-surface-subtle)',
-                    border: '1px solid var(--admin-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 16,
-                    flexWrap: 'wrap'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--admin-text-primary)' }}>
-                      {m.candidateName} — {m.jobTitle}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10 }}>
+                    <div style={{ fontSize: 11.5, color: '#94A3B8' }}>
+                      Assigned: <strong>{task.assignedToName}</strong>
                     </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--admin-text-secondary)', marginTop: 2 }}>
-                      Email: <strong>{m.candidateEmail}</strong>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--admin-text-muted)', marginTop: 4 }}>
-                      ⏰ <strong>{new Date(m.scheduledAt).toLocaleString()}</strong> ({m.durationMinutes} mins)
-                    </div>
-                  </div>
 
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {m.meetingLink && (
-                      <a
-                        href={m.meetingLink}
-                        target="_blank"
-                        rel="noreferrer"
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleToggleTaskStatus(task)}
                         style={{
-                          background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)',
-                          color: '#FFFFFF',
-                          padding: '8px 16px',
-                          borderRadius: 10,
-                          fontSize: 13,
-                          fontWeight: 700,
-                          textDecoration: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 6,
-                          boxShadow: '0 4px 14px rgba(2, 132, 199, 0.3)'
+                          background: task.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.18)' : '#1E293B',
+                          color: task.status === 'COMPLETED' ? '#10B981' : '#CBD5E1',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          fontSize: 11,
+                          fontWeight: 800,
+                          cursor: 'pointer'
                         }}
                       >
-                        <Video size={14} /> Join Video Call
-                      </a>
-                    )}
+                        {task.status}
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteTask(task.id)}
+                        style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: 4 }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
 
-      {/* ────────────────────────────────────────────────────────
-          TAB 6: CANDIDATE VERIFICATION APPROVAL QUEUE
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'VERIFICATIONS' && (
-        <CompanyTagApprovalQueue />
-      )}
-
-      {/* ────────────────────────────────────────────────────────
-          TAB 7: EDIT COMPANY PROFILE
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'EDIT_PROFILE' && (
-        <div className="admin-card-section" style={{ maxWidth: 680 }}>
-          <h3 className="admin-section-heading">
-            <Edit3 size={18} color="var(--admin-primary)" /> Edit Company Profile & Legal Identity
-          </h3>
-          <p style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--admin-text-secondary)' }}>
-            Configure your corporate details, branding, official headquarters, and public bio.
-          </p>
-
-          <form onSubmit={(e) => { e.preventDefault(); setMsg('✅ Company profile updated successfully!'); }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Company Legal Name *</label>
-                <input
-                  required
-                  value={companyName}
-                  onChange={e => setCompanyName(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13.5, boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Primary Website URL</label>
-                  <input
-                    value={companyWebsite}
-                    onChange={e => setCompanyWebsite(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13.5, boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Industry & Sector</label>
-                  <input
-                    value={companyIndustry}
-                    onChange={e => setCompanyIndustry(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13.5, boxSizing: 'border-box' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Headquarters Location</label>
-                  <input
-                    value={companyLocation}
-                    onChange={e => setCompanyLocation(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13.5, boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Employee Headcount</label>
-                  <select
-                    value={companyHeadcount}
-                    onChange={e => setCompanyHeadcount(e.target.value)}
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13.5, boxSizing: 'border-box' }}
-                  >
-                    <option value="1-50 Employees">1-50 Employees</option>
-                    <option value="50-150 Employees">50-150 Employees</option>
-                    <option value="150-500 Employees">150-500 Employees</option>
-                    <option value="500+ Enterprise">500+ Enterprise</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Company Description / Bio</label>
-                <textarea
-                  rows={3}
-                  value={companyAbout}
-                  onChange={e => setCompanyAbout(e.target.value)}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13.5, resize: 'none', boxSizing: 'border-box' }}
-                />
-              </div>
-
-              <button
-                type="submit"
-                style={{ background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)', color: '#FFFFFF', border: 'none', padding: '10px 20px', borderRadius: 10, fontWeight: 800, fontSize: 13.5, cursor: 'pointer', alignSelf: 'flex-start' }}
-              >
-                Save Profile Changes
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* ────────────────────────────────────────────────────────
-          TAB 8: COMPANY SETTINGS & SECURITY VAULT
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'SETTINGS' && (
-        <div className="admin-card-section" style={{ maxWidth: 680 }}>
-          <h3 className="admin-section-heading">
-            <Settings size={18} color="var(--admin-primary)" /> Corporate Governance & Vault Security Settings
-          </h3>
-          <p style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--admin-text-secondary)' }}>
-            Configure multi-tenant data access, verification approval controls, and notifications.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ padding: '14px 18px', borderRadius: 12, background: 'var(--admin-surface-subtle)', border: '1px solid var(--admin-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--admin-text-primary)' }}>🛡️ Multi-Tenant Isolation Vault</div>
-                <div style={{ fontSize: 12, color: 'var(--admin-text-secondary)', marginTop: 2 }}>Strict row-level cryptographic isolation active for all company dossiers.</div>
-              </div>
-              <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800 }}>ACTIVE</span>
-            </div>
-
-            <div style={{ padding: '14px 18px', borderRadius: 12, background: 'var(--admin-surface-subtle)', border: '1px solid var(--admin-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--admin-text-primary)' }}>✍️ Director Signature Requirement</div>
-                <div style={{ fontSize: 12, color: 'var(--admin-text-secondary)', marginTop: 2 }}>Require Company Director approval before candidate badges are minted.</div>
-              </div>
-              <span style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800 }}>ENFORCED</span>
-            </div>
-
-            <div style={{ padding: '14px 18px', borderRadius: 12, background: 'var(--admin-surface-subtle)', border: '1px solid var(--admin-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--admin-text-primary)' }}>🔔 Instant Email & Push Notifications</div>
-                <div style={{ fontSize: 12, color: 'var(--admin-text-secondary)', marginTop: 2 }}>Trigger instant notifications when an HR submits a new candidate tag.</div>
-              </div>
-              <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 800 }}>ENABLED</span>
+            {/* Candidate Verifications Queue */}
+            <div style={{ marginTop: 10 }}>
+              <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 900, color: '#F8FAFC' }}>
+                🛡️ Candidate Credential Tag Approvals Queue
+              </h3>
+              <CompanyTagApprovalQueue />
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ────────────────────────────────────────────────────────
-          TAB 9: INVOICES & BILLING
-          ──────────────────────────────────────────────────────── */}
-      {activeTab === 'BILLING' && (
-        <div className="admin-card-section">
-          <h3 className="admin-section-heading">
-            <CreditCard size={18} color="var(--admin-primary)" /> Corporate Subscription & Invoices
-          </h3>
-          <p style={{ margin: '0 0 16px 0', fontSize: 13, color: 'var(--admin-text-secondary)' }}>
-            Enterprise recruitment tier, candidate credential allocations, and downloadable billing invoices.
-          </p>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14, marginBottom: 20 }}>
-            <div style={{ padding: '16px 20px', borderRadius: 14, background: 'var(--admin-surface-subtle)', border: '1px solid var(--admin-border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', fontWeight: 800 }}>CURRENT PLAN</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#38BDF8', marginTop: 4 }}>Enterprise Platinum Suite</div>
-              <div style={{ fontSize: 12, color: 'var(--admin-text-secondary)', marginTop: 2 }}>Unlimited candidate credential issuance & HR team seats</div>
+        {/* ────────────────────────────────────────────────────────
+            VIEW 5: TEAM & RECRUITER VERIFIED BADGES
+            ──────────────────────────────────────────────────────── */}
+        {activeNav === 'TEAM' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div className="exec-card-section">
+              <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: '#F8FAFC' }}>
+                👥 Company HR Recruiter Roster & Verified Badges
+              </h2>
+              <p style={{ margin: 0, fontSize: 13, color: '#94A3B8' }}>
+                Authorize HR recruiters with official Company Verified Badges so candidates can authenticate their identity.
+              </p>
             </div>
 
-            <div style={{ padding: '16px 20px', borderRadius: 14, background: 'var(--admin-surface-subtle)', border: '1px solid var(--admin-border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--admin-text-muted)', fontWeight: 800 }}>CREDENTIAL CREDITS</div>
-              <div style={{ fontSize: 18, fontWeight: 900, color: '#10B981', marginTop: 4 }}>∞ Unlimited Quota</div>
-              <div style={{ fontSize: 12, color: 'var(--admin-text-secondary)', marginTop: 2 }}>Active company token with zero throttling</div>
-            </div>
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14 }}>
+              {hrTeam.map(hr => (
+                <div
+                  key={hr.hrProfileId}
+                  className="exec-card-section"
+                  style={{
+                    padding: '18px 20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: 14
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 12,
+                      background: 'linear-gradient(135deg, #0EA5E9 0%, #2563EB 100%)',
+                      color: '#fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 900,
+                      fontSize: 16
+                    }}>
+                      {hr.name.charAt(0)}
+                    </div>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 14.5, fontWeight: 800, color: '#F8FAFC' }}>{hr.name}</span>
+                        {hr.companyVerified && (
+                          <span className="exec-kpi-badge positive" style={{ fontSize: 10 }}>
+                            ✓ Verified
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#94A3B8' }}>{hr.email}</div>
+                    </div>
+                  </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--admin-border)', fontSize: 12, color: 'var(--admin-text-muted)', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 14px' }}>Invoice ID</th>
-                <th style={{ padding: '12px 14px' }}>Billing Cycle</th>
-                <th style={{ padding: '12px 14px' }}>Amount</th>
-                <th style={{ padding: '12px 14px' }}>Status</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Receipt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { id: 'INV-2026-08', period: 'August 2026', amount: '$2,499.00', status: 'PAID' },
-                { id: 'INV-2026-07', period: 'July 2026', amount: '$2,499.00', status: 'PAID' },
-                { id: 'INV-2026-06', period: 'June 2026', amount: '$2,499.00', status: 'PAID' }
-              ].map(inv => (
-                <tr key={inv.id} style={{ borderBottom: '1px solid var(--admin-border)', fontSize: 13 }}>
-                  <td style={{ padding: '14px', fontWeight: 800, color: 'var(--admin-text-primary)' }}>{inv.id}</td>
-                  <td style={{ padding: '14px', color: 'var(--admin-text-secondary)' }}>{inv.period}</td>
-                  <td style={{ padding: '14px', fontWeight: 800, color: 'var(--admin-text-primary)' }}>{inv.amount}</td>
-                  <td style={{ padding: '14px' }}>
-                    <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 800 }}>
-                      ✓ {inv.status}
-                    </span>
-                  </td>
-                  <td style={{ padding: '14px', textAlign: 'right' }}>
-                    <button style={{ background: 'var(--admin-surface-subtle)', border: '1px solid var(--admin-border)', color: '#38BDF8', padding: '4px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                      Download PDF 📄
+                  <div style={{ display: 'flex', gap: 8, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12 }}>
+                    <button
+                      onClick={() => handleToggleHrBadge(hr)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        background: hr.companyVerified ? 'rgba(239, 68, 68, 0.18)' : 'linear-gradient(135deg, #059669 0%, #10B981 100%)',
+                        color: hr.companyVerified ? '#EF4444' : '#FFFFFF'
+                      }}
+                    >
+                      {hr.companyVerified ? 'Revoke Badge' : '🛡️ Award Badge'}
                     </button>
-                  </td>
-                </tr>
+                    <button
+                      onClick={() => navigate('/team-chat')}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: 8,
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        background: '#1E293B',
+                        color: '#F8FAFC',
+                        fontWeight: 700,
+                        fontSize: 12,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Message
+                    </button>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          </div>
+        )}
+
+        {/* ────────────────────────────────────────────────────────
+            VIEW 6: SETTINGS & CORPORATE PROFILE
+            ──────────────────────────────────────────────────────── */}
+        {activeNav === 'SETTINGS' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 680 }}>
+            <div className="exec-card-section">
+              <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: '#F8FAFC' }}>
+                ⚙️ Executive Profile & Corporate Configuration
+              </h2>
+              <p style={{ margin: '0 0 20px', fontSize: 13, color: '#94A3B8' }}>
+                Manage your enterprise identity, verified domain parameters, and security policies.
+              </p>
+
+              <form onSubmit={(e) => { e.preventDefault(); setMsg('✅ Corporate profile settings updated!'); }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Company Legal Name</label>
+                    <input
+                      value={companyName}
+                      onChange={e => setCompanyName(e.target.value)}
+                      className="exec-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Primary Website URL</label>
+                    <input
+                      value={companyWebsite}
+                      onChange={e => setCompanyWebsite(e.target.value)}
+                      className="exec-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Industry & Sector</label>
+                    <input
+                      value={companyIndustry}
+                      onChange={e => setCompanyIndustry(e.target.value)}
+                      className="exec-input"
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Company Description</label>
+                    <textarea
+                      rows={3}
+                      value={companyAbout}
+                      onChange={e => setCompanyAbout(e.target.value)}
+                      className="exec-textarea"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="exec-primary-btn"
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+      </main>
 
       {/* ── CREATE TASK MODAL ── */}
       {showTaskModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)', padding: 20 }}>
-          <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 16, width: 480, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
+        <div className="exec-modal-backdrop">
+          <div className="exec-modal-box">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--admin-text-primary)' }}>Create & Assign Goal / Task</h3>
-              <button onClick={() => setShowTaskModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--admin-text-muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: '#F8FAFC' }}>Create & Delegate Goal / Task</h3>
+              <button onClick={() => setShowTaskModal(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
 
             <form onSubmit={handleCreateTask}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Task Title *</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Task Title *</label>
                   <input
                     required
-                    placeholder="e.g. Screen top 10 AI candidates for Backend role"
+                    placeholder="e.g. Screen top 10 AI candidates for Core Engine"
                     value={taskTitle}
                     onChange={e => setTaskTitle(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                    className="exec-input"
                   />
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Description</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Description</label>
                   <textarea
                     rows={2}
-                    placeholder="Detailed goals or deliverables..."
+                    placeholder="Deliverable details..."
                     value={taskDesc}
                     onChange={e => setTaskDesc(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, resize: 'none', boxSizing: 'border-box' }}
+                    className="exec-textarea"
                   />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Priority</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Priority</label>
                     <select
                       value={taskPriority}
                       onChange={e => setTaskPriority(e.target.value)}
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                      className="exec-select"
                     >
-                      <option value="HIGH">🔴 High Priority</option>
-                      <option value="MEDIUM">🟡 Medium Priority</option>
-                      <option value="LOW">🟢 Low Priority</option>
+                      <option value="HIGH">🔴 High</option>
+                      <option value="MEDIUM">🟡 Medium</option>
+                      <option value="LOW">🟢 Low</option>
                     </select>
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Category</label>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Category</label>
                     <select
                       value={taskCategory}
                       onChange={e => setTaskCategory(e.target.value)}
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                      className="exec-select"
                     >
-                      <option value="HIRING">Hiring & Sourcing</option>
-                      <option value="INTERVIEW">Technical Interviews</option>
-                      <option value="COMPLIANCE">Compliance & Verification</option>
-                      <option value="GENERAL">General Operations</option>
+                      <option value="HIRING">Hiring</option>
+                      <option value="INTERVIEW">Interviews</option>
+                      <option value="COMPLIANCE">Compliance</option>
+                      <option value="GENERAL">General</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Assign to HR Recruiter</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 4 }}>Assign to HR Recruiter</label>
                   <select
                     value={taskAssigneeId}
                     onChange={e => setTaskAssigneeId(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
+                    className="exec-select"
                   >
-                    <option value="">Unassigned (Open Team Goal)</option>
+                    <option value="">Unassigned (Team Goal)</option>
                     {hrTeam.map(hr => (
                       <option key={hr.userId} value={hr.userId}>
-                        {hr.name} ({hr.designation || 'HR Recruiter'})
+                        {hr.name} ({hr.designation || 'HR'})
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Due Date</label>
-                  <input
-                    type="date"
-                    value={taskDueDate}
-                    onChange={e => setTaskDueDate(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
-                  />
-                </div>
-
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-                  <button type="button" onClick={() => setShowTaskModal(false)} style={{ background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', border: '1px solid var(--admin-border)', padding: '8px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
+                  <button type="button" onClick={() => setShowTaskModal(false)} style={{ background: '#1E293B', color: '#CBD5E1', border: 'none', padding: '8px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
                     Cancel
                   </button>
-                  <button type="submit" style={{ background: '#38BDF8', color: '#0F172A', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
+                  <button type="submit" className="exec-primary-btn" style={{ fontSize: 13, padding: '8px 16px' }}>
                     Create Task 🚀
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── SCHEDULE MEETING MODAL ── */}
-      {showMeetingModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)', padding: 20 }}>
-          <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 16, width: 480, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--admin-text-primary)' }}>Schedule Executive Meeting / Interview</h3>
-              <button onClick={() => setShowMeetingModal(false)} style={{ background: 'transparent', border: 'none', color: 'var(--admin-text-muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
-            </div>
-
-            <form onSubmit={handleScheduleMeeting}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Candidate / Participant Name *</label>
-                  <input
-                    required
-                    placeholder="e.g. Alex Mercer"
-                    value={meetingCandidateName}
-                    onChange={e => setMeetingCandidateName(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Candidate Email</label>
-                  <input
-                    type="email"
-                    placeholder="candidate@hiremind.ai"
-                    value={meetingCandidateEmail}
-                    onChange={e => setMeetingCandidateEmail(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Date & Time *</label>
-                    <input
-                      required
-                      type="datetime-local"
-                      value={meetingDate}
-                      onChange={e => setMeetingDate(e.target.value)}
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Duration (Minutes)</label>
-                    <select
-                      value={meetingDuration}
-                      onChange={e => setMeetingDuration(e.target.value)}
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
-                    >
-                      <option value="30">30 Minutes</option>
-                      <option value="45">45 Minutes</option>
-                      <option value="60">60 Minutes</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--admin-text-secondary)', marginBottom: 4 }}>Video Meeting Link (Google Meet / Zoom)</label>
-                  <input
-                    placeholder="https://meet.google.com/hmd-exec-sync"
-                    value={meetingLink}
-                    onChange={e => setMeetingLink(e.target.value)}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--admin-border)', background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', fontSize: 13, boxSizing: 'border-box' }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
-                  <button type="button" onClick={() => setShowMeetingModal(false)} style={{ background: 'var(--admin-surface-subtle)', color: 'var(--admin-text-primary)', border: '1px solid var(--admin-border)', padding: '8px 14px', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
-                    Cancel
-                  </button>
-                  <button type="submit" style={{ background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)', color: '#FFFFFF', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}>
-                    Schedule & Send 📅
                   </button>
                 </div>
               </div>
@@ -1930,49 +1401,46 @@ export const CompanyExecutiveDashboard: React.FC = () => {
 
       {/* ── SALARY DISBURSAL RECEIPT SLIP MODAL ── */}
       {activeReceipt && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, backdropFilter: 'blur(4px)', padding: 20 }}>
-          <div style={{ background: 'var(--admin-surface)', border: '1px solid var(--admin-border)', borderRadius: 16, width: 440, padding: 24, boxShadow: '0 20px 40px rgba(0,0,0,0.6)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottom: '1px solid var(--admin-border)', paddingBottom: 12 }}>
+        <div className="exec-modal-backdrop">
+          <div className="exec-modal-box" style={{ width: 420 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ShieldCheck size={20} color="#10B981" />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: 'var(--admin-text-primary)' }}>Salary Disbursal Receipt</h3>
+                <ShieldCheck size={18} color="#10B981" />
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#F8FAFC' }}>Salary Disbursal Receipt</h3>
               </div>
-              <button onClick={() => setActiveReceipt(null)} style={{ background: 'transparent', border: 'none', color: 'var(--admin-text-muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
+              <button onClick={() => setActiveReceipt(null)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', fontSize: 18, cursor: 'pointer' }}>✕</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12.5 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--admin-text-muted)' }}>Transaction Reference:</span>
-                <span style={{ fontWeight: 800, color: 'var(--admin-text-primary)' }}>{activeReceipt.transactionRef}</span>
+                <span style={{ color: '#94A3B8' }}>Ref ID:</span>
+                <span style={{ fontWeight: 800, color: '#F8FAFC' }}>{activeReceipt.transactionRef}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--admin-text-muted)' }}>Beneficiary:</span>
-                <span style={{ fontWeight: 800, color: 'var(--admin-text-primary)' }}>{activeReceipt.employeeName}</span>
+                <span style={{ color: '#94A3B8' }}>Beneficiary:</span>
+                <span style={{ fontWeight: 800, color: '#F8FAFC' }}>{activeReceipt.employeeName}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--admin-text-muted)' }}>Designation:</span>
-                <span style={{ color: 'var(--admin-text-secondary)' }}>{activeReceipt.role}</span>
+                <span style={{ color: '#94A3B8' }}>Role:</span>
+                <span style={{ color: '#CBD5E1' }}>{activeReceipt.role}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--admin-text-muted)' }}>Account / UPI:</span>
-                <span style={{ fontWeight: 700, color: 'var(--admin-text-primary)' }}>{activeReceipt.accountMasked}</span>
+                <span style={{ color: '#94A3B8' }}>Account / UPI:</span>
+                <span style={{ fontWeight: 700, color: '#F8FAFC' }}>{activeReceipt.accountMasked}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--admin-text-muted)' }}>Payout Date:</span>
-                <span style={{ color: 'var(--admin-text-primary)' }}>{activeReceipt.payoutDate}</span>
-              </div>
-              <div style={{ borderTop: '1px dashed var(--admin-border)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--admin-text-primary)' }}>Total Disbursed:</span>
-                <span style={{ fontWeight: 900, fontSize: 18, color: '#10B981' }}>${(activeReceipt.baseSalary + activeReceipt.incentive).toLocaleString()}</span>
+              <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 800, fontSize: 13, color: '#F8FAFC' }}>Total Disbursed:</span>
+                <span style={{ fontWeight: 900, fontSize: 17, color: '#10B981' }}>${(activeReceipt.baseSalary + activeReceipt.incentive).toLocaleString()}</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
               <button
                 onClick={() => setActiveReceipt(null)}
-                style={{ background: 'linear-gradient(135deg, #0284C7 0%, #2563EB 100%)', color: '#FFFFFF', border: 'none', padding: '8px 16px', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: 'pointer' }}
+                className="exec-primary-btn"
+                style={{ fontSize: 12.5, padding: '7px 16px' }}
               >
-                Done
+                Close Receipt
               </button>
             </div>
           </div>

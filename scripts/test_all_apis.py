@@ -83,10 +83,10 @@ def request(endpoint, method="GET", data=None, token=None):
     except Exception as e:
         return 0, str(e)
 
-def get_redis_otp(email):
+def get_redis_otp(email, prefix="otp:reg:"):
     try:
         raw = subprocess.check_output(
-            ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"otp:reg:{email}"]
+            ["docker", "exec", "talentiq-redis", "redis-cli", "GET", f"{prefix}{email}"]
         ).decode().strip().strip('"')
         return raw
     except Exception as e:
@@ -147,9 +147,9 @@ def run_suite():
     ts = int(time.time())
     cand_email = f"candidate.{ts}@gmail.com"
     hr_email = f"hr.{ts}@gmail.com"
-    comp_email = f"director.{ts}@gmail.com"
-    dev_email = f"developer.{ts}@gmail.com"
-    mgmt_email = f"mgmt.{ts}@gmail.com"
+    comp_email = f"director.{ts}@enterprise.com"
+    dev_email = f"developer.{ts}@tech.net"
+    mgmt_email = f"mgmt.{ts}@platform.co.in"
 
     # ─────────────────────────────────────────────────────────────
     # SUITE 1: HEALTH & PUBLIC ANALYTICS
@@ -162,9 +162,40 @@ def run_suite():
     log_test("Health", "/v1/analytics/public-stats", "GET", code, 200)
 
     # ─────────────────────────────────────────────────────────────
-    # SUITE 2: MULTI-ROLE REGISTRATION & AUTHENTICATION
+    # SUITE 2: ANTI-DISPOSABLE / TEMP-MAIL SECURITY & GMAIL ENFORCEMENT
     # ─────────────────────────────────────────────────────────────
-    print(f"\n{YELLOW}{BOLD}SUITE 2: Multi-Role Dropdown Registration & Auth{RESET}")
+    print(f"\n{YELLOW}{BOLD}SUITE 2: Anti-Disposable / Temp-Mail Security Guard{RESET}")
+
+    # Negative test 1: Send OTP to temp-mail.org
+    code, res = request("/v1/auth/register/send-otp", "POST", {
+        "email": "hacker.temp@temp-mail.org",
+        "firstName": "Hacker",
+        "role": "ROLE_CANDIDATE"
+    })
+    log_test("Security", "POST /v1/auth/register/send-otp (Blocked disposable email temp-mail.org -> 400)", "POST", code, 400)
+
+    # Negative test 2: Direct registration with 10minutemail.com
+    code, res = request("/v1/auth/register", "POST", {
+        "email": "fake.user@10minutemail.com",
+        "password": "Password@123",
+        "firstName": "Fake",
+        "lastName": "User",
+        "role": "ROLE_CANDIDATE",
+        "otp": "1234"
+    })
+    log_test("Security", "POST /v1/auth/register (Blocked disposable email 10minutemail.com -> 400)", "POST", code, 400)
+
+    # Negative test 3: Login attempt with non-Gmail domain
+    code, res = request("/v1/auth/login", "POST", {
+        "email": "intruder@yahoo.com",
+        "password": "Password@123"
+    })
+    log_test("Security", "POST /v1/auth/login (Blocked non-Gmail domain -> 400)", "POST", code, 400)
+
+    # ─────────────────────────────────────────────────────────────
+    # SUITE 3: MULTI-ROLE REGISTRATION & AUTHENTICATION (OFFICIAL GMAIL)
+    # ─────────────────────────────────────────────────────────────
+    print(f"\n{YELLOW}{BOLD}SUITE 3: Multi-Role Dropdown Registration & Auth (@gmail.com){RESET}")
 
     # 1. Candidate Registration
     cand_token, cand_id, err = register_user("ROLE_CANDIDATE", cand_email, "Alex", "Rivera", {
@@ -205,6 +236,39 @@ def run_suite():
         "password": "Password123!"
     })
     log_test("Auth", "/v1/auth/login (Candidate password auth)", "POST", code, 200)
+
+    # ─────────────────────────────────────────────────────────────
+    # SUITE 4: PASSWORD RETRIEVAL & 4-DIGIT OTP RESET LIFECYCLE
+    # ─────────────────────────────────────────────────────────────
+    print(f"\n{YELLOW}{BOLD}SUITE 4: Password Retrieval & 4-Digit OTP Reset Lifecycle{RESET}")
+
+    # 1. Request Password Reset OTP
+    code, res = request("/v1/auth/forgot-password", "POST", {"email": cand_email})
+    log_test("PasswordReset", f"POST /v1/auth/forgot-password (Dispatched 4-digit OTP to {cand_email})", "POST", code, 200)
+
+    # 2. Extract OTP from Redis
+    pwd_otp = get_redis_otp(cand_email, prefix="otp:code:")
+
+    # 3. Verify OTP
+    code, res = request("/v1/auth/verify-otp", "POST", {"email": cand_email, "otp": pwd_otp})
+    log_test("PasswordReset", f"POST /v1/auth/verify-otp (Verified OTP {pwd_otp})", "POST", code, 200)
+
+    # 4. Reset & Set New Password
+    code, res = request("/v1/auth/reset-password", "POST", {
+        "email": cand_email,
+        "otp": pwd_otp,
+        "newPassword": "UpdatedPassword@456"
+    })
+    log_test("PasswordReset", "POST /v1/auth/reset-password (Updated to new password)", "POST", code, 200)
+
+    # 5. Authenticate with New Password
+    code, res = request("/v1/auth/login", "POST", {
+        "email": cand_email,
+        "password": "UpdatedPassword@456"
+    })
+    if code == 200 and res.get("data", {}).get("accessToken"):
+        cand_token = res["data"]["accessToken"]
+    log_test("PasswordReset", "POST /v1/auth/login (Login with new password)", "POST", code, 200)
 
     # ─────────────────────────────────────────────────────────────
     # SUITE 3: APPLICATION DEVELOPER SAFEGUARD ENFORCEMENT

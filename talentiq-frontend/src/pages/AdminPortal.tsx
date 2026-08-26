@@ -370,6 +370,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
     return true;
   });
 
+  // For Company Executive Suite: Return the bespoke Executive Dashboard
+  if (portalMode === 'COMPANY') {
+    return <CompanyExecutiveDashboard />;
+  }
+
   return (
     <div className={`admin-page-wrapper admin-theme-${theme}`}>
       <div className="admin-container">
@@ -381,12 +386,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
               <h1 className="admin-title-text">
                 {portalMode === 'DEVELOPER' && 'Application Developer Suite'}
                 {portalMode === 'MANAGEMENT' && 'HireMind-Management Team Governance'}
-                {portalMode === 'COMPANY' && 'Register Company — Corporate Executive Suite'}
               </h1>
               <p className="admin-subtitle-text">
                 {portalMode === 'DEVELOPER' && 'Core AI Engine Architecture, Agent Orchestration & Real-Time Diagnostics (Safe DB Guard Active)'}
                 {portalMode === 'MANAGEMENT' && 'AI Copilot Governance, Candidate/HR Dossiers, Temporal Analytics & MySQL/Radish Control'}
-                {portalMode === 'COMPANY' && 'Corporate Multi-Tenant Verification Queue, Candidate Endorsement & Verified Badge Dispatch'}
               </p>
             </div>
           </div>
@@ -1049,15 +1052,6 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({ mode }) => {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* ────────────────────────────────────────────────────────
-            PORTAL 3: REGISTER COMPANY ONLY (EXECUTIVE DASHBOARD & WORKSPACE)
-            ──────────────────────────────────────────────────────── */}
-        {portalMode === 'COMPANY' && (
-          <div>
-            <CompanyExecutiveDashboard />
           </div>
         )}
       </div>

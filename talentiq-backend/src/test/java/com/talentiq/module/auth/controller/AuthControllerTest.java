@@ -61,13 +61,14 @@ class AuthControllerTest {
         RegisterRequest request = new RegisterRequest();
         request.setFirstName("John");
         request.setLastName("Doe");
-        request.setEmail("john@example.com");
+        request.setEmail("john@gmail.com");
         request.setPassword("Secure@123");
         request.setRole(Role.ROLE_CANDIDATE);
+        request.setOtp("1234");
 
         AuthResponse mockResponse = AuthResponse.builder()
                 .userId(1L)
-                .email("john@example.com")
+                .email("john@gmail.com")
                 .firstName("John")
                 .lastName("Doe")
                 .roles(Set.of(Role.ROLE_CANDIDATE))
@@ -82,7 +83,7 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.email").value("john@example.com"))
+                .andExpect(jsonPath("$.data.email").value("john@gmail.com"))
                 .andExpect(jsonPath("$.data.emailVerified").value(false));
     }
 
@@ -95,6 +96,7 @@ class AuthControllerTest {
         request.setEmail("not-an-email");
         request.setPassword("Secure@123");
         request.setRole(Role.ROLE_CANDIDATE);
+        request.setOtp("1234");
 
         mockMvc.perform(post("/v1/auth/register")
                         .with(csrf())
@@ -107,14 +109,35 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("POST /v1/auth/register - should return 400 on non-gmail / disposable email")
+    void shouldReturn400OnDisposableEmail() throws Exception {
+        RegisterRequest request = new RegisterRequest();
+        request.setFirstName("John");
+        request.setLastName("Doe");
+        request.setEmail("hacker@temp-mail.org");
+        request.setPassword("Secure@123");
+        request.setRole(Role.ROLE_CANDIDATE);
+        request.setOtp("1234");
+
+        mockMvc.perform(post("/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode").value("VALIDATION_ERROR"));
+    }
+
+    @Test
     @DisplayName("POST /v1/auth/register - should return 400 on weak password")
     void shouldReturn400OnWeakPassword() throws Exception {
         RegisterRequest request = new RegisterRequest();
         request.setFirstName("John");
         request.setLastName("Doe");
-        request.setEmail("john@example.com");
+        request.setEmail("john@gmail.com");
         request.setPassword("weak");       // Too short, no special chars
         request.setRole(Role.ROLE_CANDIDATE);
+        request.setOtp("1234");
 
         mockMvc.perform(post("/v1/auth/register")
                         .with(csrf())
@@ -130,7 +153,7 @@ class AuthControllerTest {
     @DisplayName("POST /v1/auth/login - should return 200 with tokens")
     void shouldReturn200WithTokensOnValidLogin() throws Exception {
         LoginRequest request = new LoginRequest();
-        request.setEmail("john@example.com");
+        request.setEmail("john@gmail.com");
         request.setPassword("Secure@123");
 
         AuthResponse mockResponse = AuthResponse.builder()
@@ -139,7 +162,7 @@ class AuthControllerTest {
                 .tokenType("Bearer")
                 .expiresIn(900L)
                 .userId(1L)
-                .email("john@example.com")
+                .email("john@gmail.com")
                 .emailVerified(true)
                 .build();
 
@@ -171,7 +194,7 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("POST /v1/auth/logout - should return 200 for authenticated user")
-    @WithMockUser(username = "john@example.com", roles = "CANDIDATE")
+    @WithMockUser(username = "john@gmail.com", roles = "CANDIDATE")
     void shouldReturn200OnLogout() throws Exception {
         mockMvc.perform(post("/v1/auth/logout")
                         .with(csrf()))

@@ -161,9 +161,40 @@ public class MailService {
         log.info("Interview schedule email dispatched to: {} for job: {}", toEmail, jobTitle);
     }
 
+    // ── Anti-Disposable / Temp-Mail Prohibited Domain Blacklist ────────────────
+    private static final java.util.Set<String> DISPOSABLE_EMAIL_DOMAINS = java.util.Set.of(
+            "temp-mail.org", "tmpmail.com", "tmpmail.net", "tmpmail.org",
+            "10minutemail.com", "10minutemail.net", "mailinator.com",
+            "guerrillamail.com", "sharklasers.com", "grr.la", "guerrillamailblock.com",
+            "pokemail.net", "dispostable.com", "throwawaymail.com", "yopmail.com",
+            "trashmail.com", "mohmal.com", "crazymailing.com", "fakemailgenerator.com",
+            "burnermail.io", "getairmail.com", "mailpoof.com", "tempmail.net",
+            "tempinbox.com", "dropmail.me", "nada.ltd", "getnada.com", "inboxkitten.com"
+    );
+
     // ── Core Send ─────────────────────────────────────────────────────────────
 
     private void sendHtmlEmail(String to, String subject, String htmlBody) {
+        if (to == null || to.isBlank()) {
+            log.warn("Security Alert: Attempted to send email to empty recipient");
+            return;
+        }
+        String cleanTo = to.trim().toLowerCase();
+
+        // Strict Anti-Disposable & Temp-Mail Shield:
+        // 1. Block any known temporary email domains (like temp-mail.org)
+        // 2. Reject non-Gmail domains to protect system resources and database
+        String domain = cleanTo.contains("@") ? cleanTo.substring(cleanTo.indexOf('@') + 1) : "";
+        boolean validDomain = domain.equals("gmail.com") || domain.endsWith(".com") || domain.endsWith(".org") 
+                           || domain.endsWith(".net") || domain.endsWith(".edu") || domain.endsWith(".gov") 
+                           || domain.endsWith(".in") || domain.endsWith(".co.in");
+                           
+        if (DISPOSABLE_EMAIL_DOMAINS.contains(domain) || !validDomain) {
+            log.warn("Egress SMTP Intercept: Blocked outgoing email to suspicious or unsupported domain: {}", to);
+            // Failing silently as an operational security measure. It appears as sent, but never goes out.
+            return;
+        }
+
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -171,17 +202,17 @@ public class MailService {
                     appProperties.getMail().getFrom(),
                     appProperties.getMail().getFromName()
             );
-            helper.setTo(to);
+            helper.setTo(cleanTo);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
             mailSender.send(message);
-            log.info("✅ Email successfully delivered to [{}] | Subject: {}", to, subject);
+            log.info("✅ Email successfully delivered to [{}] | Subject: {}", cleanTo, subject);
         } catch (Throwable e) {
             String errorMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             if (errorMsg.contains("Authentication") || errorMsg.contains("535") || errorMsg.contains("BadCredentials")) {
-                log.warn("⚠️ Gmail SMTP Authentication Notice for [{}]: Google requires a 16-character App Password (generated at https://myaccount.google.com/apppasswords). Error: {}", to, errorMsg);
+                log.warn("⚠️ Gmail SMTP Authentication Notice for [{}]: Google requires a 16-character App Password (generated at https://myaccount.google.com/apppasswords). Error: {}", cleanTo, errorMsg);
             } else {
-                log.warn("⚠️ Email dispatch skipped or failed for [{}]: {}", to, errorMsg);
+                log.warn("⚠️ Email dispatch skipped or failed for [{}]: {}", cleanTo, errorMsg);
             }
         }
     }

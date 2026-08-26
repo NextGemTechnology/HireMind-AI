@@ -27,6 +27,47 @@ import '../css/login.css';
 type LoginRoleMode = 'CANDIDATE' | 'HR' | 'ADMIN';
 type AuthCardMode = 'LOGIN' | 'REGISTER' | 'FORGOT_PASSWORD';
 
+const DISPOSABLE_DOMAINS = [
+  'temp-mail.org', 'tmpmail.com', 'tmpmail.net', 'tmpmail.org',
+  '10minutemail.com', '10minutemail.net', 'mailinator.com',
+  'guerrillamail.com', 'sharklasers.com', 'grr.la', 'guerrillamailblock.com',
+  'pokemail.net', 'dispostable.com', 'throwawaymail.com', 'yopmail.com',
+  'trashmail.com', 'mohmal.com', 'crazymailing.com', 'fakemailgenerator.com',
+  'burnermail.io', 'getairmail.com', 'mailpoof.com', 'tempmail.net'
+];
+
+const validateEmailPolicy = (emailStr: string, isAdmin: boolean): { valid: boolean; error?: string } => {
+  const clean = emailStr.trim().toLowerCase();
+  if (!clean) return { valid: false, error: 'Email address is required.' };
+  const domain = clean.includes('@') ? clean.substring(clean.indexOf('@') + 1) : '';
+  
+  if (DISPOSABLE_DOMAINS.includes(domain) || domain.includes('temp-mail') || domain.includes('tmpmail') || domain.includes('10minute')) {
+    return {
+      valid: false,
+      error: '🚫 Security Alert: Temporary & disposable email services (like temp-mail.org) are strictly blocked to protect system and database security.'
+    };
+  }
+
+  if (isAdmin) {
+    const allowedExtensions = ['org', 'com', 'net', 'edu', 'gov', 'in', 'co.in'];
+    const isAllowedExt = allowedExtensions.some(ext => domain.endsWith(`.${ext}`));
+    if (!isAllowedExt) {
+      return {
+        valid: false,
+        error: '🔒 Security Policy: Admins must use .org, .com, .net, .edu, .gov, .in, or .co.in email addresses.'
+      };
+    }
+  } else {
+    if (!clean.endsWith('@gmail.com')) {
+      return {
+        valid: false,
+        error: '🔒 Security Policy: Only official @gmail.com accounts are permitted for HR and Candidates.'
+      };
+    }
+  }
+  return { valid: true };
+};
+
 interface LoginProps {
   initialRole?: LoginRoleMode;
 }
@@ -207,11 +248,12 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     e.preventDefault();
     setError('');
 
-    const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
-      setError('Please enter a valid email address.');
+    const policy = validateEmailPolicy(email, selectedRole === 'ADMIN');
+    if (!policy.valid) {
+      setError(policy.error || 'Please enter a valid email address.');
       return;
     }
+    const trimmedEmail = email.trim().toLowerCase();
 
     setLoading(true);
     try {
@@ -314,11 +356,12 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegError('');
-    const trimmedEmail = regEmail.trim().toLowerCase();
-    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
-      setRegError('Please enter a valid email address.');
+    const policy = validateEmailPolicy(regEmail, selectedRole === 'ADMIN');
+    if (!policy.valid) {
+      setRegError(policy.error || 'Please enter a valid email address.');
       return;
     }
+    const trimmedEmail = regEmail.trim().toLowerCase();
     if (!regFirstName.trim() || !regLastName.trim()) {
       setRegError('Please enter both your first and last name.');
       return;
@@ -353,6 +396,12 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const handleResendRegOtp = async () => {
     if (regResendCountdown > 0 || regLoading) return;
     setRegError('');
+    const policy = validateEmailPolicy(regEmail, selectedRole === 'ADMIN');
+    if (!policy.valid) {
+      setRegError(policy.error || 'Please enter a valid email address.');
+      return;
+    }
+    const trimmedEmail = regEmail.trim().toLowerCase();
     setRegLoading(true);
     try {
       const targetRole = selectedRole === 'ADMIN'
@@ -362,7 +411,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         : 'ROLE_CANDIDATE';
 
       await apiClient.post('/auth/register/send-otp', {
-        email: regEmail.trim().toLowerCase(),
+        email: trimmedEmail,
         firstName: regFirstName.trim(),
         role: targetRole
       });
@@ -440,11 +489,12 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     if (e) e.preventDefault();
     setForgotError('');
     setForgotSuccess('');
-    const targetEmail = forgotEmail.trim().toLowerCase();
-    if (!targetEmail) {
-      setForgotError('Please enter your registered email address.');
+    const policy = validateEmailPolicy(forgotEmail, selectedRole === 'ADMIN');
+    if (!policy.valid) {
+      setForgotError(policy.error || 'Please enter a valid email address.');
       return;
     }
+    const targetEmail = forgotEmail.trim().toLowerCase();
     setForgotLoading(true);
     try {
       const res = await apiClient.post('/auth/forgot-password', { email: targetEmail });
@@ -453,7 +503,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       setResendCountdown(60);
       setTimeout(() => otpRefs[0].current?.focus(), 150);
     } catch (err: any) {
-      setForgotError(err.response?.data?.message || 'Failed to send OTP. Please verify your email.');
+      const valError = err.response?.data?.data ? Object.values(err.response.data.data).join(', ') : null;
+      setForgotError(valError || err.response?.data?.message || err.message || 'Failed to send OTP. Please verify your registered email.');
     } finally {
       setForgotLoading(false);
     }
@@ -478,7 +529,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       setForgotSuccess(res.data?.message || 'OTP Verified! Please create your new password.');
       setForgotStep(3);
     } catch (err: any) {
-      setForgotError(err.response?.data?.message || 'Invalid or expired 4-digit OTP.');
+      const valError = err.response?.data?.data ? Object.values(err.response.data.data).join(', ') : null;
+      setForgotError(valError || err.response?.data?.message || err.message || 'Invalid or expired 4-digit OTP.');
     } finally {
       setForgotLoading(false);
     }
@@ -508,7 +560,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       setForgotStep(4);
       setEmail(forgotEmail.trim().toLowerCase());
     } catch (err: any) {
-      setForgotError(err.response?.data?.message || 'Failed to reset password. Please try again.');
+      const valError = err.response?.data?.data ? Object.values(err.response.data.data).join(', ') : null;
+      setForgotError(valError || err.response?.data?.message || err.message || 'Failed to reset password. Please try again.');
     } finally {
       setForgotLoading(false);
     }

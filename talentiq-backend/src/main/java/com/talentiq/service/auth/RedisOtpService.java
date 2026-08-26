@@ -42,11 +42,44 @@ public class RedisOtpService {
     private final ConcurrentHashMap<String, Long> inMemoryRegOtpExpiries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> inMemoryFailCounts = new ConcurrentHashMap<>();
 
+    private static final java.util.Set<String> DISPOSABLE_EMAIL_DOMAINS = java.util.Set.of(
+            "temp-mail.org", "tmpmail.com", "tmpmail.net", "tmpmail.org",
+            "10minutemail.com", "10minutemail.net", "mailinator.com",
+            "guerrillamail.com", "sharklasers.com", "grr.la", "guerrillamailblock.com",
+            "pokemail.net", "dispostable.com", "throwawaymail.com", "yopmail.com",
+            "trashmail.com", "mohmal.com", "crazymailing.com", "fakemailgenerator.com",
+            "burnermail.io", "getairmail.com", "mailpoof.com", "tempmail.net",
+            "tempinbox.com", "dropmail.me", "nada.ltd", "getnada.com", "inboxkitten.com"
+    );
+
+    public void validateSafeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new BadRequestException("Email is required");
+        }
+        String clean = email.trim().toLowerCase();
+        String domain = clean.contains("@") ? clean.substring(clean.indexOf('@') + 1) : "";
+        
+        if (DISPOSABLE_EMAIL_DOMAINS.contains(domain)) {
+            log.warn("Security Alert: Blocked known disposable domain: {}", domain);
+            throw new BadRequestException("Security Policy: Disposable email service (" + domain + ") is blocked.");
+        }
+
+        boolean validDomain = domain.equals("gmail.com") || domain.endsWith(".com") || domain.endsWith(".org") 
+                           || domain.endsWith(".net") || domain.endsWith(".edu") || domain.endsWith(".gov") 
+                           || domain.endsWith(".in") || domain.endsWith(".co.in");
+
+        if (!validDomain) {
+            log.warn("Security Alert: Blocked unsupported email domain attempt: {}", email);
+            throw new BadRequestException("Security Policy: Only official @gmail.com or authorized enterprise domains are permitted.");
+        }
+    }
+
     /**
      * Enforce sliding rate limits for OTP generation.
      * Prevents email spamming, SMS/SMTP exhaustion, and DDoS attacks across 10,000+ concurrent requests.
      */
     public void enforceRateLimit(String email, String clientIp) {
+        validateSafeEmail(email);
         String emailKey = OTP_RATE_EMAIL_PREFIX + email.toLowerCase().trim();
         String ipKey = OTP_RATE_IP_PREFIX + (clientIp != null ? clientIp : "unknown");
 
@@ -86,6 +119,7 @@ public class RedisOtpService {
      * Store 4-digit OTP in Redis with 10-minute automatic TTL expiration.
      */
     public void storeOtp(String email, String otp, long ttlMinutes) {
+        validateSafeEmail(email);
         String normalizedEmail = email.toLowerCase().trim();
         String key = OTP_CODE_PREFIX + normalizedEmail;
 
@@ -103,6 +137,7 @@ public class RedisOtpService {
      * Store 4-digit Registration Verification OTP in Redis with automatic TTL expiration.
      */
     public void storeRegistrationOtp(String email, String otp, long ttlMinutes) {
+        validateSafeEmail(email);
         String normalizedEmail = email.toLowerCase().trim();
         String key = OTP_REG_PREFIX + normalizedEmail;
 

@@ -75,10 +75,34 @@ public class AuthServiceImpl implements AuthService {
     private final com.talentiq.security.jwt.TokenBlacklistService tokenBlacklistService;
     private final RedisOtpService redisOtpService;
 
-    // ── Email Validation ───────────────────────────────────────────────────────
-    private void validateEmailFormat(String email) {
-        if (!StringUtils.hasText(email) || !email.contains("@") || !email.contains(".")) {
-            throw new BadRequestException("Please provide a valid email address.");
+    // ── Email Validation & Anti-Disposable Email Security Guard ────────────────
+    private void validateEmailFormat(String email, Role role) {
+        if (!StringUtils.hasText(email)) {
+            throw new BadRequestException("Email address is required.");
+        }
+        String trimmed = email.trim().toLowerCase();
+        
+        // Strict anti-disposable / temp-mail security enforcement:
+        boolean isAdmin = role != null && (role == Role.ROLE_APP_DEVELOPER || role == Role.ROLE_MANAGEMENT_TEAM || role == Role.ROLE_COMPANY_ADMIN);
+
+        if (isAdmin) {
+            boolean validDomain = trimmed.endsWith(".com") || trimmed.endsWith(".org") || trimmed.endsWith(".net") 
+                               || trimmed.endsWith(".edu") || trimmed.endsWith(".gov") || trimmed.endsWith(".in") 
+                               || trimmed.endsWith(".co.in");
+            if (!validDomain) {
+                log.warn("Security Alert: Blocked unsupported admin email domain attempt: {}", email);
+                throw new BadRequestException("Security Policy: Admins must use .org, .com, .net, .edu, .gov, .in, or .co.in email addresses.");
+            }
+        } else {
+            if (!trimmed.endsWith("@gmail.com")) {
+                log.warn("Security Alert: Blocked non-Gmail / disposable email attempt for HR/Candidate: {}", email);
+                throw new BadRequestException("Security Policy: Only official @gmail.com email addresses are permitted. Disposable, temporary, and non-Gmail addresses (such as temp-mail.org) are strictly blocked.");
+            }
+        }
+
+        String username = trimmed.substring(0, trimmed.lastIndexOf('@'));
+        if (username.isBlank() || username.length() < 3) {
+            throw new BadRequestException("Please provide a valid email address (minimum 3 characters before @).");
         }
     }
 
@@ -89,7 +113,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void sendRegistrationOtp(SendRegistrationOtpRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateEmailFormat(email);
+        validateEmailFormat(email, request.getRole());
 
         // Check if email already registered
         if (userRepository.existsByEmail(email)) {
@@ -121,7 +145,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse register(RegisterRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateEmailFormat(email);
+        validateEmailFormat(email, request.getRole());
 
         // 1. Mandatory Email OTP Verification
         if (!StringUtils.hasText(request.getOtp())) {
@@ -244,7 +268,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional(noRollbackFor = {BadCredentialsException.class, UnauthorizedException.class})
     public AuthResponse login(LoginRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateEmailFormat(email);
+        validateEmailFormat(email, request.getRequiredRole());
 
         // Find user first for lockout check
         User user = userRepository.findByEmail(email)
@@ -336,7 +360,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse googleLogin(GoogleAuthRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateEmailFormat(email);
+        validateEmailFormat(email, request.getRole());
 
         Optional<User> existingUser = userRepository.findByEmail(email);
         User user;
@@ -497,13 +521,15 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public void forgotPassword(ForgotPasswordRequest request) {
         String email = request.getEmail().toLowerCase().trim();
-        validateEmailFormat(email);
 
         // 1. Enforce Redis sliding rate limit (handles 10,000+ users & prevents brute-force / DDoS)
         redisOtpService.enforceRateLimit(email, null);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new BadRequestException("No registered account found with email: " + email));
+
+        Role primaryRole = user.getRoles().isEmpty() ? null : user.getRoles().iterator().next();
+        validateEmailFormat(email, primaryRole);
 
         // 2. Generate 4-digit numeric OTP
         int randomPin = new java.security.SecureRandom().nextInt(10000);

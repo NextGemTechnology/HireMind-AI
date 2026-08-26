@@ -37,6 +37,47 @@ interface FormData {
   specialization: string;
 }
 
+const DISPOSABLE_DOMAINS = [
+  'temp-mail.org', 'tmpmail.com', 'tmpmail.net', 'tmpmail.org',
+  '10minutemail.com', '10minutemail.net', 'mailinator.com',
+  'guerrillamail.com', 'sharklasers.com', 'grr.la', 'guerrillamailblock.com',
+  'pokemail.net', 'dispostable.com', 'throwawaymail.com', 'yopmail.com',
+  'trashmail.com', 'mohmal.com', 'crazymailing.com', 'fakemailgenerator.com',
+  'burnermail.io', 'getairmail.com', 'mailpoof.com', 'tempmail.net'
+];
+
+const validateEmailPolicy = (emailStr: string, isAdmin: boolean): { valid: boolean; error?: string } => {
+  const clean = emailStr.trim().toLowerCase();
+  if (!clean) return { valid: false, error: 'Email address is required.' };
+  const domain = clean.includes('@') ? clean.substring(clean.indexOf('@') + 1) : '';
+  
+  if (DISPOSABLE_DOMAINS.includes(domain) || domain.includes('temp-mail') || domain.includes('tmpmail') || domain.includes('10minute')) {
+    return {
+      valid: false,
+      error: '🚫 Security Alert: Temporary & disposable email services (like temp-mail.org) are strictly blocked to protect system security.'
+    };
+  }
+
+  if (isAdmin) {
+    const allowedExtensions = ['org', 'com', 'net', 'edu', 'gov', 'in', 'co.in'];
+    const isAllowedExt = allowedExtensions.some(ext => domain.endsWith(`.${ext}`));
+    if (!isAllowedExt) {
+      return {
+        valid: false,
+        error: '🔒 Security Policy: Admins must use .org, .com, .net, .edu, .gov, .in, or .co.in email addresses.'
+      };
+    }
+  } else {
+    if (!clean.endsWith('@gmail.com')) {
+      return {
+        valid: false,
+        error: '🔒 Security Policy: Only official @gmail.com accounts are permitted for registration.'
+      };
+    }
+  }
+  return { valid: true };
+};
+
 const INDUSTRIES = [
   'Technology / Software', 'Finance & Banking', 'Healthcare & Life Sciences',
   'E-Commerce / Retail', 'Education', 'Consulting', 'Manufacturing',
@@ -149,8 +190,10 @@ export const Register: React.FC = () => {
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
       setError('All fields are required'); return;
     }
-    if (!form.email || !form.email.includes('@') || !form.email.includes('.')) {
-      setError('Registration requires a valid email address.'); return;
+    const policy = validateEmailPolicy(form.email, true);
+    if (!policy.valid) {
+      setError(policy.error || 'Please enter a valid email address.');
+      return;
     }
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match'); return;
@@ -164,11 +207,17 @@ export const Register: React.FC = () => {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    const policy = validateEmailPolicy(form.email, true);
+    if (!policy.valid) {
+      setError(policy.error || 'Please enter a valid email address.');
+      return;
+    }
+    const trimmedEmail = form.email.trim().toLowerCase();
     setLoading(true);
 
     try {
       await apiClient.post('/auth/register/send-otp', {
-        email: form.email.trim().toLowerCase(),
+        email: trimmedEmail,
         firstName: form.firstName.trim(),
         role: selectedRole
       });

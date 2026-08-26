@@ -43,10 +43,7 @@ public class AuthController {
 
     @PostMapping("/register/send-otp")
     @SecurityRequirements
-    @Operation(
-            summary = "Send Registration Verification OTP",
-            description = "Sends a 4-digit verification code to the specified email address prior to account creation."
-    )
+    @Operation(summary = "Send Registration Verification OTP", description = "Sends a 4-digit verification code to the specified email address prior to account creation.")
     public ResponseEntity<ApiResponse<Void>> sendRegistrationOtp(
             @Valid @RequestBody SendRegistrationOtpRequest request,
             HttpServletRequest httpRequest) {
@@ -57,13 +54,8 @@ public class AuthController {
 
     @PostMapping("/register")
     @SecurityRequirements  // No auth required
-    @Operation(
-            summary = "Register a new user",
-            description = "Creates a new CANDIDATE or HR account with mandatory 4-digit email verification OTP."
-    )
-    public ResponseEntity<ApiResponse<AuthResponse>> register(
-            @Valid @RequestBody RegisterRequest request,
-            HttpServletRequest httpRequest) {
+    @Operation(summary = "Register a new user", description = "Creates a new CANDIDATE or HR account with mandatory 4-digit email verification OTP.")
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
 
         AuthResponse response = authService.register(request, httpRequest);
         return ResponseEntity
