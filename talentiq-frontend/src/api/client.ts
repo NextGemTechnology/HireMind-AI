@@ -21,15 +21,15 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response Interceptor: Handle Token Refresh on 401 or 403
+// Response Interceptor: Handle Token Refresh strictly on 401 Unauthorized
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
     const status = error.response?.status;
-    const isAuthError = status === 401 || (status === 403 && !originalRequest.url?.includes('/auth/login'));
 
-    if (isAuthError && !originalRequest._retry) {
+    // Only 401 means token expired/invalid. 403 is permission-denied and should NOT trigger logout
+    if (status === 401 && originalRequest && !originalRequest._retry && !originalRequest.url?.includes('/auth/')) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('refreshToken');
 
@@ -51,7 +51,7 @@ apiClient.interceptors.response.use(
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
-          const publicRoutes = ['/', '/jobs', '/user-login', '/hr-login', '/admin-login'];
+          const publicRoutes = ['/', '/jobs', '/user-login', '/hr-login', '/admin-login', '/contact', '/about', '/terms', '/privacy'];
           if (!publicRoutes.includes(window.location.pathname)) {
             window.location.href = '/user-login';
           }
@@ -61,7 +61,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         sessionStorage.clear();
-        const publicRoutes = ['/', '/jobs', '/user-login', '/hr-login', '/admin-login'];
+        const publicRoutes = ['/', '/jobs', '/user-login', '/hr-login', '/admin-login', '/contact', '/about', '/terms', '/privacy'];
         if (!publicRoutes.includes(window.location.pathname)) {
           window.location.href = '/user-login';
         }

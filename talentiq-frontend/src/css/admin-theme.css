@@ -58,7 +58,31 @@
 }
 
 /* ──────────────────────────────────────────────────────────────
-   3. 100% DARK MODE (Executive Obsidian Midnight)
+   3. 75% DARK / 25% LIGHT BLEND MODE (Executive Charcoal Glow - Default)
+   ────────────────────────────────────────────────────────────── */
+.admin-theme-blend-75 {
+  --admin-bg: #0C1222;
+  --admin-surface: #141D38;
+  --admin-surface-subtle: #1C284C;
+  --admin-border: rgba(167, 139, 250, 0.25);
+  --admin-border-focus: #8B5CF6;
+  --admin-text-primary: #FFFFFF;
+  --admin-text-secondary: #E2E8F0;
+  --admin-text-muted: #94A3B8;
+  --admin-primary: #8B5CF6;
+  --admin-primary-hover: #7C3AED;
+  --admin-accent: #38BDF8;
+  --admin-success: #34D399;
+  --admin-danger: #F87171;
+  --admin-warning: #FBBF24;
+  --admin-card-shadow: 0 10px 32px rgba(0, 0, 0, 0.6);
+  --admin-header-bg: rgba(20, 29, 56, 0.94);
+  background-color: var(--admin-bg) !important;
+  color: var(--admin-text-primary) !important;
+}
+
+/* ──────────────────────────────────────────────────────────────
+   4. 100% DARK MODE (Executive Obsidian Midnight)
    ────────────────────────────────────────────────────────────── */
 .admin-theme-dark-100 {
   --admin-bg: #090D1A;

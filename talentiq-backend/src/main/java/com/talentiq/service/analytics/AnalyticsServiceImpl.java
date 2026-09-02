@@ -85,7 +85,9 @@ public class AnalyticsServiceImpl implements AnalyticsService {
     @Override
     @Transactional(readOnly = true)
     public AnalyticsDto.HrDashboardResponse getHrAnalyticsDashboard(Long hrUserId) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId).orElse(null);
+        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
+                .or(() -> hrProfileRepository.findByUserId(hrUserId))
+                .orElse(null);
         Company company = hrProfile != null ? hrProfile.getCompany() : null;
 
         if (company == null) {

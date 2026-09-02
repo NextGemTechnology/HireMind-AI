@@ -66,7 +66,7 @@ class AuthServiceImplTest {
     @Mock private HrCredentialRepository hrCredentialRepository;
     @Mock private CompanyCredentialRepository companyCredentialRepository;
     @Mock private AppDevCredentialRepository appDevCredentialRepository;
-    @Mock private ManagementTeamCredentialRepository managementTeamCredentialRepository;
+    @Mock private com.talentiq.repository.auth.ServiceTeamCredentialRepository serviceTeamCredentialRepository;
 
     @InjectMocks
     private AuthServiceImpl authService;

@@ -16,15 +16,15 @@ import java.time.Instant;
 @Builder
 @Entity
 @Table(
-        name = "management_team_credentials",
+        name = "service_team_credentials",
         indexes = {
-                @Index(name = "idx_mgmt_cred_email", columnList = "email", unique = true),
-                @Index(name = "idx_mgmt_cred_user_id", columnList = "user_id", unique = true),
-                @Index(name = "idx_mgmt_cred_status", columnList = "status"),
-                @Index(name = "idx_mgmt_cred_locked_until", columnList = "locked_until")
+                @Index(name = "idx_svc_team_cred_email", columnList = "email", unique = true),
+                @Index(name = "idx_svc_team_cred_user_id", columnList = "user_id", unique = true),
+                @Index(name = "idx_svc_team_cred_status", columnList = "status"),
+                @Index(name = "idx_svc_team_cred_locked_until", columnList = "locked_until")
         }
 )
-public class ManagementTeamCredential extends AuditEntity {
+public class ServiceTeamCredential extends AuditEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -43,7 +43,7 @@ public class ManagementTeamCredential extends AuditEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     @Builder.Default
-    private Role role = Role.ROLE_MANAGEMENT_TEAM;
+    private Role role = Role.ROLE_SERVICE_TEAM;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)

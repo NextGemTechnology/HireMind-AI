@@ -32,7 +32,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final HrCredentialRepository hrCredentialRepository;
     private final CompanyCredentialRepository companyCredentialRepository;
     private final AppDevCredentialRepository appDevCredentialRepository;
-    private final ManagementTeamCredentialRepository managementTeamCredentialRepository;
+    private final ServiceTeamCredentialRepository serviceTeamCredentialRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -96,7 +96,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         }
 
         // 4. Check Management Team credentials
-        Optional<ManagementTeamCredential> mgmtCred = managementTeamCredentialRepository.findByUserId(user.getId());
+        Optional<ServiceTeamCredential> mgmtCred = serviceTeamCredentialRepository.findByUserId(user.getId());
         if (mgmtCred.isPresent()) {
             return new UserPrincipal(user, mgmtCred.get());
         }

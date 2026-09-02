@@ -23,6 +23,7 @@ import {
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 // import { GoogleAuthButton } from '../components/GoogleAuthButton'; // Disabled for security hardening
 import { HireMindLogo } from '../components/HireMindLogo';
+import { getAdminDashboardRoute } from '../utils/roleRoutes';
 import '../css/login.css';
 
 type LoginRoleMode = 'CANDIDATE' | 'HR' | 'ADMIN';
@@ -99,7 +100,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   // Login Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [adminLoginRole, setAdminLoginRole] = useState<'ROLE_APP_DEVELOPER' | 'ROLE_MANAGEMENT_TEAM' | 'ROLE_COMPANY_ADMIN'>('ROLE_APP_DEVELOPER');
+  const [adminLoginRole, setAdminLoginRole] = useState<'ROLE_APP_DEVELOPER' | 'ROLE_SERVICE_TEAM' | 'ROLE_COMPANY_ADMIN' | 'ROLE_SUPER_ADMIN'>('ROLE_APP_DEVELOPER');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -133,7 +134,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
   const [regPassword, setRegPassword] = useState('');
   const [regCompany, setRegCompany] = useState('');
   const [regDesiredRole, setRegDesiredRole] = useState('');
-  const [adminRoleOption, setAdminRoleOption] = useState<'ROLE_APP_DEVELOPER' | 'ROLE_MANAGEMENT_TEAM' | 'ROLE_COMPANY_ADMIN'>('ROLE_APP_DEVELOPER');
+  const [adminRoleOption, setAdminRoleOption] = useState<'ROLE_APP_DEVELOPER' | 'ROLE_SERVICE_TEAM' | 'ROLE_COMPANY_ADMIN'>('ROLE_APP_DEVELOPER');
   const [regSpecialization, setRegSpecialization] = useState('');
   const [regJobTitle, setRegJobTitle] = useState('');
   const [regError, setRegError] = useState('');
@@ -315,14 +316,15 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         otp: fullOtp
       });
 
-      if (adminLoginRole === 'ROLE_APP_DEVELOPER') {
-        navigate('/admin-application-developere-suit');
-      } else if (adminLoginRole === 'ROLE_MANAGEMENT_TEAM') {
-        navigate('/admin-Management-team');
-      } else {
-        const slug = authData?.companySlug || 'company';
-        navigate(`/Admin-${slug}`);
-      }
+      // Redirect strictly using the AUTHENTICATED ROLE returned by backend
+      const authenticatedRoles: string[] = Array.isArray(authData?.roles)
+        ? authData.roles
+        : authData?.roles
+        ? Object.values(authData.roles)
+        : (JSON.parse(localStorage.getItem('user') || '{}').roles || []);
+
+      const targetPath = getAdminDashboardRoute(authenticatedRoles);
+      navigate(targetPath);
     } catch (err: any) {
       setTwoFactorError(err.response?.data?.message || 'Invalid or expired 2FA code. Please try again.');
     } finally {
@@ -380,48 +382,37 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         return;
       }
 
-      const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
-      const roles: string[] = savedUser.roles || [];
-
-      const userIsHr = roles.includes('ROLE_HR') || roles.includes('HR');
-      const userIsAdmin = roles.includes('ROLE_SUPER_ADMIN') ||
-                          roles.includes('SUPER_ADMIN') ||
-                          roles.includes('ROLE_PLATFORM_ADMIN') ||
-                          roles.includes('ROLE_APP_DEVELOPER') ||
-                          roles.includes('ROLE_MANAGEMENT_TEAM') ||
-                          roles.includes('ROLE_COMPANY_ADMIN');
-      const userIsCandidate = roles.includes('ROLE_CANDIDATE') || roles.includes('CANDIDATE');
+      // Read authenticated roles from backend response as primary source of truth
+      const authenticatedRoles: string[] = Array.isArray(loginRes?.roles)
+        ? loginRes.roles
+        : loginRes?.roles
+        ? Object.values(loginRes.roles)
+        : (JSON.parse(localStorage.getItem('user') || '{}').roles || []);
 
       if (selectedRole === 'HR') {
+        const userIsHr = authenticatedRoles.includes('ROLE_HR') || authenticatedRoles.includes('HR');
+        const userIsAdmin = authenticatedRoles.some(r =>
+          ['ROLE_SUPER_ADMIN', 'ROLE_PLATFORM_ADMIN', 'ROLE_APP_DEVELOPER', 'ROLE_SERVICE_TEAM', 'ROLE_COMPANY_ADMIN', 'SUPER_ADMIN'].includes(r)
+        );
         if (!userIsHr && !userIsAdmin) {
           logout();
-          setError('Invalid email, password, or role');
+          setError('Unauthorized: Your account does not have HR Recruiter permissions.');
           return;
         }
         navigate('/hr-analytics');
       } else if (selectedRole === 'ADMIN') {
-        const hasSelectedRole = roles.includes(adminLoginRole) ||
-                                roles.includes('ROLE_SUPER_ADMIN') ||
-                                roles.includes('ROLE_PLATFORM_ADMIN');
-        if (!hasSelectedRole) {
+        const adminPath = getAdminDashboardRoute(authenticatedRoles);
+        if (adminPath === '/admin-login') {
           logout();
-          const roleLabel = adminLoginRole === 'ROLE_APP_DEVELOPER'
-            ? 'Application Developer'
-            : adminLoginRole === 'ROLE_MANAGEMENT_TEAM'
-            ? 'Management Team'
-            : 'Register Company';
-          setError(`Unauthorized: Your account is not registered as ${roleLabel}.`);
+          setError('Unauthorized: Your account does not have Enterprise Admin permissions.');
           return;
         }
-        if (adminLoginRole === 'ROLE_APP_DEVELOPER') {
-          navigate('/admin-application-developere-suit');
-        } else if (adminLoginRole === 'ROLE_MANAGEMENT_TEAM') {
-          navigate('/admin-Management-team');
-        } else {
-          const slug = savedUser?.companySlug || 'company';
-          navigate(`/Admin-${slug}`);
-        }
+        navigate(adminPath);
       } else {
+        const userIsCandidate = authenticatedRoles.includes('ROLE_CANDIDATE') || authenticatedRoles.includes('CANDIDATE');
+        const userIsAdmin = authenticatedRoles.some(r =>
+          ['ROLE_SUPER_ADMIN', 'ROLE_PLATFORM_ADMIN', 'ROLE_APP_DEVELOPER', 'ROLE_SERVICE_TEAM', 'ROLE_COMPANY_ADMIN', 'SUPER_ADMIN'].includes(r)
+        );
         if (!userIsCandidate && !userIsAdmin) {
           logout();
           setError('Invalid email or password');
@@ -501,7 +492,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       else if (targetRole === 'ROLE_HR') otpEndpoint = '/auth/hr/send-otp';
       else if (targetRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
       else if (targetRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
-      else if (targetRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+      else if (targetRole === 'ROLE_SERVICE_TEAM') otpEndpoint = '/auth/management/send-otp';
 
       await apiClient.post(otpEndpoint, {
         email: trimmedEmail,
@@ -540,7 +531,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
       else if (targetRole === 'ROLE_HR') otpEndpoint = '/auth/hr/send-otp';
       else if (targetRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
       else if (targetRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
-      else if (targetRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+      else if (targetRole === 'ROLE_SERVICE_TEAM') otpEndpoint = '/auth/management/send-otp';
 
       await apiClient.post(otpEndpoint, {
         email: trimmedEmail,
@@ -583,7 +574,9 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
           payload.specialization = regSpecialization || 'Core Systems & Governance';
         }
         await register(payload);
-        navigate('/admin-portal');
+        const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const regRoles = savedUser.roles || [adminRoleOption];
+        navigate(getAdminDashboardRoute(regRoles));
       } else if (selectedRole === 'HR') {
         await register({
           firstName: regFirstName.trim(),
@@ -1201,9 +1194,10 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                           }}
                           required
                         >
-                          <option value="ROLE_APP_DEVELOPER">👨💻 Application Developer (App Control)</option>
-                          <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team</option>
-                          <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Manage Team)</option>
+                          <option value="ROLE_APP_DEVELOPER">👨‍💻 Application Developer (App Control & AI Terminal)</option>
+                          <option value="ROLE_SERVICE_TEAM">🛡️ Service Team (Support & Moderation)</option>
+                          <option value="ROLE_COMPANY_ADMIN">🏢 Company Manager (Corporate SaaS Workspace)</option>
+                          <option value="ROLE_SUPER_ADMIN">👑 Super Administrator (Financial & Master Security)</option>
                         </select>
                       </div>
                     )}
@@ -1276,9 +1270,11 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                             ? 'HR Recruiter'
                             : adminLoginRole === 'ROLE_APP_DEVELOPER'
                             ? 'Application Developer'
-                            : adminLoginRole === 'ROLE_MANAGEMENT_TEAM'
-                            ? 'Management Team'
-                            : 'Register Company'}{' '}
+                            : adminLoginRole === 'ROLE_SERVICE_TEAM'
+                            ? 'Service Team'
+                            : adminLoginRole === 'ROLE_SUPER_ADMIN'
+                            ? 'Super Administrator'
+                            : 'Company Manager'}{' '}
                           <ArrowRight size={15} />
                         </span>
                       )}
@@ -1399,9 +1395,9 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                       className="login-input"
                       style={{ background: '#0F172A', color: '#F8FAFC', cursor: 'pointer', border: '1px solid rgba(251, 113, 133, 0.5)' }}
                     >
-                      <option value="ROLE_APP_DEVELOPER">👨‍💻 Application Developer (App Control)</option>
-                      <option value="ROLE_MANAGEMENT_TEAM">🛡️ HireMind-Management Team</option>
-                      <option value="ROLE_COMPANY_ADMIN">🏢 Register Company (Manage Team)</option>
+                      <option value="ROLE_APP_DEVELOPER">👨‍💻 Application Developer (App Control & AI Terminal)</option>
+                      <option value="ROLE_SERVICE_TEAM">🛡️ Service Team (Support & Moderation)</option>
+                      <option value="ROLE_COMPANY_ADMIN">🏢 Company Manager (Corporate SaaS Workspace)</option>
                     </select>
                   </div>
                 )}

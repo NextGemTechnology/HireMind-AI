@@ -146,18 +146,9 @@ export const MyApplications: React.FC = () => {
         {/* ── HERO HEADER DIV (Placed Cleanly Just Below Navigation Header) ── */}
         <div className="lunar-hero-panel">
           <div className="lunar-hero-content">
-            <div className="lunar-hero-badge">
-              <Moon size={14} color="#93C5FD" />
-              <span>Lunar Tracking Horizon</span>
-            </div>
-
             <h1 className="lunar-hero-title">
               My <span className="lunar-gradient-text">Application Constellation</span>
             </h1>
-
-            <p className="lunar-hero-subtitle">
-              Real-time candidate recruitment trajectories, interview countdowns, and AI score auditing across active HR pipelines.
-            </p>
 
             {/* Metric Chips inside the Hero Panel */}
             <div className="lunar-metrics-grid">
@@ -198,39 +189,6 @@ export const MyApplications: React.FC = () => {
 
         {/* ── Filter Horizon Pills ── */}
         <div className="lunar-filters-row">
-          <div className="lunar-filter-pills">
-            <button
-              onClick={() => setSelectedFilter('ALL')}
-              className={`lunar-pill ${selectedFilter === 'ALL' ? 'active' : ''}`}
-            >
-              🌕 All Applications ({totalCount})
-            </button>
-            <button
-              onClick={() => setSelectedFilter('INTERVIEWING')}
-              className={`lunar-pill ${selectedFilter === 'INTERVIEWING' ? 'active' : ''}`}
-            >
-              📅 Interviewing ({interviewingCount})
-            </button>
-            <button
-              onClick={() => setSelectedFilter('OFFERED')}
-              className={`lunar-pill ${selectedFilter === 'OFFERED' ? 'active-offer' : ''}`}
-            >
-              🎉 Offers ({offeredCount})
-            </button>
-            <button
-              onClick={() => setSelectedFilter('SCREENED')}
-              className={`lunar-pill ${selectedFilter === 'SCREENED' ? 'active' : ''}`}
-            >
-              ⚡ Screened ({applications.filter(a => a.status === 'SCREENED').length})
-            </button>
-            <button
-              onClick={() => setSelectedFilter('APPLIED')}
-              className={`lunar-pill ${selectedFilter === 'APPLIED' ? 'active' : ''}`}
-            >
-              🌑 Submitted ({applications.filter(a => a.status === 'APPLIED').length})
-            </button>
-          </div>
-
           <button onClick={fetchApplications} className="lunar-refresh-btn" title="Refresh Pipeline">
             <RefreshCw size={15} /> Refresh
           </button>

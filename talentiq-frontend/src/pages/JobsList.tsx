@@ -4,6 +4,7 @@ import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { Search, MapPin, Building, DollarSign, CheckCircle2, Plus, X, Sparkles, Filter, Rocket, Map, List, Globe, MessageSquare } from 'lucide-react';
 import { JobMap, type JobItem } from '../components/JobMap';
+import { HrSidebar } from '../components/HrSidebar';
 import '../css/jobs-list.css';
 
 /* ══════════════════════════
@@ -104,8 +105,10 @@ export const JobsList: React.FC = () => {
 
   useEffect(() => {
     fetchJobs();
-    fetchMyApplications();
-  }, []);
+    if (!isHr && !isAdmin) {
+      fetchMyApplications();
+    }
+  }, [isHr, isAdmin]);
 
   const fetchMyApplications = async () => {
     const token = localStorage.getItem('accessToken');
@@ -297,8 +300,8 @@ export const JobsList: React.FC = () => {
     return matchesSearch && matchesType;
   });
 
-  return (
-    <div className="jobs-page-wrapper">
+  const jobsContent = (
+    <div className="jobs-page-wrapper" style={isHr ? { flex: 1, height: '100vh', overflowY: 'auto' } : undefined}>
       {/* Star Canvas */}
       <StarCanvas />
 
@@ -312,31 +315,6 @@ export const JobsList: React.FC = () => {
           {/* Orbital Decorative Ring */}
           <div className="jobs-orbital-ring">
             <div className="jobs-orbital-dot" />
-          </div>
-
-          <div className="jobs-hero-content">
-            <div>
-              <div className="jobs-badge-tag">
-                <Sparkles size={14} /> Cosmic Tech Opportunities
-              </div>
-              <h1 className="jobs-hero-title">
-                Explore <span className="jobs-gradient-text">Active Career Horizons</span> 🪐
-              </h1>
-              <p className="jobs-hero-desc">
-                {isHr || isAdmin
-                  ? 'Manage your corporate postings, recruit top engineering talent, or launch new career orbits.'
-                  : 'Discover high-impact software, AI, and cloud roles matched directly with your technical profile.'}
-              </p>
-            </div>
-
-            {(isHr || isAdmin) && (
-              <button
-                onClick={() => setShowPostModal(true)}
-                className="cosmic-btn-primary jobs-post-btn-hero"
-              >
-                <Plus size={18} /> Post New Job
-              </button>
-            )}
           </div>
 
           {/* Success Banner Alert */}
@@ -444,7 +422,18 @@ export const JobsList: React.FC = () => {
                 {pill.label}
               </button>
             ))}
+        <div className="jobs-hero-content">
+                    {(isHr || isAdmin) && (
+                      <button
+                        onClick={() => setShowPostModal(true)}
+                        className="cosmic-btn-primary jobs-post-btn-hero"
+                      >
+                        <Plus size={12} /> Post New Job
+                      </button>
+                    )}
+                  </div>
           </div>
+
         </div>
 
         {/* 🗺️ Interactive State-wise Job Map Section */}
@@ -775,4 +764,15 @@ export const JobsList: React.FC = () => {
       </div>
     </div>
   );
+
+  if (isHr) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1, background: '#0F172A' }}>
+        <HrSidebar activeNav="Jobs" />
+        {jobsContent}
+      </div>
+    );
+  }
+
+  return jobsContent;
 };

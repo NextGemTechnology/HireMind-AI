@@ -108,11 +108,11 @@ public class UserPrincipal implements UserDetails {
         this.active = credential != null ? credential.isActive() : user.isActive();
     }
 
-    public UserPrincipal(User user, ManagementTeamCredential credential) {
+    public UserPrincipal(User user, ServiceTeamCredential credential) {
         this.id = user.getId();
         this.email = user.getEmail();
         this.fullName = user.getFullName();
-        this.roles = user.getRoles() != null ? user.getRoles() : Set.of(Role.ROLE_MANAGEMENT_TEAM);
+        this.roles = user.getRoles() != null ? user.getRoles() : Set.of(Role.ROLE_SERVICE_TEAM);
         this.user = user;
         this.hrProfile = null;
         this.credential = null;

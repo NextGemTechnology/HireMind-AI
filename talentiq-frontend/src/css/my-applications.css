@@ -17,12 +17,19 @@
   z-index: 10;
 }
 
-/* ── Hero Panel (Directly below navigation header) ──────────── */
-.lunar-hero-panel {
+ /* ── Hero Panel (Directly below navigation header) ──────────── */
+
+.lunar-gradient-text {
+  background: linear-gradient(135deg, #93C5FD 0%, #C4B5FD 50%, #F472B6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+/*.lunar-hero-panel {
   background: linear-gradient(135deg, rgba(15, 23, 48, 0.94) 0%, rgba(10, 16, 38, 0.97) 100%);
   border: 1.5px solid rgba(147, 197, 253, 0.45);
   border-radius: 20px;
-  padding: 32px 36px;
+  background: transparent;
+  padding: 0px 10px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(147, 197, 253, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -30,23 +37,7 @@
 }
 
 .lunar-hero-content {
-  width: 100%;
-}
-
-.lunar-hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(59, 130, 246, 0.2);
-  color: #93C5FD;
-  border: 1px solid rgba(147, 197, 253, 0.45);
-  padding: 5px 14px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  margin-bottom: 12px;
-  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+  width: 75%;
 }
 
 .lunar-hero-title {
@@ -58,11 +49,7 @@
   letter-spacing: -0.02em;
 }
 
-.lunar-gradient-text {
-  background: linear-gradient(135deg, #93C5FD 0%, #C4B5FD 50%, #F472B6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
+
 
 .lunar-hero-subtitle {
   font-size: 14px;
@@ -71,6 +58,7 @@
   line-height: 1.6;
   margin: 0 0 24px 0;
 }
+*/
 
 /* ── Motion Metric Cards ────────────────────────────────────── */
 .lunar-metrics-grid {
@@ -141,6 +129,7 @@
   color: #94A3B8;
   letter-spacing: 0.02em;
 }
+
 
 /* ── Filter Pills Row ───────────────────────────────────────── */
 .lunar-filters-row {

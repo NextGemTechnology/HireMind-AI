@@ -47,13 +47,11 @@ SELECT user_id, email, password_hash, role, status, email_verified, password_res
 INSERT IGNORE INTO user_credentials (user_id, email, password_hash, role, status, email_verified, password_reset_otp, password_reset_otp_expires_at, login_attempts, locked_until, last_login_at, created_at, updated_at)
 SELECT user_id, email, password_hash, role, status, email_verified, password_reset_otp, password_reset_otp_expires_at, login_attempts, locked_until, last_login_at, created_at, updated_at FROM management_team_credentials;
 
--- ── 3. Drop all authentication and token columns from users table ──
+-- ── 3. Drop legacy authentication and token columns from users table ──
 ALTER TABLE users
     DROP COLUMN password_hash,
     DROP COLUMN password_reset_token,
     DROP COLUMN password_reset_token_expires_at,
-    DROP COLUMN password_reset_otp,
-    DROP COLUMN password_reset_otp_expires_at,
     DROP COLUMN email_verification_token,
     DROP COLUMN email_verification_token_expires_at,
     DROP COLUMN login_attempts,

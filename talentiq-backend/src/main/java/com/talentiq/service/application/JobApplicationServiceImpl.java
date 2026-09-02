@@ -41,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -140,10 +141,15 @@ public class JobApplicationServiceImpl implements JobApplicationService {
         return mapToResponse(saved);
     }
 
+    private HrProfile resolveHrProfile(Long hrUserId) {
+        return hrProfileRepository.findById(hrUserId)
+                .or(() -> hrProfileRepository.findByUserId(hrUserId))
+                .orElseThrow(() -> new ForbiddenException("Only company HR members can access recruitment applications"));
+    }
+
     @Override
     public JobApplicationDto.Response updateApplicationStatus(Long hrUserId, Long applicationId, JobApplicationDto.StatusUpdateRequest request) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
-                .orElseThrow(() -> new ForbiddenException("Only HR team members can update application status"));
+        HrProfile hrProfile = resolveHrProfile(hrUserId);
 
         JobApplication application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("JobApplication", "id", applicationId));
@@ -199,8 +205,7 @@ public class JobApplicationServiceImpl implements JobApplicationService {
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<JobApplicationDto.Response> getApplicationsForHrCompany(Long hrUserId, ApplicationStatus status, Pageable pageable) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
-                .orElseThrow(() -> new ForbiddenException("Only company HR members can view job applications"));
+        HrProfile hrProfile = resolveHrProfile(hrUserId);
 
         Page<JobApplication> applications;
         if (status != null) {
@@ -214,8 +219,7 @@ public class JobApplicationServiceImpl implements JobApplicationService {
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<JobApplicationDto.Response> getApplicationsForJob(Long hrUserId, Long jobId, ApplicationStatus status, Pageable pageable) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(hrUserId)
-                .orElseThrow(() -> new ForbiddenException("Only company HR members can view job applications"));
+        HrProfile hrProfile = resolveHrProfile(hrUserId);
 
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job", "id", jobId));
@@ -249,24 +253,26 @@ public class JobApplicationServiceImpl implements JobApplicationService {
         JobApplication application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("JobApplication", "id", applicationId));
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
-
-        // Permission verification: Candidate (applicant) or company HR or Admin
-        boolean isOwner = application.getCandidate().getUser().getId().equals(userId);
-        boolean isCompanyHr = false;
-
-        if (user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_HR)) {
-            HrProfile hrProfile = hrProfileRepository.findByUserId(userId).orElse(null);
-            if (hrProfile != null && hrProfile.getCompany().getId().equals(application.getJob().getCompany().getId())) {
-                isCompanyHr = true;
+        // Check if caller is HR
+        Optional<HrProfile> hrProfileOpt = hrProfileRepository.findById(userId).or(() -> hrProfileRepository.findByUserId(userId));
+        if (hrProfileOpt.isPresent()) {
+            HrProfile hr = hrProfileOpt.get();
+            if (hr.getCompany() != null && hr.getCompany().getId().equals(application.getJob().getCompany().getId())) {
+                return mapToResponse(application);
             }
         }
 
-        boolean isAdmin = user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_SUPER_ADMIN)
-                || user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_PLATFORM_ADMIN);
+        User user = userRepository.findById(userId).orElse(null);
 
-        if (!isOwner && !isCompanyHr && !isAdmin) {
+        // Permission verification: Candidate (applicant) or company HR or Admin
+        boolean isOwner = application.getCandidate() != null
+                && application.getCandidate().getUser() != null
+                && application.getCandidate().getUser().getId().equals(userId);
+
+        boolean isAdmin = user != null && (user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_SUPER_ADMIN)
+                || user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_PLATFORM_ADMIN));
+
+        if (!isOwner && !isAdmin) {
             throw new ForbiddenException("You do not have permission to view this job application");
         }
 

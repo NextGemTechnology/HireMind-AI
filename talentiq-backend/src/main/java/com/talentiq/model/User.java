@@ -60,6 +60,9 @@ public class User extends AuditEntity {
     @Builder.Default
     private boolean emailVerified = true;
 
+    @Column(name = "last_seen_at")
+    private java.time.Instant lastSeenAt;
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(
             name = "user_roles",

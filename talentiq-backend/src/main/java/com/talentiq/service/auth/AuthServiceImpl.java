@@ -69,7 +69,7 @@ public class AuthServiceImpl implements AuthService {
     private final HrCredentialRepository hrCredentialRepository;
     private final CompanyCredentialRepository companyCredentialRepository;
     private final AppDevCredentialRepository appDevCredentialRepository;
-    private final ManagementTeamCredentialRepository managementTeamCredentialRepository;
+    private final ServiceTeamCredentialRepository serviceTeamCredentialRepository;
 
     // ── Email Validation & Security Guard ──────────────────────────────────────
     private void validateEmailFormat(String email, Role role) {
@@ -83,7 +83,7 @@ public class AuthServiceImpl implements AuthService {
                 || hrCredentialRepository.existsByEmail(email)
                 || companyCredentialRepository.existsByEmail(email)
                 || appDevCredentialRepository.existsByEmail(email)
-                || managementTeamCredentialRepository.existsByEmail(email);
+                || serviceTeamCredentialRepository.existsByEmail(email);
     }
 
     // ── Registration OTP Flow ──────────────────────────────────────────────────
@@ -289,16 +289,16 @@ public class AuthServiceImpl implements AuthService {
             AppDevCredential savedCred = appDevCredentialRepository.save(credential);
             principal = new UserPrincipal(savedUser, savedCred);
 
-        } else if (request.getRole().equals(Role.ROLE_MANAGEMENT_TEAM)) {
-            ManagementTeamCredential credential = ManagementTeamCredential.builder()
+        } else if (request.getRole().equals(Role.ROLE_SERVICE_TEAM)) {
+            ServiceTeamCredential credential = ServiceTeamCredential.builder()
                     .user(savedUser)
                     .email(email)
                     .passwordHash(passwordHash)
-                    .role(Role.ROLE_MANAGEMENT_TEAM)
+                    .role(Role.ROLE_SERVICE_TEAM)
                     .status(UserStatus.ACTIVE)
                     .emailVerified(true)
                     .build();
-            ManagementTeamCredential savedCred = managementTeamCredentialRepository.save(credential);
+            ServiceTeamCredential savedCred = serviceTeamCredentialRepository.save(credential);
             principal = new UserPrincipal(savedUser, savedCred);
 
         } else {
@@ -352,7 +352,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AuthResponse registerManagementTeam(RegisterRequest request, HttpServletRequest httpRequest) {
-        request.setRole(Role.ROLE_MANAGEMENT_TEAM);
+        request.setRole(Role.ROLE_SERVICE_TEAM);
         return register(request, httpRequest);
     }
 
@@ -483,14 +483,14 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse loginManagementTeam(LoginRequest request, HttpServletRequest httpRequest) {
         String email = request.getEmail().toLowerCase().trim();
-        validateEmailFormat(email, Role.ROLE_MANAGEMENT_TEAM);
+        validateEmailFormat(email, Role.ROLE_SERVICE_TEAM);
 
-        ManagementTeamCredential cred = managementTeamCredentialRepository.findByEmail(email)
+        ServiceTeamCredential cred = serviceTeamCredentialRepository.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
 
         checkCredentialLockout(cred.isLocked(), cred.getLockedUntil());
 
-        if (cred.getRole() != Role.ROLE_MANAGEMENT_TEAM && (cred.getUser() == null || !cred.getUser().hasRole(Role.ROLE_MANAGEMENT_TEAM))) {
+        if (cred.getRole() != Role.ROLE_SERVICE_TEAM && (cred.getUser() == null || !cred.getUser().hasRole(Role.ROLE_SERVICE_TEAM))) {
             throw new BadCredentialsException("Account is not authorized for Management portal.");
         }
 
@@ -498,7 +498,7 @@ public class AuthServiceImpl implements AuthService {
             throw handleFailedManagementLogin(cred);
         }
 
-        return initiateAdmin2FaFlow(cred.getUser(), Role.ROLE_MANAGEMENT_TEAM, httpRequest);
+        return initiateAdmin2FaFlow(cred.getUser(), Role.ROLE_SERVICE_TEAM, httpRequest);
     }
 
     @Override
@@ -508,7 +508,7 @@ public class AuthServiceImpl implements AuthService {
                 return loginCompany(request, httpRequest);
             } else if (request.getRequiredRole() == Role.ROLE_APP_DEVELOPER) {
                 return loginAppDeveloper(request, httpRequest);
-            } else if (request.getRequiredRole() == Role.ROLE_MANAGEMENT_TEAM) {
+            } else if (request.getRequiredRole() == Role.ROLE_SERVICE_TEAM) {
                 return loginManagementTeam(request, httpRequest);
             }
         }
@@ -565,9 +565,9 @@ public class AuthServiceImpl implements AuthService {
             return buildAuthResponse(user, accessToken, refreshToken.getToken());
         }
 
-        Optional<ManagementTeamCredential> mgmtOpt = managementTeamCredentialRepository.findByEmail(email);
+        Optional<ServiceTeamCredential> mgmtOpt = serviceTeamCredentialRepository.findByEmail(email);
         if (mgmtOpt.isPresent()) {
-            managementTeamCredentialRepository.recordSuccessfulLogin(mgmtOpt.get().getId(), Instant.now());
+            serviceTeamCredentialRepository.recordSuccessfulLogin(mgmtOpt.get().getId(), Instant.now());
             UserPrincipal principal = new UserPrincipal(user, mgmtOpt.get());
             String accessToken = jwtService.generateAccessToken(principal, user.getId());
             RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
@@ -628,7 +628,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 5. Try Management Team credentials
-        Optional<ManagementTeamCredential> mgmtCredOpt = managementTeamCredentialRepository.findByEmail(email);
+        Optional<ServiceTeamCredential> mgmtCredOpt = serviceTeamCredentialRepository.findByEmail(email);
         if (mgmtCredOpt.isPresent()) {
             return loginManagementTeam(request, httpRequest);
         }
@@ -806,8 +806,8 @@ public class AuthServiceImpl implements AuthService {
                 .ifPresent(c -> companyCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
         appDevCredentialRepository.findByEmail(email)
                 .ifPresent(c -> appDevCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
-        managementTeamCredentialRepository.findByEmail(email)
-                .ifPresent(c -> managementTeamCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
+        serviceTeamCredentialRepository.findByEmail(email)
+                .ifPresent(c -> serviceTeamCredentialRepository.savePasswordResetOtp(c.getId(), otp, expiresAt));
 
         mailService.sendPasswordResetOtpEmail(email, firstName, otp);
         log.info("🔑 [HIREMIND AI - 4-DIGIT OTP DISPATCHED FOR {}]", email);
@@ -845,7 +845,7 @@ public class AuthServiceImpl implements AuthService {
         hrCredentialRepository.findByEmail(email).ifPresent(c -> hrCredentialRepository.updatePassword(c.getId(), newHash));
         companyCredentialRepository.findByEmail(email).ifPresent(c -> companyCredentialRepository.updatePassword(c.getId(), newHash));
         appDevCredentialRepository.findByEmail(email).ifPresent(c -> appDevCredentialRepository.updatePassword(c.getId(), newHash));
-        managementTeamCredentialRepository.findByEmail(email).ifPresent(c -> managementTeamCredentialRepository.updatePassword(c.getId(), newHash));
+        serviceTeamCredentialRepository.findByEmail(email).ifPresent(c -> serviceTeamCredentialRepository.updatePassword(c.getId(), newHash));
 
         redisOtpService.consumeVerifiedTicket(email);
         userRepository.findByEmail(email).ifPresent(u -> refreshTokenRepository.revokeAllUserTokens(u.getId()));
@@ -914,13 +914,13 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    private RuntimeException handleFailedManagementLogin(ManagementTeamCredential cred) {
+    private RuntimeException handleFailedManagementLogin(ServiceTeamCredential cred) {
         int attempts = cred.getLoginAttempts() + 1;
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
-            managementTeamCredentialRepository.lockAccount(cred.getId(), Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
+            serviceTeamCredentialRepository.lockAccount(cred.getId(), Instant.now().plus(LOCKOUT_MINUTES, ChronoUnit.MINUTES));
             return new UnauthorizedException(String.format("Account is temporarily locked for %d minutes due to %d consecutive failed password attempts.", LOCKOUT_MINUTES, MAX_LOGIN_ATTEMPTS));
         } else {
-            managementTeamCredentialRepository.incrementLoginAttempts(cred.getId());
+            serviceTeamCredentialRepository.incrementLoginAttempts(cred.getId());
             int remaining = MAX_LOGIN_ATTEMPTS - attempts;
             return new BadCredentialsException(String.format("Invalid password. %d attempt%s remaining before account is temporarily locked.", remaining, remaining == 1 ? "" : "s"));
         }
@@ -1015,7 +1015,7 @@ public class AuthServiceImpl implements AuthService {
         if (devCred.isPresent()) {
             return new UserPrincipal(user, devCred.get());
         }
-        Optional<ManagementTeamCredential> mgmtCred = managementTeamCredentialRepository.findByUserId(user.getId());
+        Optional<ServiceTeamCredential> mgmtCred = serviceTeamCredentialRepository.findByUserId(user.getId());
         if (mgmtCred.isPresent()) {
             return new UserPrincipal(user, mgmtCred.get());
         }
@@ -1031,8 +1031,8 @@ public class AuthServiceImpl implements AuthService {
                 .ifPresent(c -> companyCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
         appDevCredentialRepository.findByUserId(user.getId())
                 .ifPresent(c -> appDevCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
-        managementTeamCredentialRepository.findByUserId(user.getId())
-                .ifPresent(c -> managementTeamCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
+        serviceTeamCredentialRepository.findByUserId(user.getId())
+                .ifPresent(c -> serviceTeamCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
         userCredentialRepository.findByUserId(user.getId())
                 .ifPresent(c -> userCredentialRepository.recordSuccessfulLogin(c.getId(), Instant.now()));
     }

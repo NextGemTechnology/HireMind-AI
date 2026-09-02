@@ -23,7 +23,7 @@ public class SecurityAuditController {
     private final SecurityAuditService securityAuditService;
 
     @GetMapping("/audit")
-    @PreAuthorize("hasAnyRole('APP_DEVELOPER', 'MANAGEMENT_TEAM', 'SUPER_ADMIN', 'PLATFORM_ADMIN')")
+    @PreAuthorize("hasAnyRole('APP_DEVELOPER', 'SERVICE_TEAM', 'SUPER_ADMIN', 'PLATFORM_ADMIN')")
     @Operation(summary = "Run automated defensive security vulnerability and diagnostic assessment")
     public ResponseEntity<ApiResponse<SecurityAuditDto.AuditReportResponse>> runSecurityAudit(
             @AuthenticationPrincipal UserPrincipal principal) {

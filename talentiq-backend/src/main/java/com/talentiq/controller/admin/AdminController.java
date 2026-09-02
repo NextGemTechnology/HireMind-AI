@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/v1/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'SUPER_ADMIN', 'MANAGEMENT_TEAM', 'APP_DEVELOPER')")
+@PreAuthorize("hasAnyRole('PLATFORM_ADMIN', 'SUPER_ADMIN', 'SERVICE_TEAM', 'APP_DEVELOPER')")
 @Tag(name = "Admin Management", description = "Platform administration, moderation, and temporal job metrics")
 public class AdminController {
 

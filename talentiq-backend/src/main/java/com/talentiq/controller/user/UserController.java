@@ -26,7 +26,7 @@ public class UserController {
     @Operation(summary = "Get current authenticated user profile")
     public ResponseEntity<ApiResponse<UserDto.Response>> getMyProfile(
             @AuthenticationPrincipal UserPrincipal principal) {
-        UserDto.Response profile = userService.getUserProfile(principal.getId());
+        UserDto.Response profile = userService.getUserProfile(principal);
         return ResponseEntity.ok(ApiResponse.success(profile));
     }
 
@@ -36,7 +36,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<UserDto.Response>> updateMyProfile(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody UserDto.UpdateProfileRequest request) {
-        UserDto.Response updated = userService.updateUserProfile(principal.getId(), request);
+        UserDto.Response updated = userService.updateUserProfile(principal, request);
         return ResponseEntity.ok(ApiResponse.success("Profile updated successfully", updated));
     }
 
@@ -46,7 +46,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody UserDto.ChangePasswordRequest request) {
-        userService.changePassword(principal.getId(), request);
+        userService.changePassword(principal, request);
         return ResponseEntity.ok(ApiResponse.success("Password changed successfully"));
     }
 }

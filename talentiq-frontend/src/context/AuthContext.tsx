@@ -93,7 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       endpoint = '/auth/company/login';
     } else if (credentials.requiredRole === 'ROLE_APP_DEVELOPER') {
       endpoint = '/auth/app-developer/login';
-    } else if (credentials.requiredRole === 'ROLE_MANAGEMENT_TEAM') {
+    } else if (credentials.requiredRole === 'ROLE_SERVICE_TEAM') {
       endpoint = '/auth/management/login';
     } else if (credentials.requiredRole === 'ROLE_SUPER_ADMIN' || credentials.requiredRole === 'ROLE_PLATFORM_ADMIN') {
       endpoint = '/auth/admin/login';
@@ -141,7 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       endpoint = '/auth/company/register';
     } else if (data.role === 'ROLE_APP_DEVELOPER') {
       endpoint = '/auth/app-developer/register';
-    } else if (data.role === 'ROLE_MANAGEMENT_TEAM') {
+    } else if (data.role === 'ROLE_SERVICE_TEAM') {
       endpoint = '/auth/management/register';
     }
 
@@ -192,7 +192,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAdmin = roles.includes('ROLE_SUPER_ADMIN') ||
                   roles.includes('ROLE_PLATFORM_ADMIN') ||
                   roles.includes('ROLE_APP_DEVELOPER') ||
-                  roles.includes('ROLE_MANAGEMENT_TEAM') ||
+                  roles.includes('ROLE_SERVICE_TEAM') ||
                   roles.includes('ROLE_COMPANY_ADMIN') ||
                   roles.includes('SUPER_ADMIN');
 

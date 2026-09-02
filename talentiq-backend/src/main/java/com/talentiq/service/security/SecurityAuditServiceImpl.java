@@ -37,7 +37,7 @@ public class SecurityAuditServiceImpl implements SecurityAuditService {
                 .category("ACCESS_CONTROL")
                 .status("SECURE")
                 .description("Spring Security filter chain strictly enforces method security annotations (@PreAuthorize) on all sensitive administrative and business controllers.")
-                .details("Strict separation verified across CANDIDATE, HR, COMPANY_ADMIN, APP_DEVELOPER, and MANAGEMENT_TEAM roles.")
+                .details("Strict separation verified across CANDIDATE, HR, COMPANY_ADMIN, APP_DEVELOPER, and SERVICE_TEAM roles.")
                 .recommendation("Maintain granular role scopes and avoid wildcard authorization rules.")
                 .build());
 

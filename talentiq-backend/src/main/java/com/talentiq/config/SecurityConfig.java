@@ -85,8 +85,11 @@ public class SecurityConfig {
                 // ── Authorization rules ───────────────────────────────────────
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/v1/jobs/**").permitAll()
-                        .requestMatchers("/v1/admin/**").hasAnyRole("PLATFORM_ADMIN", "SUPER_ADMIN", "MANAGEMENT_TEAM", "APP_DEVELOPER")
+                        .requestMatchers("/v1/admin/developer/**").hasAnyRole("APP_DEVELOPER", "SUPER_ADMIN", "PLATFORM_ADMIN")
+                        .requestMatchers("/v1/admin/service/**").hasAnyRole("SERVICE_TEAM", "SUPER_ADMIN", "PLATFORM_ADMIN")
+                        .requestMatchers("/v1/admin/company/**").hasAnyRole("COMPANY_ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN")
+                        .requestMatchers("/v1/admin/super/**").hasAnyRole("SUPER_ADMIN", "PLATFORM_ADMIN")
+                        .requestMatchers("/v1/admin/**").hasAnyRole("PLATFORM_ADMIN", "SUPER_ADMIN", "SERVICE_TEAM", "APP_DEVELOPER", "COMPANY_ADMIN")
                         .anyRequest().authenticated()
                 )
 

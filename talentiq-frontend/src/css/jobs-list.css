@@ -130,7 +130,7 @@
   box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
 }
 
-/* ── Hero Banner ─────────────────────────────────────────── */
+/* ── Hero Banner ───────────────────────────────────────────
 .jobs-hero-panel {
   position: relative;
   padding: 48px 40px;
@@ -141,7 +141,7 @@
   box-shadow: var(--shadow-lg);
   margin-bottom: 36px;
   overflow: hidden;
-}
+}*/
 
 .jobs-orbital-ring {
   position: absolute;

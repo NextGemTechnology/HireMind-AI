@@ -83,7 +83,7 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<CompanyVerificationDto.Response> getCompanyPendingVerifications(Long companyAdminUserId, String status, Pageable pageable) {
-        HrProfile adminProfile = hrProfileRepository.findByUserId(companyAdminUserId).orElse(null);
+        HrProfile adminProfile = hrProfileRepository.findById(companyAdminUserId).or(() -> hrProfileRepository.findByUserId(companyAdminUserId)).orElse(null);
         Long companyId = null;
 
         if (adminProfile != null && adminProfile.getCompany() != null) {
@@ -117,7 +117,7 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", companyAdminUserId));
 
         // Enforce Multi-tenant isolation: verify admin belongs to the same company
-        HrProfile adminProfile = hrProfileRepository.findByUserId(companyAdminUserId).orElse(null);
+        HrProfile adminProfile = hrProfileRepository.findById(companyAdminUserId).or(() -> hrProfileRepository.findByUserId(companyAdminUserId)).orElse(null);
         boolean isSuperAdmin = adminUser.getRoles().contains(com.talentiq.common.enums.Role.ROLE_SUPER_ADMIN);
         
         if (!isSuperAdmin) {
@@ -166,7 +166,7 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
     @Override
     @Transactional(readOnly = true)
     public List<CompanyVerificationDto.HrMemberResponse> getCompanyHrTeam(Long companyAdminUserId) {
-        HrProfile adminProfile = hrProfileRepository.findByUserId(companyAdminUserId).orElse(null);
+        HrProfile adminProfile = hrProfileRepository.findById(companyAdminUserId).or(() -> hrProfileRepository.findByUserId(companyAdminUserId)).orElse(null);
         Long companyId = null;
 
         if (adminProfile != null && adminProfile.getCompany() != null) {
@@ -212,7 +212,7 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
         HrProfile targetHr = hrProfileRepository.findById(hrProfileId)
                 .orElseThrow(() -> new ResourceNotFoundException("HR Profile", "id", hrProfileId));
 
-        HrProfile adminProfile = hrProfileRepository.findByUserId(companyAdminUserId).orElse(null);
+        HrProfile adminProfile = hrProfileRepository.findById(companyAdminUserId).or(() -> hrProfileRepository.findByUserId(companyAdminUserId)).orElse(null);
         User adminUser = userRepository.findById(companyAdminUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", companyAdminUserId));
         boolean isSuperAdmin = adminUser.getRoles().contains(com.talentiq.common.enums.Role.ROLE_SUPER_ADMIN);

@@ -283,7 +283,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> sendManagementOtp(
             @Valid @RequestBody SendRegistrationOtpRequest request,
             HttpServletRequest httpRequest) {
-        request.setRole(Role.ROLE_MANAGEMENT_TEAM);
+        request.setRole(Role.ROLE_SERVICE_TEAM);
         authService.sendRegistrationOtp(request, httpRequest);
         return ResponseEntity.ok(ApiResponse.success(
                 "A 4-digit verification code has been dispatched to " + request.getEmail() + ". Please enter the code to complete registration."));
@@ -294,7 +294,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> registerManagementTeam(
             @Valid @RequestBody RegisterRequest request,
             HttpServletRequest httpRequest) {
-        request.setRole(Role.ROLE_MANAGEMENT_TEAM);
+        request.setRole(Role.ROLE_SERVICE_TEAM);
         AuthResponse response = authService.registerManagementTeam(request, httpRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Management Team registration successful. Account created!", response));

@@ -9,11 +9,12 @@ import {
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 // import { GoogleAuthButton } from '../components/GoogleAuthButton'; // Disabled for security hardening
 import { HireMindLogo } from '../components/HireMindLogo';
+import { getPostLoginRoute } from '../utils/roleRoutes';
 import '../css/register.css';
 
 export type RoleOption =
   | 'ROLE_APP_DEVELOPER'
-  | 'ROLE_MANAGEMENT_TEAM'
+  | 'ROLE_SERVICE_TEAM'
   | 'ROLE_COMPANY_ADMIN';
 
 interface FormData {
@@ -90,23 +91,23 @@ const ROLE_DEFINITIONS: { id: RoleOption; label: string; tag: string; icon: any;
   {
     id: 'ROLE_APP_DEVELOPER',
     label: 'Application Developer',
-    tag: 'Full App Control (Safe DB Mode)',
+    tag: 'App Telemetry & AI Terminal',
     icon: Code2,
-    desc: 'Full administrative control to manage the HIREMIND-AI platform, AI agents, diagnostics, and code triggers. (Protected from destructive database drop/wipe actions).'
+    desc: 'Technical administrative control: cluster telemetry, JVM & DB metrics, error audit logs, and controlled AI Developer Terminal sandbox.'
   },
   {
-    id: 'ROLE_MANAGEMENT_TEAM',
-    label: 'HireMind-Management Team',
-    tag: 'Moderation & Temporal Metrics',
+    id: 'ROLE_SERVICE_TEAM',
+    label: 'Service & Support Team',
+    tag: 'Moderation & SLA Governance',
     icon: Users2,
-    desc: 'Platform governance: manage DB records safely, moderate/block candidates & HRs, blacklist/unblock companies, and inspect Day/Week/Month/Year job posting telemetry.'
+    desc: 'Customer onboarding & support: corporate verification approval queue, user & HR moderation, candidate dossier investigations, and support ticket SLA tracking.'
   },
   {
     id: 'ROLE_COMPANY_ADMIN',
-    label: 'Register Company',
-    tag: 'Company Executive / CEO / Director',
+    label: 'Company Manager',
+    tag: 'Company Executive Workspace',
     icon: Building2,
-    desc: 'Register an enterprise corporate entity with isolated confidential data. Issue verified recruiter badges to HRs and approve/reject candidate verification tags.'
+    desc: 'Executive workspace: multi-tenant corporate data, HR recruiter team management, milestone task tracking, and AI Company Manager natural language assistant.'
   }
 ];
 
@@ -220,7 +221,7 @@ export const Register: React.FC = () => {
       let otpEndpoint = '/auth/register/send-otp';
       if (selectedRole === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
       else if (selectedRole === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
-      else if (selectedRole === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+      else if (selectedRole === 'ROLE_SERVICE_TEAM') otpEndpoint = '/auth/management/send-otp';
 
       await apiClient.post(otpEndpoint, {
         email: trimmedEmail,
@@ -249,7 +250,7 @@ export const Register: React.FC = () => {
       let otpEndpoint = '/auth/register/send-otp';
       if (roleToUse === 'ROLE_COMPANY_ADMIN') otpEndpoint = '/auth/company/send-otp';
       else if (roleToUse === 'ROLE_APP_DEVELOPER') otpEndpoint = '/auth/app-developer/send-otp';
-      else if (roleToUse === 'ROLE_MANAGEMENT_TEAM') otpEndpoint = '/auth/management/send-otp';
+      else if (roleToUse === 'ROLE_SERVICE_TEAM') otpEndpoint = '/auth/management/send-otp';
 
       await apiClient.post(otpEndpoint, {
         email: form.email.trim().toLowerCase(),
@@ -298,14 +299,9 @@ export const Register: React.FC = () => {
       }
 
       await register(payload);
-
-      if (selectedRole === 'ROLE_APP_DEVELOPER' || selectedRole === 'ROLE_MANAGEMENT_TEAM' || selectedRole === 'ROLE_COMPANY_ADMIN') {
-        navigate('/admin-portal');
-      } else if (selectedRole === 'ROLE_HR') {
-        navigate('/hr-analytics');
-      } else {
-        navigate('/jobs');
-      }
+      const savedUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const regRoles = savedUser.roles || [selectedRole];
+      navigate(getPostLoginRoute(regRoles));
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || 'Registration failed. Please verify your OTP and try again.');
     } finally {

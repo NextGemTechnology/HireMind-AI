@@ -31,10 +31,34 @@
   - 🛡️ **Login Security & Alert Notifications**
 
 ### 🚪 3. Role-Based Access Control (RBAC) & Dedicated Portal Routing
-- **Candidate Portal** (`http://localhost:3000/login`): Fast candidate sign-in, profile building, 85%+ AI match scores, and application constellation.
+- **Candidate Portal** (`http://localhost:3000/user-login`): Candidate sign-in, profile building, 85%+ AI match scores, and application tracking.
 - **HR Recruiter Portal** (`http://localhost:3000/hr-login`): Job publishing, candidate applicant desk, resume review, and pipeline tracking.
-- **Super Admin Portal** (`http://localhost:3000/admin-login`): Platform analytics, company approval, and user moderation.
-- **Cross-Portal Protection**: Clean `401 Unauthorized ("Invalid email or password")` error responses prevent user enumeration and enforce strict RBAC boundaries.
+- **Dedicated Admin Portals** (`http://localhost:3000/admin-login`): Strict 1:1 RBAC isolation across 4 locked Admin roles (`/admin/developer`, `/admin/service-team`, `/admin/company`, `/admin/super-admin`).
+- **Cross-Portal Protection**: Clean `401 Unauthorized` error responses prevent user enumeration and enforce strict backend security boundaries.
+
+---
+
+## 👑 Enterprise Admin SaaS Platform Architecture & RBAC Isolation
+
+HireMind features a **hardened, multi-tenant Admin SaaS Architecture** built around 4 locked Admin roles, decoupled credential storage tables, strict backend Role-Based Access Control (RBAC), and dedicated, visually isolated admin portals.
+
+### 🔒 1. The 4 Locked Admin Roles & Dedicated Portals
+
+| Admin Role | Canonical Route | Database Table | Visual Theme & Architecture | Core Capabilities & Governance |
+|---|---|---|---|---|
+| **`ROLE_APP_DEVELOPER`** | `/admin/developer` | `app_dev_credentials` | **Cyberpunk / Matrix Dark Terminal** (`#10B981` Emerald / `#06B6D4` Cyan) | • **Cluster Telemetry**: JVM Heap, thread counts, GC pauses, MySQL HikariPool connection state, and live candidate/HR Redis presence.<br>• **AI Developer Terminal**: Real-time diagnostic terminal runner with ANSI syntax highlighting and tool execution chips (`READ_LOGS`, `READ_METRICS`, `CHECK_DATABASE`, `ANALYZE_QUERY`, `CHECK_DEPLOYMENT`).<br>• **Error Log Tracing**: Filterable Spring Boot log streamer.<br>• **Developer Provisioning**: Developer team invite dispatch. |
+| **`ROLE_SERVICE_TEAM`** | `/admin/service-team` | `service_team_credentials` | **Operations & Customer Success Desk** (`#6366F1` Indigo / `#F59E0B` Amber) | • **Corporate Verification Queue**: Pending company registrations with document preview, corporate registry validation, and 1-click "Approve & Issue Badge" or "Reject".<br>• **User & Recruiter Moderation Bureau**: Candidate & HR search, dossier inspect modal, and account block/unblock with audit notes.<br>• **Customer Support Tickets Desk**: Priority-tagged support queue (High/Medium/Low SLA urgency), official customer reply composer, and resolution tracking. |
+| **`ROLE_COMPANY_ADMIN`** | `/admin/company` | `company_credentials` | **Corporate Executive Workspace** (`#2563EB` Royal Blue / `#38BDF8` Sky) | • **Enterprise Branding & Seal**: Corporate profile management, employee size, industry, and Gold Verified Corporate Partner badge.<br>• **HR Recruiter Team Roster**: Recruiter management table with verified recruiter badge issuing.<br>• **Milestone Roadmap**: Kanban sprint goals and task assignment modal.<br>• **Recruitment Funnel**: Live job postings and candidate application metrics.<br>• **AI Executive Copilot**: Natural language team productivity assistant. |
+| **`ROLE_SUPER_ADMIN`** | `/admin/super-admin` | `user_credentials` | **Master Governance & Security Center** (`#8B5CF6` Violet / `#F43F5E` Rose Gold) | • **SaaS Financial Engine**: MRR ($14,200.00), ARR ($170,400.00), active tenant subscriptions, and plan tier breakdown.<br>• **TOTP 2FA Security Center**: RFC 6238 TOTP QR code generator, live 6-digit authenticator verification, and Step-Up enforcement.<br>• **Forensic Audit Trail**: Searchable immutable audit event ledger with IP address, actor, and outcome.<br>• **Global Tenant Directory**: Enterprise tenant registry and lockdown control. |
+
+---
+
+### 🛡️ 2. Security Infrastructure & RBAC Mechanics
+- **Decoupled Credential Tables**: Admin accounts are stored in isolated database tables (`app_dev_credentials`, `service_team_credentials`, `company_credentials`, `user_credentials`), preventing privilege escalation across admin tiers.
+- **Server-Authenticated Routing**: Post-login and 2FA redirects derive exclusively from the server-authenticated `roles` array returned in the backend JSON payload, bypassing client dropdown state.
+- **Strict ProtectedRoute Barrier**: Navigating to an unauthorized admin URL renders an **Access Restricted** barrier displaying the user's active identity, active role, and a direct 1-click button to navigate to their authorized portal (`Go to My Portal →`).
+- **RFC 6238 TOTP Multi-Factor Authentication**: SuperAdmin accounts support 2FA using Google Authenticator, Authy, or 1Password with 6-digit validation and step-up verification.
+- **Immutable Forensic Audit Logging**: High-privilege administrative actions are automatically persisted to the `audit_logs` table with actor user ID, email, IP address, user agent, and timestamp.
 
 ### 💬 4. Full-Duplex Real-Time Candidate-to-HR Chat Desk
 - **SockJS + STOMP Messaging**: WebSocket pipeline over Nginx with persistent fallback.

@@ -32,7 +32,9 @@ public class CompanyTaskServiceImpl implements CompanyTaskService {
     private final UserRepository userRepository;
 
     private Company resolveCompany(Long userId) {
-        HrProfile hrProfile = hrProfileRepository.findByUserId(userId).orElse(null);
+        HrProfile hrProfile = hrProfileRepository.findById(userId)
+                .or(() -> hrProfileRepository.findByUserId(userId))
+                .orElse(null);
         if (hrProfile != null && hrProfile.getCompany() != null) {
             return hrProfile.getCompany();
         }
