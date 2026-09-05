@@ -14,6 +14,10 @@ public interface AiCopilotService {
 
     List<AiCopilotDto.MessageResponse> getMessages(Long hrUserId, Long conversationId);
 
+    void deleteConversation(Long hrUserId, Long conversationId);
+
+    void clearConversation(Long hrUserId, Long conversationId);
+
     AiCopilotDto.ConfigResponse getConfig(Long hrUserId);
 
     AiCopilotDto.ConfigResponse updateConfig(Long hrUserId, AiCopilotDto.ConfigUpdateRequest request);

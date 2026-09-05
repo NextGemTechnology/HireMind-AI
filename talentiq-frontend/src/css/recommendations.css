@@ -927,42 +927,49 @@
   position: fixed;
   bottom: 28px;
   right: 28px;
-  z-index: 900;
+  z-index: 9999;
   display: flex;
   align-items: center;
   gap: 10px;
-  background: linear-gradient(135deg, #7C3AED 0%, #EC4899 100%);
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  padding: 8px 18px 8px 10px;
   border-radius: 999px;
-  padding: 10px 20px 10px 16px;
-  box-shadow: 0 10px 32px rgba(124, 58, 237, 0.5), 0 0 24px rgba(236, 72, 153, 0.4);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 13.5px;
+  box-shadow: 0 10px 30px -5px rgba(14, 165, 233, 0.4), 0 0 16px rgba(99, 102, 241, 0.3);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  user-select: none;
 }
 
 .recs-floating-ai-agent-btn:hover {
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 14px 40px rgba(124, 58, 237, 0.65), 0 0 32px rgba(236, 72, 153, 0.55);
+  transform: translateY(-2px);
+  border-color: rgba(56, 189, 248, 0.85);
+  box-shadow: 0 14px 38px -4px rgba(14, 165, 233, 0.55), 0 0 24px rgba(99, 102, 241, 0.45);
 }
 
 .recs-floating-agent-info {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 .recs-floating-agent-title {
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
+  color: #F8FAFC;
   letter-spacing: -0.01em;
 }
 
 .recs-floating-agent-sub {
-  font-size: 10px;
-  color: #FBCFE8;
-  font-weight: 600;
+  font-size: 10.5px;
+  color: #38BDF8;
+  font-weight: 500;
 }
 
 .recs-chat-prompts-bar {

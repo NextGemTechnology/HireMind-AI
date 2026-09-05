@@ -30,12 +30,20 @@ public class AiConversation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "hr_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "hr_id")
     private User hr;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "company_id", nullable = false)
+    @Column(name = "user_type", nullable = false, length = 20)
+    @Builder.Default
+    private String userType = "HR"; // HR or CANDIDATE
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "candidate_id")
+    private Candidate candidate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id")
     private Company company;
 
     @Column(length = 300)
@@ -55,6 +63,10 @@ public class AiConversation {
     @Column(name = "is_archived", nullable = false)
     @Builder.Default
     private boolean archived = false;
+
+    @Column(name = "chat_enabled", nullable = false)
+    @Builder.Default
+    private boolean chatEnabled = true;
 
     @Column(name = "message_count", nullable = false)
     @Builder.Default

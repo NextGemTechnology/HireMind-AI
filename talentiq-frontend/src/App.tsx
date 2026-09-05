@@ -31,6 +31,7 @@ import { HrApplications } from './pages/HrApplications';
 import HrMessages from './pages/HrMessages';
 import HrCalendar from './pages/HrCalendar';
 import { HrGlobalNotificationToast } from './components/HrGlobalNotificationToast';
+import { AiGuideChatbot } from './components/AiGuideChatbot';
 
 // 4 Dedicated Admin Dashboards
 import { AppDeveloperDashboard } from './pages/AppDeveloperDashboard';
@@ -180,6 +181,7 @@ function AppLayout() {
         </Routes>
       </main>
       <HrGlobalNotificationToast />
+      <AiGuideChatbot />
     </div>
   );
 }

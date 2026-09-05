@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { Bot, Sparkles, X, Send, ArrowRight } from 'lucide-react';
+import { Sparkles, X, Send, ArrowRight } from 'lucide-react';
+import { AiLogo } from './AiLogo';
 import '../css/ai-guide-chatbot.css';
 
 interface Message {
@@ -25,6 +26,7 @@ export const AiGuideChatbot: React.FC<{ dark?: boolean }> = ({ dark: propDark })
   const { isUniverse } = useTheme();
   const dark = propDark !== undefined ? propDark : isUniverse;
   const navigate = useNavigate();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -107,6 +109,11 @@ export const AiGuideChatbot: React.FC<{ dark?: boolean }> = ({ dark: propDark })
     }, 600);
   };
 
+  // Suppress global guide floating button on pages that have dedicated full-screen AI interfaces
+  if (location.pathname === '/copilot' || location.pathname === '/recommendations') {
+    return null;
+  }
+
   return (
     <div className="chatbot-root">
       {/* ── Floating Action Trigger Button ── */}
@@ -116,10 +123,7 @@ export const AiGuideChatbot: React.FC<{ dark?: boolean }> = ({ dark: propDark })
           className="chatbot-launcher-btn"
           aria-label="Open AI Guide Chatbot"
         >
-          <div className="chatbot-avatar-box">
-            <Bot size={18} color="#FFF" />
-          </div>
-          <span>AI Platform Guide</span>
+          <AiLogo size={30} animated title="HireMind AI" />
           <span className="chatbot-status-dot" />
         </button>
       )}
@@ -130,9 +134,9 @@ export const AiGuideChatbot: React.FC<{ dark?: boolean }> = ({ dark: propDark })
           {/* Header */}
           <div className="chatbot-header">
             <div className="chatbot-header-info">
-              <div className="chatbot-avatar-box">
-                <Bot size={22} color="#FFF" />
-                <span className="chatbot-avatar-online" />
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <AiLogo size={30} animated title="HireMind AI Guide" />
+                <span className="chatbot-avatar-online" style={{ bottom: '-2px', right: '-2px' }} />
               </div>
               <div>
                 <h4 className="chatbot-header-title">HireMind AI Guide</h4>

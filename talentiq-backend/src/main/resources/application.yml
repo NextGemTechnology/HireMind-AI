@@ -179,6 +179,14 @@ app:
     ollama:
       base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
       model: ${OLLAMA_MODEL:llama3.2}
+    agents:
+      hr-model: ${AI_HR_MODEL:gpt-4o}
+      candidate-model: ${AI_CANDIDATE_MODEL:gpt-4o-mini}
+      chat-retention-days: ${AI_CHAT_RETENTION_DAYS:90}
+      cache-ttl-minutes: ${AI_CACHE_TTL_MINUTES:30}
+      training-enabled: ${AI_TRAINING_ENABLED:false}
+      max-tokens-per-user-daily: ${AI_MAX_TOKENS_PER_USER_DAILY:50000}
+      max-requests-per-minute: ${AI_MAX_REQUESTS_PER_MINUTE:10}
 
   # Rate Limiting
   rate-limit:

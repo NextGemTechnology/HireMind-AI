@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { Moon3DCanvas } from '../components/Moon3DCanvas';
+import { useTheme } from '../context/ThemeContext';
+import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import {
   CheckCircle2,
   XCircle,
@@ -50,6 +51,7 @@ interface ApplicationItem {
 
 export const MyApplications: React.FC = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
 
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,8 +140,7 @@ export const MyApplications: React.FC = () => {
 
   return (
     <div className="lunar-page-wrapper">
-      {/* ── FULL-SCREEN 3D MOON UNIVERSE CANVAS BACKGROUND ── */}
-      <Moon3DCanvas interactive={true} orbitSpeedMultiplier={1.0} />
+      <InteractiveGalaxyBackground theme={theme} />
 
       {/* ── MAIN CONTENT CONTAINER (Z-INDEX 10) ── */}
       <div className="lunar-apps-container">

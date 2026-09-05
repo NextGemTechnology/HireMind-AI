@@ -7,9 +7,10 @@ import {
   User as UserIcon, Upload, CheckCircle2, Sparkles,
   Edit3, Lock, ShieldCheck, Briefcase, Building2, Phone,
   Mail, MapPin, ArrowRight, FileText, MessageSquare,
-  BarChart3, Bot, Save, X, Sun, Moon
+  BarChart3, Save, X, Sun, Moon
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
+import { AiLogo } from '../components/AiLogo';
 import '../css/profile-page.css';
 
 interface ParsedResult {
@@ -548,7 +549,7 @@ export const ProfilePage: React.FC = () => {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Bot size={18} color="#A78BFA" />
+                  <AiLogo size={18} />
                   <div>
                     <div style={{ fontWeight: 600, fontSize: '14px' }}>AI Hiring Copilot</div>
                     <div style={{ fontSize: '12px', color: '#94A3B8' }}>Generate JD questions & autonomous interview screening</div>

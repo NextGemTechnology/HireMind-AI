@@ -63,6 +63,26 @@ public class AiCopilotController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @DeleteMapping("/conversations/{id}")
+    @PreAuthorize("hasRole('HR')")
+    @Operation(summary = "Archive/Delete a copilot conversation session (HR only)")
+    public ResponseEntity<ApiResponse<Void>> deleteConversation(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        copilotService.deleteConversation(principal.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Conversation deleted successfully"));
+    }
+
+    @DeleteMapping("/conversations/{id}/messages")
+    @PreAuthorize("hasRole('HR')")
+    @Operation(summary = "Clear messages in a copilot conversation session (HR only)")
+    public ResponseEntity<ApiResponse<Void>> clearConversation(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable Long id) {
+        copilotService.clearConversation(principal.getId(), id);
+        return ResponseEntity.ok(ApiResponse.success("Conversation messages cleared successfully"));
+    }
+
     @GetMapping("/config")
     @PreAuthorize("hasRole('HR')")
     @Operation(summary = "Get recruiter's custom copilot LLM configuration parameters")

@@ -5,8 +5,9 @@ import { useTheme } from '../context/ThemeContext';
 import {
   LayoutDashboard, MessageSquare, Calendar, Briefcase,
   Users, Star, UserCircle2, BarChart2,
-  Settings, LogOut, Bot, Sparkles
+  Settings, LogOut, Sparkles
 } from 'lucide-react';
+import { AiLogo } from './AiLogo';
 
 export type HrNavKey =
   | 'Dashboard'
@@ -220,7 +221,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
             style={navItemStyle(activeNav === 'Copilot')}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Bot size={16} />
+              <AiLogo size={16} />
               <span>AI Copilot</span>
             </div>
           </button>

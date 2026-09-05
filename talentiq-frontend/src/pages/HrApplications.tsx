@@ -5,7 +5,6 @@ import { apiClient } from '../api/client';
 import {
   Users,
   Download,
-  Bot,
   CheckCircle2,
   MapPin,
   Briefcase,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
+import { AiLogo } from '../components/AiLogo';
 import '../css/hr-applications.css';
 
 interface ApplicationItem {
@@ -288,8 +288,9 @@ export const HrApplications: React.FC = () => {
                     <button
                       onClick={() => navigate('/copilot')}
                       className="btn btn-secondary hr-app-action-btn"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                     >
-                      <Bot size={16} color="#F59E0B" /> AI Copilot
+                      <AiLogo size={16} /> AI Copilot
                     </button>
                   </div>
                 </div>

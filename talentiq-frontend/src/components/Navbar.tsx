@@ -6,7 +6,6 @@ import { apiClient } from '../api/client';
 import { 
   Sparkles, 
   Briefcase, 
-  Bot, 
   BarChart3, 
   ShieldCheck, 
   Bell, 
@@ -24,6 +23,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { HireMindLogo } from './HireMindLogo';
+import { AiLogo } from './AiLogo';
 import { getAdminDashboardRoute } from '../utils/roleRoutes';
 import '../css/navbar.css';
 
@@ -135,7 +135,7 @@ export const Navbar: React.FC = () => {
                 <MessageSquare size={15} color="var(--primary-cyan)" /> HR Messages
               </Link>
               <Link to="/copilot" className={`btn btn-secondary nav-link-btn ${location.pathname === '/copilot' ? 'active-cyan' : ''}`}>
-                <Bot size={15} color="var(--primary-cyan)" /> HR AI Copilot
+                <AiLogo size={16} /> HR AI Copilot
               </Link>
               <Link to="/jobs" className={`btn btn-secondary nav-link-btn ${location.pathname === '/jobs' ? 'active-link' : ''}`}>
                 <Briefcase size={15} /> Jobs

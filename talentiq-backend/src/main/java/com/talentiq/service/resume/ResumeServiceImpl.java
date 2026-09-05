@@ -30,11 +30,23 @@ public class ResumeServiceImpl implements ResumeService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ResumeParserService resumeParserService;
+    private final com.talentiq.service.ai.AiSecurityGateway aiSecurityGateway;
 
     private static final String SUBDIR = "resumes";
 
     @Override
     public ResumeDto uploadResume(Long userId, String versionName, MultipartFile file) {
+        // Binary Magic Number validation via AI Security Gateway
+        try {
+            if (!aiSecurityGateway.validateResumeBinary(file.getInputStream(), file.getContentType(), file.getOriginalFilename())) {
+                throw new com.talentiq.common.exception.BadRequestException("File rejected: file contents do not match authentic PDF or DOCX format.");
+            }
+        } catch (com.talentiq.common.exception.BadRequestException bre) {
+            throw bre;
+        } catch (Exception e) {
+            log.warn("Could not inspect magic bytes: {}", e.getMessage());
+        }
+
         Candidate candidate = candidateRepository.findByUserId(userId).orElseGet(() -> {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));

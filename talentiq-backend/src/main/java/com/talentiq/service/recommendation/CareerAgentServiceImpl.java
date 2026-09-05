@@ -1,17 +1,29 @@
 package com.talentiq.service.recommendation;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.talentiq.common.exception.ForbiddenException;
 import com.talentiq.common.exception.ResourceNotFoundException;
+import com.talentiq.config.AppProperties;
+import com.talentiq.dto.copilot.AiCopilotDto;
 import com.talentiq.dto.job.JobDto;
 import com.talentiq.dto.recommendation.CareerAgentDto;
 import com.talentiq.model.*;
+import com.talentiq.repository.ai.AiUserPreferencesRepository;
 import com.talentiq.repository.candidate.CandidateRepository;
+import com.talentiq.repository.copilot.AiConversationRepository;
+import com.talentiq.repository.copilot.AiMessageRepository;
 import com.talentiq.repository.job.JobRepository;
 import com.talentiq.repository.recommendation.JobRecommendationRepository;
 import com.talentiq.repository.resume.ResumeParsedDataRepository;
 import com.talentiq.repository.resume.ResumeRepository;
+import com.talentiq.service.ai.AiModelFactory;
+import com.talentiq.service.ai.AiSecurityGateway;
+import com.talentiq.service.ai.AiUsageLogService;
 import com.talentiq.service.company.CompanyServiceImpl;
+import dev.langchain4j.data.message.ChatMessage;
+import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.UserMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -21,10 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,33 +47,18 @@ public class CareerAgentServiceImpl implements CareerAgentService {
     private final ResumeRepository resumeRepository;
     private final ResumeParsedDataRepository resumeParsedDataRepository;
     private final JobRecommendationRepository recommendationRepository;
-    private final RecommendationService recommendationService;
+    private final AiConversationRepository conversationRepository;
+    private final AiMessageRepository messageRepository;
+    private final AiUserPreferencesRepository userPreferencesRepository;
+    private final AiSecurityGateway aiSecurityGateway;
+    private final AiModelFactory aiModelFactory;
+    private final AiUsageLogService aiUsageLogService;
+    private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
-
-    // In-memory security guard tracking per User ID (backed by concurrent state)
-    private static final Map<Long, Integer> userWarnings = new ConcurrentHashMap<>();
-    private static final Map<Long, Instant> userBlocks = new ConcurrentHashMap<>();
-
-    // Malicious & Destructive Command Patterns
-    private static final Pattern HARMFUL_PATTERN = Pattern.compile(
-            "(?i)(drop\\s+(database|table|schema|user)|delete\\s+from|truncate\\s+table|alter\\s+table|exec\\s*\\(|xp_cmdshell|shutdown|rm\\s+-rf|chmod\\s+|/etc/passwd|bash\\s+-i|cmd\\.exe|powershell|give\\s+me\\s+(all\\s+)?(passwords|database\\s+password|admin\\s+credentials|secret\\s+key|api\\s+key|env\\s+variables)|dump\\s+database|bypass\\s+security)"
-    );
-
-    // Non-Career Code Generation Request Patterns
-    private static final Pattern CODE_REQUEST_PATTERN = Pattern.compile(
-            "(?i)(give\\s+me\\s+code|write\\s+(a\\s+)?(code|program|script|function|class|algorithm|leetcode)|debug\\s+(this\\s+)?code|python\\s+code|java\\s+code|c\\+\\+\\s+code|javascript\\s+code|react\\s+component\\s+code|write\\s+html|fibonacci|calculator\\s+app|binary\\s+search\\s+code|recipe\\s+for|capital\\s+of)"
-    );
 
     @Override
     public boolean isUserBlocked(Long userId) {
-        Instant blockedUntil = userBlocks.get(userId);
-        if (blockedUntil == null) return false;
-        if (Instant.now().isAfter(blockedUntil)) {
-            userBlocks.remove(userId);
-            userWarnings.remove(userId);
-            return false;
-        }
-        return true;
+        return aiSecurityGateway.isUserBlocked(userId);
     }
 
     @Override
@@ -74,72 +68,78 @@ public class CareerAgentServiceImpl implements CareerAgentService {
 
         String rawMsg = request.getMessage() != null ? request.getMessage().trim() : "";
 
-        // ── 1. Check if user is currently blocked ────────────────────────────
-        if (isUserBlocked(userId)) {
-            Instant blockedUntil = userBlocks.get(userId);
+        // ── 1. AI Security Gateway Validation ─────────────────────────────────
+        AiSecurityGateway.ValidationResult valResult = aiSecurityGateway.validatePrompt(
+                userId, rawMsg, "CANDIDATE_CAREER_AGENT", "127.0.0.1"
+        );
+
+        if (!valResult.isValid()) {
             return CareerAgentDto.ChatResponse.builder()
-                    .intent("SECURITY_BLOCKED")
-                    .isBlocked(true)
-                    .blockedUntil(blockedUntil)
-                    .reply("🚫 Access Suspended: Your access to the TalentIQ AI Career Advisor has been temporarily blocked for 24 hours due to security policy violations. Access will be restored after: " + blockedUntil)
+                    .intent(valResult.getRejectionReason())
+                    .isBlocked(valResult.isBlocked())
+                    .blockedUntil(valResult.getBlockedUntil())
+                    .warningCount(valResult.getWarningCount())
+                    .reply(valResult.getRefusalReply())
                     .build();
         }
 
-        // ── 2. Security Guardrail: Check for harmful scripts / attacks ────────
-        if (HARMFUL_PATTERN.matcher(rawMsg).find()) {
-            int warnings = userWarnings.getOrDefault(userId, 0) + 1;
-            userWarnings.put(userId, warnings);
+        String sanitizedMsg = valResult.getSanitizedInput();
 
-            if (warnings >= 2) {
-                Instant blockedUntil = Instant.now().plus(24, ChronoUnit.HOURS);
-                userBlocks.put(userId, blockedUntil);
-                log.warn("Candidate ID {} (User ID {}) temporarily blocked for 24h due to repeated security violation: '{}'",
-                        candidate.getId(), userId, rawMsg);
-
-                return CareerAgentDto.ChatResponse.builder()
-                        .intent("SECURITY_BLOCKED")
-                        .isBlocked(true)
-                        .blockedUntil(blockedUntil)
-                        .warningCount(warnings)
-                        .reply("🚫 Account Temporarily Blocked: Repeated security violation detected (destructive script or credential probe). Your AI Career Advisor chat has been suspended for 24 hours.")
-                        .build();
-            } else {
-                log.warn("Candidate ID {} (User ID {}) issued 1st security warning for: '{}'",
-                        candidate.getId(), userId, rawMsg);
-
-                return CareerAgentDto.ChatResponse.builder()
-                        .intent("SECURITY_WARNING")
-                        .warningCount(1)
-                        .isBlocked(false)
-                        .reply("⚠️ Security Alert (Warning 1 of 1): Destructive instructions, database queries, and system probing are strictly prohibited on TalentIQ. One more violation will immediately result in a 24-hour temporary block.")
-                        .build();
-            }
+        // ── 2. Conversation & Privacy Session Management ───────────────────────
+        AiConversation conversation = null;
+        if (request.getConversationId() != null) {
+            conversation = conversationRepository.findByIdAndCandidateId(request.getConversationId(), candidate.getId())
+                    .orElse(null);
         }
 
-        // ── 3. Code Generation & Non-Career Refusal ───────────────────────────
-        boolean isAskingForCode = CODE_REQUEST_PATTERN.matcher(rawMsg).find();
-        boolean isJobSearchQuery = isJobOrRoleQuery(rawMsg);
+        boolean storeChat = userPreferencesRepository.findByUserId(userId)
+                .map(AiUserPreferences::isChatStorageEnabled)
+                .orElse(true);
 
-        if (isAskingForCode && !isJobSearchQuery) {
-            return CareerAgentDto.ChatResponse.builder()
-                    .intent("REFUSAL_NON_CAREER")
-                    .isBlocked(false)
-                    .reply("I am your dedicated TalentIQ AI Career Advisor. I specialize strictly in job recommendations, resume matching, and career advice. I cannot generate or debug programming code, or assist with non-career queries. Would you like me to find open job positions matching your skill set instead?")
+        if (conversation != null && storeChat) {
+            AiMessage userMsg = AiMessage.builder()
+                    .conversation(conversation)
+                    .role("USER")
+                    .content(sanitizedMsg)
                     .build();
+            messageRepository.save(userMsg);
+            conversation.incrementMessageCount();
         }
 
-        // ── 4. Resume-Based Recommendations Intent ────────────────────────────
-        if (isResumeMatchQuery(rawMsg)) {
-            return handleResumeMatchQuery(candidate);
+        // ── 3. Intent Detection & Routing ─────────────────────────────────────
+        CareerAgentDto.ChatResponse response;
+        if (isResumeMatchQuery(sanitizedMsg)) {
+            response = handleResumeMatchQuery(candidate);
+        } else if (isJobOrRoleQuery(sanitizedMsg) || sanitizedMsg.toLowerCase().contains("suggest") || sanitizedMsg.toLowerCase().contains("job")) {
+            response = handleJobSearchQuery(candidate, sanitizedMsg);
+        } else {
+            response = handleGeneralCareerQueryWithLlm(candidate, sanitizedMsg, request.getHistory(), userId);
         }
 
-        // ── 5. Skill / Role Search Intent (e.g. "suggest me java developer job")
-        if (isJobSearchQuery || rawMsg.toLowerCase().contains("suggest") || rawMsg.toLowerCase().contains("job")) {
-            return handleJobSearchQuery(candidate, rawMsg);
+        // ── 4. Output Sanitization & Assistant Message Persistence ────────────
+        String sanitizedReply = aiSecurityGateway.sanitizeOutput(response.getReply());
+        response.setReply(sanitizedReply);
+
+        if (conversation != null && storeChat) {
+            int promptTokens = Math.max(1, sanitizedMsg.length() / 4);
+            int compTokens = Math.max(1, sanitizedReply.length() / 4);
+            int totalTokens = promptTokens + compTokens;
+
+            AiMessage assistantMsg = AiMessage.builder()
+                    .conversation(conversation)
+                    .role("ASSISTANT")
+                    .content(sanitizedReply)
+                    .tokensUsed(totalTokens)
+                    .model(appProperties.getAi().getAgents().getCandidateModel())
+                    .build();
+            messageRepository.save(assistantMsg);
+            conversation.incrementMessageCount();
+            conversationRepository.save(conversation);
+
+            response.setConversationId(conversation.getId());
         }
 
-        // ── 6. General Career & Guidance Q&A ───────────────────────────────────
-        return handleGeneralCareerQuery(rawMsg);
+        return response;
     }
 
     private boolean isResumeMatchQuery(String msg) {
@@ -172,21 +172,21 @@ public class CareerAgentServiceImpl implements CareerAgentService {
         Resume resume = activeResume.orElse(allResumes.get(0));
         String resumeName = resume.getOriginalName() != null ? resume.getOriginalName() : resume.getVersionName();
 
-        // Query top 10 recommended jobs for candidate with 85%+ match score prioritized
         Page<JobRecommendation> recPage = recommendationRepository.findAllByCandidateIdAndMinScore(
                 candidate.getId(),
                 BigDecimal.valueOf(85.0),
                 PageRequest.of(0, 10)
         );
 
-        // Fallback to top matches if less than 10 are >= 85%
-        List<JobRecommendation> recsList = recPage.getContent();
+        List<JobRecommendation> recsList = (recPage != null && recPage.getContent() != null) ? recPage.getContent() : Collections.emptyList();
         if (recsList.size() < 10) {
             Page<JobRecommendation> allRecs = recommendationRepository.findAllByCandidateIdActive(
                     candidate.getId(),
                     PageRequest.of(0, 10)
             );
-            recsList = allRecs.getContent();
+            if (allRecs != null && allRecs.getContent() != null && !allRecs.isEmpty()) {
+                recsList = allRecs.getContent();
+            }
         }
 
         List<JobDto.Response> jobs = recsList.stream()
@@ -217,7 +217,6 @@ public class CareerAgentServiceImpl implements CareerAgentService {
             jobPage = jobRepository.findRecentActiveJobs(PageRequest.of(0, 10));
         }
 
-        // If search returned empty, fallback to recent active jobs
         if (jobPage.isEmpty()) {
             jobPage = jobRepository.findRecentActiveJobs(PageRequest.of(0, 10));
         }
@@ -241,17 +240,83 @@ public class CareerAgentServiceImpl implements CareerAgentService {
                 .build();
     }
 
-    private CareerAgentDto.ChatResponse handleGeneralCareerQuery(String query) {
-        String reply = "I'm your TalentIQ AI Career Advisor! You can ask me to:\n"
-                + "• **\"Suggest me Java developer jobs\"** (or React, Python, DevOps, Cloud Architect)\n"
-                + "• **\"Based on my resume suggest me jobs\"** (analyzes your resume for 85%+ matches)\n"
-                + "• **\"Show remote engineering jobs\"**\n"
-                + "Tell me what roles or tech stack you'd like to explore!";
+    private CareerAgentDto.ChatResponse handleGeneralCareerQueryWithLlm(Candidate candidate, String query,
+                                                                         List<CareerAgentDto.ChatMessageItem> history,
+                                                                         Long userId) {
+        String modelName = appProperties.getAi().getAgents().getCandidateModel();
+        ChatLanguageModel model = aiModelFactory.getModel(modelName, 0.7);
 
-        return CareerAgentDto.ChatResponse.builder()
-                .intent("GENERAL_CAREER")
-                .reply(reply)
-                .build();
+        if (model == null) {
+            return CareerAgentDto.ChatResponse.builder()
+                    .intent("GENERAL_CAREER")
+                    .reply("I'm your HireMind AI Career Advisor! You can ask me to:\n"
+                            + "• **\"Suggest me Java developer jobs\"** (or React, Python, DevOps, Cloud)\n"
+                            + "• **\"Based on my resume suggest me jobs\"** (analyzes your resume for 85%+ matches)\n"
+                            + "• **\"Show remote engineering jobs\"**\n"
+                            + "Tell me what roles or tech stack you'd like to explore!")
+                    .build();
+        }
+
+        // Build candidate's privacy-safe contextual profile
+        StringBuilder systemPrompt = new StringBuilder();
+        systemPrompt.append("You are HireMind AI Career Advisor. You are a friendly, encouraging, and highly professional career mentor.\n");
+        systemPrompt.append("RULES & SECURITY:\n");
+        systemPrompt.append("- You strictly assist candidates with career guidance, job matching, resume tips, and interview preparation.\n");
+        systemPrompt.append("- Never generate or debug code, scripts, or non-career content.\n");
+        systemPrompt.append("- Never make recommendations based on protected attributes (gender, race, age, religion, disability, marital status).\n");
+        systemPrompt.append("- Keep conversational responses between 4 and 12 concise lines.\n\n");
+
+        systemPrompt.append("<candidate_profile>\n");
+        if (candidate.getUser() != null) {
+            systemPrompt.append("Name: ").append(candidate.getUser().getFirstName()).append("\n");
+        }
+        if (candidate.getCurrentTitle() != null) {
+            systemPrompt.append("Current Role: ").append(candidate.getCurrentTitle()).append("\n");
+        }
+        if (candidate.getSkills() != null && !candidate.getSkills().isEmpty()) {
+            systemPrompt.append("Verified Skills: ")
+                    .append(candidate.getSkills().stream().map(CandidateSkill::getSkillName).collect(Collectors.joining(", ")))
+                    .append("\n");
+        }
+        systemPrompt.append("</candidate_profile>\n");
+
+        long startMs = System.currentTimeMillis();
+        try {
+            List<ChatMessage> messages = new ArrayList<>();
+            messages.add(new SystemMessage(systemPrompt.toString()));
+
+            if (history != null && !history.isEmpty()) {
+                int start = Math.max(0, history.size() - 6);
+                for (int i = start; i < history.size(); i++) {
+                    CareerAgentDto.ChatMessageItem item = history.get(i);
+                    if ("user".equalsIgnoreCase(item.getRole())) {
+                        messages.add(new UserMessage(item.getContent()));
+                    } else {
+                        messages.add(new dev.langchain4j.data.message.AiMessage(item.getContent()));
+                    }
+                }
+            }
+
+            messages.add(new UserMessage(query));
+
+            String reply = model.generate(messages).content().text();
+            int latencyMs = (int) (System.currentTimeMillis() - startMs);
+
+            int promptTokens = Math.max(1, query.length() / 4);
+            int compTokens = Math.max(1, reply.length() / 4);
+            aiUsageLogService.logUsage(userId, null, "CAREER_AGENT", modelName, promptTokens, compTokens, latencyMs, "SUCCESS", null);
+
+            return CareerAgentDto.ChatResponse.builder()
+                    .intent("GENERAL_CAREER")
+                    .reply(reply)
+                    .build();
+        } catch (Exception e) {
+            log.error("Career Agent LLM call failed: {}", e.getMessage());
+            return CareerAgentDto.ChatResponse.builder()
+                    .intent("GENERAL_CAREER")
+                    .reply("I can help you review job matches, improve your resume, or prepare for technical interviews. Try asking 'Suggest me remote React jobs' or 'Based on my resume suggest me jobs'!")
+                    .build();
+        }
     }
 
     private String extractKeywordFromQuery(String query) {
@@ -297,6 +362,119 @@ public class CareerAgentServiceImpl implements CareerAgentService {
                 .openings(job.getOpenings())
                 .requiredSkills(skillsList)
                 .createdAt(job.getCreatedAt())
+                .build();
+    }
+
+    // ── Candidate Conversation Management ─────────────────────────────────────
+
+    @Override
+    public CareerAgentDto.ConversationResponse createConversation(Long userId, CareerAgentDto.ConversationRequest request) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate", "userId", userId));
+
+        AiConversation conversation = AiConversation.builder()
+                .candidate(candidate)
+                .userType("CANDIDATE")
+                .title(request.getTitle() != null && !request.getTitle().isBlank() ? request.getTitle().trim() : "Career Advisory Session")
+                .contextType("CAREER")
+                .chatEnabled(true)
+                .build();
+
+        AiConversation saved = conversationRepository.save(conversation);
+        return CareerAgentDto.ConversationResponse.builder()
+                .id(saved.getId())
+                .title(saved.getTitle())
+                .messageCount(saved.getMessageCount())
+                .createdAt(saved.getCreatedAt())
+                .updatedAt(saved.getUpdatedAt())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CareerAgentDto.ConversationResponse> listConversations(Long userId) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate", "userId", userId));
+
+        return conversationRepository.findAllByCandidateIdAndArchivedFalseOrderByUpdatedAtDesc(candidate.getId()).stream()
+                .map(c -> CareerAgentDto.ConversationResponse.builder()
+                        .id(c.getId())
+                        .title(c.getTitle())
+                        .messageCount(c.getMessageCount())
+                        .createdAt(c.getCreatedAt())
+                        .updatedAt(c.getUpdatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AiCopilotDto.MessageResponse> getConversationMessages(Long userId, Long conversationId) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate", "userId", userId));
+
+        AiConversation conv = conversationRepository.findByIdAndCandidateId(conversationId, candidate.getId())
+                .orElseThrow(() -> new ForbiddenException("Access denied: Not your conversation session"));
+
+        return messageRepository.findByConversationIdOrderByCreatedAtAsc(conv.getId()).stream()
+                .map(m -> AiCopilotDto.MessageResponse.builder()
+                        .id(m.getId())
+                        .role(m.getRole())
+                        .content(m.getContent())
+                        .createdAt(m.getCreatedAt())
+                        .tokensUsed(m.getTokensUsed())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteConversation(Long userId, Long conversationId) {
+        Candidate candidate = candidateRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate", "userId", userId));
+
+        AiConversation conv = conversationRepository.findByIdAndCandidateId(conversationId, candidate.getId())
+                .orElseThrow(() -> new ForbiddenException("Access denied: Not your conversation session"));
+
+        conv.setArchived(true);
+        conversationRepository.save(conv);
+    }
+
+    // ── AI Privacy & Preferences ──────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public CareerAgentDto.PreferencesDto getUserPreferences(Long userId) {
+        AiUserPreferences prefs = userPreferencesRepository.findByUserId(userId)
+                .orElseGet(() -> AiUserPreferences.builder()
+                        .userId(userId)
+                        .chatStorageEnabled(true)
+                        .retentionDays(90)
+                        .dataSharingConsent(false)
+                        .build());
+
+        return CareerAgentDto.PreferencesDto.builder()
+                .chatStorageEnabled(prefs.isChatStorageEnabled())
+                .retentionDays(prefs.getRetentionDays())
+                .dataSharingConsent(prefs.isDataSharingConsent())
+                .build();
+    }
+
+    @Override
+    public CareerAgentDto.PreferencesDto updateUserPreferences(Long userId, CareerAgentDto.PreferencesDto request) {
+        AiUserPreferences prefs = userPreferencesRepository.findByUserId(userId)
+                .orElseGet(() -> AiUserPreferences.builder().userId(userId).build());
+
+        prefs.setChatStorageEnabled(request.isChatStorageEnabled());
+        if (request.getRetentionDays() > 0) {
+            prefs.setRetentionDays(request.getRetentionDays());
+        }
+        prefs.setDataSharingConsent(request.isDataSharingConsent());
+
+        AiUserPreferences saved = userPreferencesRepository.save(prefs);
+        return CareerAgentDto.PreferencesDto.builder()
+                .chatStorageEnabled(saved.isChatStorageEnabled())
+                .retentionDays(saved.getRetentionDays())
+                .dataSharingConsent(saved.isDataSharingConsent())
                 .build();
     }
 }

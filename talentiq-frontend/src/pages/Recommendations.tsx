@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
-import { Moon3DCanvas } from '../components/Moon3DCanvas';
+import { useTheme } from '../context/ThemeContext';
+import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import {
   Sparkles,
   CheckCircle2,
@@ -15,7 +16,6 @@ import {
   X,
   Flame,
   Send,
-  Bot,
   User,
   ChevronDown,
   Trash2,
@@ -27,8 +27,11 @@ import {
   Globe,
   Check,
   Maximize2,
-  Minimize2
+  Minimize2,
+  ShieldCheck
 } from 'lucide-react';
+import { AiChatSettings } from '../components/AiChatSettings';
+import { AiLogo } from '../components/AiLogo';
 import '../css/recommendations.css';
 
 interface SkillDto {
@@ -108,6 +111,7 @@ interface ChatMessage {
 
 export const Recommendations: React.FC = () => {
   const navigate = useNavigate();
+  const { theme } = useTheme();
 
   // Recommendations Data
   const [recommendations, setRecommendations] = useState<RecommendationItem[]>([]);
@@ -149,6 +153,8 @@ export const Recommendations: React.FC = () => {
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   const [securityBlocked, setSecurityBlocked] = useState(false);
   const [securityWarningCount, setSecurityWarningCount] = useState(0);
+  const [isPrivacySettingsOpen, setIsPrivacySettingsOpen] = useState(false);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-msg',
@@ -292,11 +298,15 @@ export const Recommendations: React.FC = () => {
 
       const res = await apiClient.post('/recommendations/chat', {
         message: text,
+        conversationId: activeConversationId,
         history
       });
 
       const data = res.data?.data || res.data;
       if (data) {
+        if (data.conversationId) {
+          setActiveConversationId(data.conversationId);
+        }
         if (data.isBlocked) {
           setSecurityBlocked(true);
         }
@@ -420,8 +430,8 @@ export const Recommendations: React.FC = () => {
 
   return (
     <div className="recs-page-wrapper">
-      {/* ── 3D Cosmic Moon Canvas Background ── */}
-      <Moon3DCanvas interactive={true} orbitSpeedMultiplier={1.0} />
+      {/* ── Interactive Cosmic Galaxy Background ── */}
+      <InteractiveGalaxyBackground theme={theme} />
 
       {/* ═══════════════════════════════════════════════════════════
           1 SINGLE UNIFIED DASHBOARD CONTAINER (1 hi div me sab kuch)
@@ -542,7 +552,7 @@ export const Recommendations: React.FC = () => {
                 className={`recs-view-pill-btn ${viewMode === 'CHAT' ? 'active' : ''}`}
                 title="AI Chat"
               >
-                <Bot size={14} />
+                <AiLogo size={14} />
                 <span>AI Chat</span>
               </button>
             </div>
@@ -610,7 +620,7 @@ export const Recommendations: React.FC = () => {
               <div className="recs-chat-top-header">
                 <div className="recs-chat-bot-info">
                   <div className="recs-chat-bot-avatar">
-                    <Bot size={18} />
+                    <AiLogo size={18} animated />
                   </div>
                   <div>
                     <span className="recs-chat-bot-title">HireMind AI Career Agent</span>
@@ -638,6 +648,15 @@ export const Recommendations: React.FC = () => {
                   >
                     <ChevronDown size={14} />
                     <span>Minimize</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsPrivacySettingsOpen(true)}
+                    className="recs-chat-header-btn"
+                    title="AI Privacy, Retention and Storage Settings"
+                  >
+                    <ShieldCheck size={13} />
+                    <span>Privacy</span>
                   </button>
 
                   <button
@@ -679,7 +698,7 @@ export const Recommendations: React.FC = () => {
                 {chatMessages.map(msg => (
                   <div key={msg.id} className={`recs-chat-row ${msg.sender === 'user' ? 'user-row' : 'agent-row'}`}>
                     <div className="recs-chat-avatar-bubble">
-                      {msg.sender === 'user' ? <User size={14} /> : <Bot size={14} />}
+                      {msg.sender === 'user' ? <User size={14} /> : <AiLogo size={15} />}
                     </div>
                     <div className="recs-chat-content-wrap">
                       <div className={`recs-chat-bubble-text ${msg.sender === 'user' ? 'user-msg' : 'agent-msg'}`}>
@@ -766,7 +785,7 @@ export const Recommendations: React.FC = () => {
 
                 {chatLoading && (
                   <div className="recs-chat-row agent-row">
-                    <div className="recs-chat-avatar-bubble"><Bot size={14} /></div>
+                    <div className="recs-chat-avatar-bubble"><AiLogo size={15} /></div>
                     <div className="recs-chat-bubble-text agent-msg loading-msg">
                       <span className="recs-pulse-dot" />
                       <span style={{ fontSize: 13, color: '#A78BFA' }}>Analyzing candidate match profile...</span>
@@ -1136,13 +1155,19 @@ export const Recommendations: React.FC = () => {
             title="Open AI Career Agent Chat"
           >
             <div className="recs-pulse-dot" />
-            <Bot size={18} />
+            <AiLogo size={28} animated title="HireMind AI Career Agent" />
             <div className="recs-floating-agent-info">
               <span className="recs-floating-agent-title">AI Career Agent</span>
               <span className="recs-floating-agent-sub">Expand AI Assistant 🚀</span>
             </div>
           </button>
         )}
+
+        {/* AI Privacy & Retention Settings Modal */}
+        <AiChatSettings
+          isOpen={isPrivacySettingsOpen}
+          onClose={() => setIsPrivacySettingsOpen(false)}
+        />
 
       </div>
     </div>

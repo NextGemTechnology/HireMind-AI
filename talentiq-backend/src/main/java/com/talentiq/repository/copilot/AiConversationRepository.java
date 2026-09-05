@@ -13,4 +13,10 @@ public interface AiConversationRepository extends JpaRepository<AiConversation, 
     List<AiConversation> findAllByHrIdAndArchivedFalseOrderByUpdatedAtDesc(Long hrId);
 
     Optional<AiConversation> findByIdAndHrId(Long id, Long hrId);
+
+    List<AiConversation> findAllByCandidateIdAndArchivedFalseOrderByUpdatedAtDesc(Long candidateId);
+
+    Optional<AiConversation> findByIdAndCandidateId(Long id, Long candidateId);
+
+    List<AiConversation> findAllByCompanyIdAndArchivedFalseOrderByUpdatedAtDesc(Long companyId);
 }

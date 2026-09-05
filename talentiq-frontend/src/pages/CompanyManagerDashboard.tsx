@@ -6,7 +6,6 @@ import {
   Users,
   CheckSquare,
   TrendingUp,
-  Bot,
   RefreshCw,
   Award,
   PlusCircle,
@@ -14,6 +13,7 @@ import {
   LogOut,
   Calendar
 } from 'lucide-react';
+import { AiLogo } from '../components/AiLogo';
 import '../css/admin-dashboards-distinct.css';
 
 export const CompanyManagerDashboard: React.FC = () => {
@@ -163,7 +163,7 @@ export const CompanyManagerDashboard: React.FC = () => {
             className={`company-nav-btn ${activeTab === 'AI_ASSISTANT' ? 'active' : ''}`}
             onClick={() => setActiveTab('AI_ASSISTANT')}
           >
-            <Bot size={16} /> AI Executive Copilot
+            <AiLogo size={16} /> AI Executive Copilot
           </button>
         </nav>
 
@@ -424,7 +424,7 @@ export const CompanyManagerDashboard: React.FC = () => {
         {activeTab === 'AI_ASSISTANT' && (
           <div className="company-card">
             <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#38BDF8', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Bot size={18} /> Natural Language Company Executive Assistant
+              <AiLogo size={18} animated /> Natural Language Company Executive Assistant
             </h3>
             <p style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '20px' }}>
               Ask about team productivity, candidate pipeline summaries, or ask to draft corporate job descriptions.

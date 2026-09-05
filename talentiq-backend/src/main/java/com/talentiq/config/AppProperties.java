@@ -62,6 +62,18 @@ public class AppProperties {
         private OpenAiProperties openai = new OpenAiProperties();
         private GeminiProperties gemini = new GeminiProperties();
         private OllamaProperties ollama = new OllamaProperties();
+        private AgentProperties agents = new AgentProperties();
+
+        @Data
+        public static class AgentProperties {
+            private String hrModel = "gpt-4o";
+            private String candidateModel = "gpt-4o-mini";
+            private int chatRetentionDays = 90;
+            private int cacheTtlMinutes = 30;
+            private boolean trainingEnabled = false;
+            private int maxTokensPerUserDaily = 50000;
+            private int maxRequestsPerMinute = 10;
+        }
 
         @Data
         public static class OpenAiProperties {

@@ -132,7 +132,7 @@ export const Contact: React.FC = () => {
               </div>
               <div>
                 <h3>Customer Support</h3>
-                <a href="tel:+919876543210">+91 98765 43210</a>
+                <a href="tel:+91-6266572529">+91-6266572529</a>
               </div>
             </div>
             <p>Available Mon - Fri, 9:00 AM – 6:00 PM IST for urgent inquiries.</p>

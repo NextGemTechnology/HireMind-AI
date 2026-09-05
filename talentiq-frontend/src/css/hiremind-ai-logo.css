@@ -1,0 +1,234 @@
+/* ============================================================
+   HireMind AI — Official Logo with Internal Reflection & Motion
+   ============================================================ */
+
+.hm-logo-container {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  user-select: none;
+  vertical-align: middle;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hm-logo-container:hover {
+  transform: translateY(-2px);
+}
+
+/* ── SVG Root ── */
+.hm-logo-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* ── Floating Levitation Motion for Emblem ── */
+.hm-logo-container.animated .hm-emblem-group {
+  animation: hmFloatLevitate 4.5s ease-in-out infinite alternate;
+  transform-origin: 400px 185px;
+}
+
+@keyframes hmFloatLevitate {
+  0% {
+    transform: translateY(0px);
+  }
+  100% {
+    transform: translateY(-5px);
+  }
+}
+
+/* ── Internal Reflection Sweep ── */
+.hm-logo-container.animated .hm-shine-sweep {
+  animation: hmInternalShineSweep 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes hmInternalShineSweep {
+  0% {
+    transform: translateX(-450px) skewX(-25deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.95;
+  }
+  45% {
+    transform: translateX(650px) skewX(-25deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(650px) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+/* ── Neural Circuit Pulses (Head Profile) ── */
+.hm-logo-container.animated .hm-circuit-trace {
+  stroke-dasharray: 8, 4;
+  animation: hmCircuitFlow 3s linear infinite;
+}
+
+@keyframes hmCircuitFlow {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.hm-logo-container.animated .hm-circuit-node {
+  animation: hmNodePulse 2.5s ease-in-out infinite alternate;
+}
+
+.hm-circuit-node:nth-child(2) {
+  animation-delay: 0.4s;
+}
+.hm-circuit-node:nth-child(3) {
+  animation-delay: 0.8s;
+}
+.hm-circuit-node:nth-child(4) {
+  animation-delay: 1.2s;
+}
+.hm-circuit-node:nth-child(5) {
+  animation-delay: 1.6s;
+}
+
+@keyframes hmNodePulse {
+  0% {
+    r: 4;
+    opacity: 0.7;
+    filter: drop-shadow(0 0 2px #38BDF8);
+  }
+  100% {
+    r: 5.5;
+    opacity: 1;
+    filter: drop-shadow(0 0 7px #00F0FF) drop-shadow(0 0 12px #38BDF8);
+  }
+}
+
+/* ── Sparkle Stars Twinkle & Gentle Spin ── */
+.hm-logo-container.animated .hm-sparkle-star {
+  transform-origin: center;
+  animation: hmStarTwinkle 3s ease-in-out infinite;
+}
+
+.hm-sparkle-star-1 {
+  animation-delay: 0s;
+  transform-origin: 260px 115px;
+}
+
+.hm-sparkle-star-2 {
+  animation-delay: 1.5s;
+  transform-origin: 555px 235px;
+}
+
+.hm-sparkle-star-3 {
+  animation-delay: 0.75s;
+  transform-origin: 692px 342px;
+}
+
+@keyframes hmStarTwinkle {
+  0%, 100% {
+    transform: scale(0.82) rotate(0deg);
+    opacity: 0.7;
+    filter: drop-shadow(0 0 2px rgba(168, 85, 247, 0.4));
+  }
+  50% {
+    transform: scale(1.18) rotate(12deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 18px rgba(168, 85, 247, 0.8));
+  }
+}
+
+/* ── Orbital Ring Subtle Glow Spin ── */
+.hm-logo-container.animated .hm-orbital-ring {
+  animation: hmOrbitPulse 5s ease-in-out infinite alternate;
+  transform-origin: 400px 185px;
+}
+
+@keyframes hmOrbitPulse {
+  0% {
+    opacity: 0.65;
+    stroke-width: 2.2px;
+  }
+  100% {
+    opacity: 0.95;
+    stroke-width: 3.2px;
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.5));
+  }
+}
+
+/* ── Ribbon Wave Breathing ── */
+.hm-logo-container.animated .hm-ribbon-wave {
+  animation: hmRibbonColorShift 6s ease-in-out infinite alternate;
+}
+
+@keyframes hmRibbonColorShift {
+  0% {
+    filter: drop-shadow(0 4px 12px rgba(14, 165, 233, 0.35));
+  }
+  100% {
+    filter: drop-shadow(0 6px 18px rgba(124, 58, 237, 0.5)) drop-shadow(0 0 10px rgba(56, 189, 248, 0.4));
+  }
+}
+
+/* ── Typography Styling ── */
+.hm-text-hiremind {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.hm-text-dark {
+  fill: #0B132B;
+}
+
+.hm-text-light {
+  fill: #F8FAFC;
+}
+
+.hm-text-tagline {
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.26em;
+}
+
+.hm-tagline-dark {
+  fill: #475569;
+}
+
+.hm-tagline-light {
+  fill: #94A3B8;
+}
+
+/* ── Sizing Presets ── */
+.hm-size-xs {
+  height: 28px;
+}
+
+.hm-size-sm {
+  height: 38px;
+}
+
+.hm-size-md {
+  height: 48px;
+}
+
+.hm-size-lg {
+  height: 72px;
+}
+
+.hm-size-xl {
+  height: 110px;
+}
+
+.hm-size-2xl {
+  height: 160px;
+}
+
+.hm-size-auto {
+  width: 100%;
+  height: auto;
+}

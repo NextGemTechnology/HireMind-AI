@@ -19,6 +19,7 @@ public class CareerAgentDto {
     public static class ChatRequest {
         @NotBlank(message = "Message content is required")
         private String message;
+        private Long conversationId;
         private List<ChatMessageItem> history;
     }
 
@@ -34,6 +35,7 @@ public class CareerAgentDto {
     @Builder
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ChatResponse {
+        private Long conversationId;
         private String reply;
         private List<JobDto.Response> suggestedJobs;
         private String intent; // "SKILL_SEARCH", "RESUME_MATCH", "REFUSAL_NON_CAREER", "SECURITY_WARNING", "SECURITY_BLOCKED", "GENERAL_CAREER"
@@ -43,5 +45,34 @@ public class CareerAgentDto {
         private boolean requiresResume;
         private String extractedRole;
         private Integer matchScore;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class ConversationResponse {
+        private Long id;
+        private String title;
+        private int messageCount;
+        private Instant createdAt;
+        private Instant updatedAt;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConversationRequest {
+        private String title;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class PreferencesDto {
+        private boolean chatStorageEnabled;
+        private int retentionDays;
+        private boolean dataSharingConsent;
     }
 }

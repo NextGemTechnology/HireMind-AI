@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
-import { AiGuideChatbot } from '../components/AiGuideChatbot';
 import { JobMap, type JobItem } from '../components/JobMap';
 import { apiClient } from '../api/client';
 import {
   Sparkles, ArrowRight, Search, MapPin, Zap,
   Brain, Bell, BarChart3, Sun, Moon,
-  Star, Users, Briefcase, TrendingUp, Bot,
+  Star, Users, Briefcase, TrendingUp,
   ChevronDown, Play, Globe
 } from 'lucide-react';
 import { HireMindLogo } from '../components/HireMindLogo';
+import { AiLogo } from '../components/AiLogo';
 import '../css/home.css';
 
 /* ─── Types ─── */
@@ -655,7 +655,7 @@ export const Home: React.FC = () => {
               <span style={{ color: '#F59E0B', fontWeight: 700 }}>easier</span>.
             </p>
             <button onClick={() => navigate('/register')} className="features-side-btn">
-              <Bot size={16} /> Try AI Matching <ArrowRight size={14} />
+              <AiLogo size={16} /> Try AI Matching <ArrowRight size={14} />
             </button>
           </div>
           <div className="features-grid-cards">
@@ -811,9 +811,6 @@ export const Home: React.FC = () => {
           </a>
         </p>
       </footer>
-
-      {/* ══ AI GUIDE CHATBOT WIDGET ══ */}
-      <AiGuideChatbot dark={dark} />
     </div>
   );
 };
