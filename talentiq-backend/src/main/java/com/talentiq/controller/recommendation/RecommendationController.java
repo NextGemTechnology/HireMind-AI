@@ -2,12 +2,12 @@ package com.talentiq.controller.recommendation;
 
 import com.talentiq.common.response.ApiResponse;
 import com.talentiq.common.response.PagedResponse;
-import com.talentiq.dto.copilot.AiCopilotDto;
-import com.talentiq.dto.recommendation.CareerAgentDto;
+import com.talentiq.ai.dto.AiCopilotDto;
+import com.talentiq.ai.dto.CareerAgentDto;
 import com.talentiq.dto.recommendation.RecommendationDto;
 import com.talentiq.dto.recommendation.RecommendationStatusDto;
 import com.talentiq.security.userdetails.UserPrincipal;
-import com.talentiq.service.recommendation.CareerAgentService;
+import com.talentiq.ai.service.CareerAgentService;
 import com.talentiq.service.recommendation.RecommendationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

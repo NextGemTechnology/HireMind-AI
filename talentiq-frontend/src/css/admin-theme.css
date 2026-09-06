@@ -140,3 +140,35 @@
   color: var(--admin-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
+
+/* ══════════════════════════════════════════════════════════════
+   ADMIN PORTAL RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .admin-layout-container {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-kpis-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-table-container table {
+    min-width: 580px;
+  }
+
+  .admin-header-bar {
+    padding: 12px 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}

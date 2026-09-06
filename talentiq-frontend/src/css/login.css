@@ -5,12 +5,13 @@
 .login-page-wrapper {
   position: relative;
   min-height: 100vh;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow-x: hidden;
-  padding: 40px 20px;
+  padding: 40px 16px;
   box-sizing: border-box;
 }
 
@@ -507,3 +508,46 @@
   gap: 8px;
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   LOGIN & AUTH MODAL RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .login-page-wrapper {
+    padding: 20px 12px;
+  }
+
+  .login-3d-perspective-stage {
+    max-width: 100%;
+  }
+
+  .login-card-face {
+    padding: 24px 16px !important;
+  }
+
+  .login-grid-2col {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .otp-boxes-container {
+    gap: 6px;
+  }
+
+  .otp-box-input {
+    width: clamp(38px, 12vw, 48px);
+    height: clamp(46px, 14vw, 56px);
+    font-size: 20px;
+    border-radius: 8px;
+  }
+
+  .forgot-step-pills {
+    gap: 4px;
+  }
+
+  .forgot-step-pill {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+}

@@ -8,7 +8,7 @@ import {
   Send, Search, MessageSquare, Briefcase, FileText,
   FolderGit2, Sparkles, LogOut, Check, CheckCheck,
   Sun, Moon, Paperclip, X, Clock,
-  ChevronDown, CheckCircle2, Trash2, Copy, Building2, User
+  ChevronDown, CheckCircle2, Trash2, Copy, Building2, User, ArrowLeft
 } from 'lucide-react';
 import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/hr-messages.css';
@@ -132,7 +132,10 @@ export const UserMessages: React.FC = () => {
     try {
       setContactsLoading(true);
       const res = await apiClient.get('/chat/contacts');
-      const list: Contact[] = res.data?.data || [];
+      const rawList: Contact[] = res.data?.data || [];
+      const list: Contact[] = rawList.filter(
+        c => c.userId !== currentUserId && c.email?.toLowerCase() !== user?.email?.toLowerCase()
+      );
 
       const savedContactId = sessionStorage.getItem('active_chat_contact_id');
 
@@ -526,7 +529,7 @@ export const UserMessages: React.FC = () => {
   };
 
   return (
-    <div className={`messages-page-wrapper theme-${theme}`}>
+    <div className={`messages-page-wrapper theme-${theme} ${selectedContact ? 'has-active-chat' : 'no-active-chat'}`}>
       {/* ── Left Navigation Sidebar ── */}
       <aside className="msg-sidebar">
         <div className="msg-sidebar-brand" onClick={() => navigate('/')}>
@@ -662,7 +665,11 @@ export const UserMessages: React.FC = () => {
                   className={`msg-contact-item ${isSelected ? 'selected' : ''} ${c.flagged ? 'is-flagged-contact' : ''}`}
                 >
                   <div className="msg-avatar-contact">
-                    {c.name.charAt(0)}
+                    {c.avatarUrl ? (
+                      <img src={c.avatarUrl} alt={c.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      c.name ? c.name.charAt(0).toUpperCase() : 'H'
+                    )}
                   </div>
                   <div className="msg-contact-info">
                     <div className="msg-contact-name-row">
@@ -706,8 +713,32 @@ export const UserMessages: React.FC = () => {
             {/* Top Chat Header */}
             <div className="msg-chat-header">
               <div className="msg-chat-header-user">
+                <button
+                  onClick={() => setSelectedContact(null)}
+                  className="msg-mobile-back-btn"
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '8px',
+                    color: 'inherit',
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    display: 'none',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '12px',
+                    marginRight: '6px',
+                  }}
+                  title="Back to Conversations"
+                >
+                  <ArrowLeft size={16} />
+                </button>
                 <div className="msg-avatar-contact active-avatar">
-                  {selectedContact.name.charAt(0)}
+                  {selectedContact.avatarUrl ? (
+                    <img src={selectedContact.avatarUrl} alt={selectedContact.name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    selectedContact.name ? selectedContact.name.charAt(0).toUpperCase() : 'H'
+                  )}
                 </div>
                 <div>
                   <div className="msg-chat-header-name">

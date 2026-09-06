@@ -1313,3 +1313,52 @@
   color: #059669 !important;
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   PORTFOLIO BUILDER RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .portfolio-page-wrapper {
+    padding: 24px 16px 60px;
+  }
+
+  .portfolio-hero-card {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .portfolio-hero-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .portfolio-hero-actions {
+    width: 100%;
+    display: flex;
+    gap: 10px;
+  }
+
+  .portfolio-hero-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .portfolio-tabs-row {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 6px;
+  }
+
+  .portfolio-tab-btn {
+    flex-shrink: 0;
+  }
+
+  .portfolio-grid-cards,
+  .qual-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

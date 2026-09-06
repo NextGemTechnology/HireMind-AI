@@ -473,3 +473,28 @@ body:not(.theme-light) .cp-badge-open {
   font-size: 13.5px;
   margin: 0;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   CANDIDATE PROFILE RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .candidate-profile-page {
+    padding: 16px 12px;
+  }
+
+  .cp-hero-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .cp-hero-actions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cp-grid-2col {
+    grid-template-columns: 1fr;
+  }
+}

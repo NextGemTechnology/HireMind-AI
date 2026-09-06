@@ -2,17 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { apiClient } from '../api/client';
 import { 
   Sparkles, 
   Briefcase, 
   BarChart3, 
   ShieldCheck, 
-  Bell, 
   LogOut, 
   FolderGit2, 
   FileText,
-  CheckCheck,
   Users,
   MessageSquare,
   Sun,
@@ -24,16 +21,9 @@ import {
 } from 'lucide-react';
 import { HireMindLogo } from './HireMindLogo';
 import { AiLogo } from './AiLogo';
+import { NotificationBell } from './NotificationBell';
 import { getAdminDashboardRoute } from '../utils/roleRoutes';
 import '../css/navbar.css';
-
-interface NotificationItem {
-  id: number;
-  title: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
-}
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, isCandidate, isHr, isAdmin, logout } = useAuth();
@@ -41,23 +31,16 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   const profileRef = useRef<HTMLDivElement | null>(null);
-  const notifRef = useRef<HTMLDivElement | null>(null);
 
   // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setShowProfileMenu(false);
-      }
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setShowNotifications(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -68,41 +51,7 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     setMobileMenuOpen(false);
     setShowProfileMenu(false);
-    setShowNotifications(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchNotifications();
-    }
-  }, [isAuthenticated, location.pathname]);
-
-  const fetchNotifications = async () => {
-    try {
-      const [countRes, listRes] = await Promise.all([
-        apiClient.get('/notifications/unread-count'),
-        apiClient.get('/notifications?page=0&size=5')
-      ]);
-      setUnreadCount(countRes.data.data);
-      setNotifications(listRes.data.content || []);
-    } catch (e) {
-      setUnreadCount(2);
-      setNotifications([
-        { id: 1, title: 'Job Match Alert', message: 'You have a 95% match with Senior Java Engineer at TechCorp', read: false, createdAt: new Date().toISOString() },
-        { id: 2, title: 'Application Updated', message: 'Your application stage changed to INTERVIEWING', read: false, createdAt: new Date().toISOString() }
-      ]);
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    try {
-      await apiClient.put('/notifications/read-all');
-      setUnreadCount(0);
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
-    } catch (e) {
-      setUnreadCount(0);
-    }
-  };
 
   const handleLogout = () => {
     logout();
@@ -177,48 +126,8 @@ export const Navbar: React.FC = () => {
       <div className="nav-right-actions">
         {isAuthenticated ? (
           <>
-            {/* Notifications Dropdown */}
-            <div style={{ position: 'relative' }} ref={notifRef}>
-              <button 
-                onClick={() => {
-                  setShowNotifications(!showNotifications);
-                  setShowProfileMenu(false);
-                }} 
-                className="btn btn-secondary nav-circle-btn"
-                aria-label="Notifications"
-                title="Notifications"
-              >
-                <Bell size={17} />
-                {unreadCount > 0 && (
-                  <span className="nav-badge-count">
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
-
-              {showNotifications && (
-                <div className="glass-panel nav-notifications-dropdown">
-                  <div className="dropdown-header">
-                    <h4>Notifications</h4>
-                    <button onClick={handleMarkAllRead} className="btn btn-sm btn-secondary" style={{ fontSize: '11px' }}>
-                      <CheckCheck size={12} /> Mark all read
-                    </button>
-                  </div>
-                  <div className="notifications-list">
-                    {notifications.length === 0 ? (
-                      <p className="notification-empty">No notifications yet</p>
-                    ) : (
-                      notifications.map(n => (
-                        <div key={n.id} className={`notification-item ${n.read ? 'read' : 'unread'}`}>
-                          <div className="notif-title" style={{ color: n.read ? 'var(--text-muted)' : 'var(--text-main)' }}>{n.title}</div>
-                          <div className="notif-msg">{n.message}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* Notifications */}
+            <NotificationBell />
 
             {/* Theme Toggle */}
             <button
@@ -235,7 +144,6 @@ export const Navbar: React.FC = () => {
               <button
                 onClick={() => {
                   setShowProfileMenu(!showProfileMenu);
-                  setShowNotifications(false);
                 }}
                 className="nav-profile-avatar-btn"
                 title="Open User Profile"

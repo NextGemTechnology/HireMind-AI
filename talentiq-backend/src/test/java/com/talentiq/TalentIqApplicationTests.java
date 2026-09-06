@@ -34,6 +34,9 @@ class TalentIqApplicationTests {
     @org.springframework.boot.test.mock.mockito.MockBean
     private org.springframework.data.redis.connection.RedisConnectionFactory redisConnectionFactory;
 
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+
     @Test
     void contextLoads() {
         // Application context must load without errors

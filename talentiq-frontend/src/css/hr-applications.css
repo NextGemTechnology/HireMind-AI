@@ -272,3 +272,35 @@ body:not(.theme-light) .hr-apps-alert-success {
   color: var(--text-dim) !important;
   font-weight: 600;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   HR APPLICATIONS RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .hr-apps-container {
+    padding: 0 14px;
+    margin: 20px auto;
+  }
+
+  .hr-app-card-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .hr-app-actions {
+    width: 100%;
+  }
+
+  .hr-app-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .hr-app-stage-pipeline {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

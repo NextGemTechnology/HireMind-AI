@@ -8,6 +8,7 @@ interface AiLogoProps {
   className?: string;
   style?: React.CSSProperties;
   title?: string;
+  color?: string;
 }
 
 export const AiLogo: React.FC<AiLogoProps> = ({
@@ -15,7 +16,8 @@ export const AiLogo: React.FC<AiLogoProps> = ({
   animated = false,
   className = '',
   style = {},
-  title = 'HireMind AI'
+  title = 'HireMind AI',
+  color
 }) => {
   return (
     <span
@@ -25,6 +27,7 @@ export const AiLogo: React.FC<AiLogoProps> = ({
         height: `${size}px`,
         minWidth: `${size}px`,
         minHeight: `${size}px`,
+        color: color || undefined,
         ...style
       }}
       title={title}

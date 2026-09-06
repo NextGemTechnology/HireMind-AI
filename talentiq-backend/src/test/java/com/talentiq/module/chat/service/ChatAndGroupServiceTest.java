@@ -260,4 +260,33 @@ class ChatAndGroupServiceTest {
         groupChatService.removeMember(2L, 50L, 3L);
         verify(memberRepository, times(1)).deleteByGroupIdAndUserId(50L, 3L);
     }
+
+    @Test
+    @DisplayName("Candidate viewing contacts receives HR details and never self")
+    void shouldReturnHrDetailsWhenCandidateCallsGetContacts() {
+        // Candidate is user ID 1
+        when(candidateRepository.findByUserId(1L)).thenReturn(Optional.of(Candidate.builder().id(5L).user(candidateUser).build()));
+        when(chatMessageRepository.findContactIds(1L)).thenReturn(List.of(10L, 1L)); // 10L is HR, 1L is self
+
+        HrProfile hr = HrProfile.builder()
+                .id(10L)
+                .firstName("Shriya")
+                .lastName("Sharma")
+                .email("shriya@ngt.com")
+                .company(company)
+                .designation("Recruitment Lead")
+                .build();
+        when(hrProfileRepository.findById(10L)).thenReturn(Optional.of(hr));
+        when(chatMessageRepository.findConversation(eq(1L), eq(10L), any())).thenReturn(List.of());
+
+        List<ChatMessageDto.ContactResponse> contacts = chatService.getContacts(1L);
+
+        assertThat(contacts).hasSize(1);
+        ChatMessageDto.ContactResponse contact = contacts.get(0);
+        assertThat(contact.getUserId()).isEqualTo(10L);
+        assertThat(contact.getName()).isEqualTo("Shriya Sharma");
+        assertThat(contact.getEmail()).isEqualTo("shriya@ngt.com");
+        assertThat(contact.getCompanyName()).isEqualTo("InstaTechnology");
+        assertThat(contact.getJobTitle()).isEqualTo("Recruitment Lead");
+    }
 }

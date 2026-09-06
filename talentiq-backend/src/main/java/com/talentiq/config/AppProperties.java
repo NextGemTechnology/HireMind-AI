@@ -68,6 +68,7 @@ public class AppProperties {
         public static class AgentProperties {
             private String hrModel = "gpt-4o";
             private String candidateModel = "gpt-4o-mini";
+            private String developerModel = "gpt-4o";
             private int chatRetentionDays = 90;
             private int cacheTtlMinutes = 30;
             private boolean trainingEnabled = false;

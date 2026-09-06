@@ -41,8 +41,8 @@ public class ResumeParserServiceImpl implements ResumeParserService {
     private final ResumeTextExtractor textExtractor;
     private final AppProperties appProperties;
     private final ObjectMapper objectMapper;
-    private final com.talentiq.service.ai.AiSecurityGateway aiSecurityGateway;
-    private final com.talentiq.service.ai.AiModelFactory aiModelFactory;
+    private final com.talentiq.ai.service.AiSecurityGateway aiSecurityGateway;
+    private final com.talentiq.ai.service.AiModelFactory aiModelFactory;
 
     @Override
     @Async("aiExecutor")

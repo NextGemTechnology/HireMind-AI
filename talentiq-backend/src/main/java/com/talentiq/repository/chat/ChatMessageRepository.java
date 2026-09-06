@@ -38,7 +38,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
               ELSE m.senderId
             END
             FROM ChatMessage m
-            WHERE m.senderId = :userId OR m.receiverId = :userId
+            WHERE (m.senderId = :userId OR m.receiverId = :userId)
+              AND m.senderId != m.receiverId
             """)
     List<Long> findContactIds(@Param("userId") Long userId);
 

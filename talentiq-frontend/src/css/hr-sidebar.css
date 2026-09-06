@@ -1,0 +1,50 @@
+/* ============================================================
+   TalentIQ / HireMind — HR Sidebar Responsive Styles
+   ============================================================ */
+
+.hr-sidebar-aside {
+  width: 230px;
+  min-width: 230px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 12px 14px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  user-select: none;
+  transition: width 0.25s ease, transform 0.25s ease;
+}
+
+@media (max-width: 1024px) {
+  .hr-sidebar-aside {
+    width: 72px;
+    min-width: 72px;
+    padding: 16px 8px 12px;
+  }
+
+  .hr-sidebar-brand-text,
+  .hr-sidebar-nav-label,
+  .hr-sidebar-user-details,
+  .hr-sidebar-signout-text {
+    display: none !important;
+  }
+
+  .hr-sidebar-aside nav button {
+    justify-content: center !important;
+    padding: 10px 0 !important;
+  }
+
+  .hr-sidebar-user-badge {
+    justify-content: center !important;
+    padding: 8px 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .hr-sidebar-aside {
+    display: none !important;
+  }
+}

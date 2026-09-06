@@ -25,8 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import com.talentiq.security.userdetails.UserPrincipal;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,37 +56,8 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public ChatMessageDto.MessageResponse sendMessage(Long senderId, ChatMessageDto.SendRequest request) {
-        User sender = userRepository.findById(senderId).orElseGet(() -> {
-            Optional<HrProfile> hrOpt = hrProfileRepository.findById(senderId).or(() -> hrProfileRepository.findByUserId(senderId));
-            if (hrOpt.isPresent()) {
-                HrProfile hr = hrOpt.get();
-                User u = User.builder()
-                        .id(hr.getId())
-                        .email(hr.getEmail())
-                        .firstName(hr.getFirstName())
-                        .lastName(hr.getLastName())
-                        .build();
-                u.addRole(Role.ROLE_HR);
-                return u;
-            }
-            throw new IllegalArgumentException("Sender not found: " + senderId);
-        });
-
-        User receiver = userRepository.findById(request.getReceiverId()).orElseGet(() -> {
-            Optional<HrProfile> hrOpt = hrProfileRepository.findById(request.getReceiverId()).or(() -> hrProfileRepository.findByUserId(request.getReceiverId()));
-            if (hrOpt.isPresent()) {
-                HrProfile hr = hrOpt.get();
-                User u = User.builder()
-                        .id(hr.getId())
-                        .email(hr.getEmail())
-                        .firstName(hr.getFirstName())
-                        .lastName(hr.getLastName())
-                        .build();
-                u.addRole(Role.ROLE_HR);
-                return u;
-            }
-            throw new IllegalArgumentException("Receiver not found: " + request.getReceiverId());
-        });
+        User sender = resolveChatParticipant(senderId, true);
+        User receiver = resolveChatParticipant(request.getReceiverId(), false);
 
         validateDirectMessagingPermissions(sender, receiver);
 
@@ -116,13 +91,18 @@ public class ChatServiceImpl implements ChatService {
 
         // Also send an in-app notification (SSE) so receiver gets alert
         try {
+            boolean isReceiverHr = receiver.getRoles() != null && receiver.getRoles().contains(Role.ROLE_HR);
+            String chatLink = isReceiverHr
+                    ? "/hr-messages?contactId=" + senderId
+                    : "/messages?contactId=" + senderId;
+
             NotificationDto.SendRequest notifReq = new NotificationDto.SendRequest();
             notifReq.setTitle("New message from " + sender.getFullName());
             notifReq.setMessage(request.getContent().length() > 80
                     ? request.getContent().substring(0, 80) + "..."
                     : request.getContent());
             notifReq.setType("CHAT_MESSAGE");
-            notifReq.setLinkUrl("/messages?contactId=" + senderId);
+            notifReq.setLinkUrl(chatLink);
             notificationService.sendNotification(request.getReceiverId(), notifReq);
         } catch (Exception e) {
             log.warn("Failed to send chat notification to userId={}: {}", request.getReceiverId(), e.getMessage());
@@ -134,10 +114,8 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public ChatMessageDto.MessageResponse sendFileMessage(Long senderId, Long receiverId, MultipartFile file) {
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new IllegalArgumentException("Sender not found: " + senderId));
-        User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new IllegalArgumentException("Receiver not found: " + receiverId));
+        User sender = resolveChatParticipant(senderId, true);
+        User receiver = resolveChatParticipant(receiverId, false);
 
         validateDirectMessagingPermissions(sender, receiver);
 
@@ -181,11 +159,16 @@ public class ChatServiceImpl implements ChatService {
 
         // Also send notification
         try {
+            boolean isReceiverHr = receiver.getRoles() != null && receiver.getRoles().contains(Role.ROLE_HR);
+            String chatLink = isReceiverHr
+                    ? "/hr-messages?contactId=" + senderId
+                    : "/messages?contactId=" + senderId;
+
             NotificationDto.SendRequest notifReq = new NotificationDto.SendRequest();
             notifReq.setTitle("📎 File from " + sender.getFullName());
             notifReq.setMessage(fileName != null ? fileName : "Sent a file attachment");
             notifReq.setType("CHAT_MESSAGE");
-            notifReq.setLinkUrl("/messages?contactId=" + senderId);
+            notifReq.setLinkUrl(chatLink);
             notificationService.sendNotification(receiverId, notifReq);
         } catch (Exception e) {
             log.warn("Failed to send file notification to userId={}: {}", receiverId, e.getMessage());
@@ -236,6 +219,26 @@ public class ChatServiceImpl implements ChatService {
     public List<ChatMessageDto.ContactResponse> getContacts(Long currentUserId) {
         List<Long> contactIds = chatMessageRepository.findContactIds(currentUserId);
 
+        // Determine if current caller is an HR recruiter
+        boolean isCallerHr = false;
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+                isCallerHr = principal.getHrProfile() != null
+                        || (principal.getRoles() != null && principal.getRoles().contains(Role.ROLE_HR));
+            } else {
+                isCallerHr = !candidateRepository.findByUserId(currentUserId).isPresent()
+                        && (hrProfileRepository.findById(currentUserId).isPresent()
+                        || hrProfileRepository.findByUserId(currentUserId).isPresent());
+            }
+        } catch (Exception ignored) {
+            isCallerHr = !candidateRepository.findByUserId(currentUserId).isPresent()
+                    && (hrProfileRepository.findById(currentUserId).isPresent()
+                    || hrProfileRepository.findByUserId(currentUserId).isPresent());
+        }
+
+        final boolean callerIsHr = isCallerHr;
+
         String hrFlagKey = "hr:flagged:" + currentUserId;
         String candFlagKey = "candidate:flagged_by:" + currentUserId;
         Set<Object> hrFlagged = null;
@@ -253,59 +256,101 @@ public class ChatServiceImpl implements ChatService {
                 ? candFlagged.stream().map(Object::toString).collect(Collectors.toSet())
                 : Set.of();
 
-        return contactIds.stream().map(contactId -> {
-            User contact = userRepository.findById(contactId).orElse(null);
-            if (contact == null) return null;
+        return contactIds.stream()
+                .filter(contactId -> contactId != null && !contactId.equals(currentUserId))
+                .map(contactId -> {
+                    long unread = chatMessageRepository.countBySenderIdAndReceiverIdAndReadFalse(contactId, currentUserId);
 
-            long unread = chatMessageRepository.countBySenderIdAndReceiverIdAndReadFalse(contactId, currentUserId);
+                    // Get last message
+                    List<ChatMessage> conv = chatMessageRepository
+                            .findConversation(currentUserId, contactId, PageRequest.of(0, 1));
 
-            // Get last message
-            List<ChatMessage> conv = chatMessageRepository
-                    .findConversation(currentUserId, contactId, PageRequest.of(0, 1));
+                    String lastMsg = "";
+                    Instant lastMsgAt = null;
+                    if (!conv.isEmpty()) {
+                        lastMsg = conv.get(conv.size() - 1).getContent();
+                        lastMsgAt = conv.get(conv.size() - 1).getSentAt();
+                    }
 
-            String lastMsg = "";
-            Instant lastMsgAt = null;
-            if (!conv.isEmpty()) {
-                lastMsg = conv.get(conv.size() - 1).getContent();
-                lastMsgAt = conv.get(conv.size() - 1).getSentAt();
-            }
+                    String name = null;
+                    String email = null;
+                    String avatarUrl = null;
+                    String companyName = null;
+                    String jobTitle = null;
 
-            // Enrich with Company & Title details (WhatsApp style)
-            String companyName = null;
-            String jobTitle = null;
+                    if (!callerIsHr) {
+                        // Current user is Candidate -> other participant is HR Recruiter
+                        Optional<HrProfile> hrOpt = hrProfileRepository.findById(contactId)
+                                .or(() -> hrProfileRepository.findByUserId(contactId));
+                        if (hrOpt.isPresent()) {
+                            HrProfile hr = hrOpt.get();
+                            name = capitalize(hr.getFullName());
+                            email = hr.getEmail();
+                            avatarUrl = hr.getAvatarUrl();
+                            if (hr.getCompany() != null) {
+                                companyName = hr.getCompany().getName();
+                            }
+                            jobTitle = hr.getDesignation() != null ? hr.getDesignation() : "Talent Partner / Recruiter";
+                        } else {
+                            User contact = userRepository.findById(contactId).orElse(null);
+                            if (contact == null) return null;
+                            name = contact.getFullName();
+                            email = contact.getEmail();
+                            avatarUrl = contact.getAvatarUrl();
+                            Optional<Candidate> candOpt = candidateRepository.findByUserId(contactId);
+                            if (candOpt.isPresent()) {
+                                Candidate cand = candOpt.get();
+                                jobTitle = cand.getHeadline() != null ? cand.getHeadline() : "Candidate / Job Seeker";
+                            }
+                        }
+                    } else {
+                        // Current user is HR -> other participant is Candidate
+                        User contact = userRepository.findById(contactId).orElse(null);
+                        if (contact != null) {
+                            name = contact.getFullName();
+                            email = contact.getEmail();
+                            avatarUrl = contact.getAvatarUrl();
+                            Optional<Candidate> candOpt = candidateRepository.findByUserId(contactId);
+                            if (candOpt.isPresent()) {
+                                Candidate cand = candOpt.get();
+                                jobTitle = cand.getHeadline() != null ? cand.getHeadline() : "Candidate / Job Seeker";
+                            }
+                        } else {
+                            Optional<HrProfile> hrOpt = hrProfileRepository.findById(contactId)
+                                    .or(() -> hrProfileRepository.findByUserId(contactId));
+                            if (hrOpt.isPresent()) {
+                                HrProfile hr = hrOpt.get();
+                                name = capitalize(hr.getFullName());
+                                email = hr.getEmail();
+                                avatarUrl = hr.getAvatarUrl();
+                                if (hr.getCompany() != null) {
+                                    companyName = hr.getCompany().getName();
+                                }
+                                jobTitle = hr.getDesignation() != null ? hr.getDesignation() : "Talent Partner / Recruiter";
+                            } else {
+                                return null;
+                            }
+                        }
+                    }
 
-            Optional<HrProfile> hrOpt = hrProfileRepository.findById(contactId)
-                    .or(() -> hrProfileRepository.findByUserId(contactId));
-            if (hrOpt.isPresent()) {
-                HrProfile hr = hrOpt.get();
-                if (hr.getCompany() != null) {
-                    companyName = hr.getCompany().getName();
-                }
-                jobTitle = hr.getDesignation() != null ? hr.getDesignation() : "Talent Partner / Recruiter";
-            } else {
-                Optional<Candidate> candOpt = candidateRepository.findByUserId(contactId);
-                if (candOpt.isPresent()) {
-                    Candidate cand = candOpt.get();
-                    jobTitle = cand.getHeadline() != null ? cand.getHeadline() : "Candidate / Job Seeker";
-                }
-            }
+                    boolean isFlagged = hrFlaggedStrs.contains(String.valueOf(contactId))
+                            || candFlaggedStrs.contains(String.valueOf(contactId));
 
-            boolean isFlagged = hrFlaggedStrs.contains(String.valueOf(contactId))
-                    || candFlaggedStrs.contains(String.valueOf(contactId));
-
-            return ChatMessageDto.ContactResponse.builder()
-                    .userId(contactId)
-                    .name(contact.getFullName())
-                    .email(contact.getEmail())
-                    .avatarUrl(contact.getAvatarUrl())
-                    .companyName(companyName)
-                    .jobTitle(jobTitle)
-                    .unreadCount(unread)
-                    .lastMessage(lastMsg.length() > 60 ? lastMsg.substring(0, 60) + "..." : lastMsg)
-                    .lastMessageAt(lastMsgAt)
-                    .flagged(isFlagged)
-                    .build();
-        }).filter(c -> c != null).collect(Collectors.toList());
+                    return ChatMessageDto.ContactResponse.builder()
+                            .userId(contactId)
+                            .name(name != null && !name.isBlank() ? name : "Contact #" + contactId)
+                            .email(email)
+                            .avatarUrl(avatarUrl)
+                            .companyName(companyName)
+                            .jobTitle(jobTitle)
+                            .unreadCount(unread)
+                            .lastMessage(lastMsg != null && lastMsg.length() > 60 ? lastMsg.substring(0, 60) + "..." : lastMsg)
+                            .lastMessageAt(lastMsgAt)
+                            .flagged(isFlagged)
+                            .build();
+                })
+                .filter(c -> c != null)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -497,6 +542,69 @@ public class ChatServiceImpl implements ChatService {
                 .fileUrl(msg.getFileUrl())
                 .fileName(msg.getFileName())
                 .build();
+    }
+
+    private User resolveChatParticipant(Long id, boolean isSender) {
+        // 1. If resolving sender, check current security context first
+        if (isSender) {
+            try {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.getPrincipal() instanceof UserPrincipal principal) {
+                    if (id.equals(principal.getId())) {
+                        if (principal.getHrProfile() != null || (principal.getRoles() != null && principal.getRoles().contains(Role.ROLE_HR))) {
+                            HrProfile hr = principal.getHrProfile() != null
+                                    ? principal.getHrProfile()
+                                    : hrProfileRepository.findById(id).or(() -> hrProfileRepository.findByUserId(id)).orElse(null);
+                            if (hr != null) {
+                                return toUserFromHr(hr, id);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        // 2. If candidate exists in candidate table with this userId, they are a Candidate
+        if (candidateRepository.findByUserId(id).isPresent()) {
+            return userRepository.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Candidate user not found: " + id));
+        }
+
+        // 3. If HR profile exists with this id, they are an HR recruiter
+        Optional<HrProfile> hrOpt = hrProfileRepository.findById(id)
+                .or(() -> hrProfileRepository.findByUserId(id));
+        if (hrOpt.isPresent()) {
+            return toUserFromHr(hrOpt.get(), id);
+        }
+
+        // 4. Fallback to general user repository
+        return userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Chat participant not found for ID: " + id));
+    }
+
+    private User toUserFromHr(HrProfile hr, Long originalId) {
+        String first = hr.getFirstName() != null ? hr.getFirstName() : (hr.getUser() != null ? hr.getUser().getFirstName() : "");
+        String last = hr.getLastName() != null ? hr.getLastName() : (hr.getUser() != null ? hr.getUser().getLastName() : "");
+        String email = hr.getEmail() != null ? hr.getEmail() : (hr.getUser() != null ? hr.getUser().getEmail() : "");
+        String avatar = hr.getAvatarUrl() != null ? hr.getAvatarUrl() : (hr.getUser() != null ? hr.getUser().getAvatarUrl() : null);
+
+        User u = User.builder()
+                .id(originalId)
+                .email(email)
+                .firstName(capitalize(first))
+                .lastName(capitalize(last))
+                .avatarUrl(avatar)
+                .build();
+        u.addRole(Role.ROLE_HR);
+        return u;
+    }
+
+    private String capitalize(String str) {
+        if (str == null || str.isBlank()) return "";
+        return Arrays.stream(str.trim().split("\\s+"))
+                .filter(w -> !w.isBlank())
+                .map(w -> Character.toUpperCase(w.charAt(0)) + (w.length() > 1 ? w.substring(1).toLowerCase() : ""))
+                .collect(Collectors.joining(" "));
     }
 }
 

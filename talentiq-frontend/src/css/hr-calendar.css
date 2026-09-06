@@ -569,3 +569,34 @@
   gap: 10px;
   margin-top: 12px;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   HR CALENDAR RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .calendar-page-wrapper {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .cal-calendar-grid-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cal-calendar-grid {
+    min-width: 580px;
+  }
+
+  .cal-header-bar {
+    padding: 12px 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .cal-modal-panel {
+    padding: 20px 16px;
+  }
+}

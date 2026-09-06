@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
-  Search, Bell, TrendingUp, ChevronDown,
+  Search, TrendingUp, ChevronDown,
   Plus, MoreVertical, RefreshCw, Sun, Moon,
   Star, UserCircle2, BarChart2, Settings,
   Calendar, ShieldCheck, Download, Award
@@ -13,6 +13,7 @@ import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
+import { NotificationBell } from '../components/NotificationBell';
 import '../css/hr-analytics.css';
 
 /* ─── Types ─── */
@@ -137,7 +138,6 @@ export const HrAnalytics: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter] = useState('Month');
-  const [notifications] = useState(3);
   const [loading, setLoading] = useState(true);
 
   const stompRef = useRef<StompClient | null>(null);
@@ -454,19 +454,7 @@ export const HrAnalytics: React.FC = () => {
           <button onClick={loadDashboardData} title="Refresh data" style={{ background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: styles.subtext, display: 'flex', alignItems: 'center' }}>
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
-          <div style={{ position: 'relative' }}>
-            <button onClick={() => navigate('/hr-messages')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: styles.subtext }}>
-              <Bell size={18} />
-            </button>
-            {notifications > 0 && (
-              <span style={{
-                position: 'absolute', top: '-4px', right: '-4px',
-                background: '#EF4444', color: '#FFF', borderRadius: '50%',
-                width: '16px', height: '16px', fontSize: '9px', fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>{notifications}</span>
-            )}
-          </div>
+          <NotificationBell />
           <div
             onClick={() => navigate('/profile')}
             style={{

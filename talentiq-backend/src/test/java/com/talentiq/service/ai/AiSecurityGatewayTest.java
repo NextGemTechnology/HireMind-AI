@@ -1,8 +1,11 @@
 package com.talentiq.service.ai;
+import com.talentiq.ai.service.AiSecurityGateway;
+import com.talentiq.ai.service.AiUsageLogService;
+import com.talentiq.ai.model.*;
 
 import com.talentiq.config.AppProperties;
-import com.talentiq.model.AiSecurityEvent;
-import com.talentiq.repository.ai.AiSecurityEventRepository;
+import com.talentiq.ai.model.AiSecurityEvent;
+import com.talentiq.ai.repository.AiSecurityEventRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

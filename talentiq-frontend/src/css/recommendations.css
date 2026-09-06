@@ -1404,3 +1404,33 @@
     max-width: 100%;
   }
 }
+/* ══════════════════════════════════════════════════════════════
+   AI RECOMMENDATIONS RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .recs-unified-dashboard {
+    padding: 0 12px 60px;
+    margin: 12px auto;
+  }
+
+  .recs-unified-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .recs-topbar-brand {
+    min-width: 100%;
+  }
+
+  .recs-topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .recs-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

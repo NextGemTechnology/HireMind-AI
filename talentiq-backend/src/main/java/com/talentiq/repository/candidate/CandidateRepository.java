@@ -15,7 +15,12 @@ import java.util.Optional;
 @Repository
 public interface CandidateRepository extends JpaRepository<Candidate, Long>, JpaSpecificationExecutor<Candidate> {
 
+    @EntityGraph(attributePaths = {"user"})
     Optional<Candidate> findByUserId(Long userId);
+
+    @Override
+    @EntityGraph(attributePaths = {"user"})
+    Optional<Candidate> findById(Long id);
 
     boolean existsByUserId(Long userId);
 

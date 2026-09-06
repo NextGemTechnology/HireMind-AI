@@ -50,8 +50,9 @@ public class NotificationServiceImpl implements NotificationService {
 
         Notification saved = notificationRepository.save(notification);
 
-        // Async email dispatch if enabled in user preferences
-        if (preferences.isEmailNotificationsEnabled()) {
+        // Async email dispatch if enabled in user preferences (exclude normal chat/conversation messages)
+        boolean isChatMessage = "CHAT_MESSAGE".equalsIgnoreCase(saved.getType()) || "MESSAGE".equalsIgnoreCase(saved.getType());
+        if (preferences.isEmailNotificationsEnabled() && !isChatMessage) {
             mailService.sendSystemAlert(recipient.getEmail(), saved.getTitle(), saved.getMessage());
         }
 

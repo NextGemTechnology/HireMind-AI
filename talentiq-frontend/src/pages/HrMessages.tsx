@@ -9,7 +9,7 @@ import {
   MessageSquare,
   Circle, Sun, Moon, Trash2, Copy, Paperclip, Image as ImageIcon,
   Check, CheckCheck, Clock, ChevronDown, CheckCircle2, Sparkles, X,
-  UserCheck, ShieldCheck, User as UserIcon, Flag, Award
+  UserCheck, ShieldCheck, User as UserIcon, Flag, Award, ArrowLeft
 } from 'lucide-react';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
@@ -733,7 +733,7 @@ export const HrMessages: React.FC = () => {
   };
 
   return (
-    <div className={`messages-page-wrapper theme-${theme}`}>
+    <div className={`messages-page-wrapper theme-${theme} ${selectedContact ? 'has-active-chat' : 'no-active-chat'}`}>
       {/* ── Retain Background Theme (Untouched Interactive Canvas Background) ── */}
       {theme === 'galaxy' && <InteractiveGalaxyBackground />}
       <audio ref={remoteAudioRef} autoPlay />
@@ -975,6 +975,26 @@ export const HrMessages: React.FC = () => {
             {/* Top Chat Header — WhatsApp-Style Clickable Profile & Flagging */}
             <div className="msg-chat-header">
               <div className="msg-chat-header-user">
+                <button
+                  onClick={() => setSelectedContact(null)}
+                  className="msg-mobile-back-btn"
+                  style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: '8px',
+                    color: 'inherit',
+                    padding: '6px 8px',
+                    cursor: 'pointer',
+                    display: 'none',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '12px',
+                    marginRight: '6px',
+                  }}
+                  title="Back to Candidate Directory"
+                >
+                  <ArrowLeft size={16} />
+                </button>
                 <div
                   className="msg-avatar-contact active-avatar whatsapp-profile-avatar"
                   onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
@@ -1003,50 +1023,57 @@ export const HrMessages: React.FC = () => {
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons — Uniform Height, Spacing & Styling */}
               <div className="msg-chat-header-actions">
-                {/* 🚩 HR Flag / Pin Toggle Button */}
+                {/* 1. Flag Candidate */}
                 <button
                   onClick={() => handleToggleFlag(selectedContact.userId)}
                   className={`msg-header-btn msg-flag-btn ${(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? 'flagged-active' : ''}`}
                   title={(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? 'Candidate is Flagged / Priority (Click to Unflag)' : 'Flag this Candidate as Priority'}
                 >
                   <Flag
-                    size={13}
+                    size={14}
                     fill={(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? '#F59E0B' : 'none'}
                     color={(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? '#F59E0B' : 'currentColor'}
                   />
                   <span>{(flaggedUserIds.has(selectedContact.userId) || selectedContact.flagged) ? 'Flagged' : 'Flag Candidate'}</span>
                 </button>
 
+                {/* 2. Give Verified Tag */}
                 <button
                   onClick={() => setShowTagModal(true)}
-                  className="msg-header-btn"
-                  style={{ color: '#10B981', borderColor: 'rgba(16, 185, 129, 0.4)' }}
+                  className="msg-header-btn msg-verify-btn"
                   title="Give Candidate Company Verified Tag"
                 >
-                  <Award size={13} /> Give Verified Tag
+                  <Award size={14} />
+                  <span>Give Verified Tag</span>
                 </button>
 
+                {/* 3. Full Profile */}
                 <button
                   onClick={() => navigate(`/candidate-profile/${selectedContact.userId}`)}
-                  className="msg-header-btn"
+                  className="msg-header-btn msg-profile-btn"
                   title="Open Full Candidate Profile"
                 >
-                  <UserCheck size={13} /> Full Profile
+                  <UserCheck size={14} />
+                  <span>Full Profile</span>
                 </button>
 
+                {/* 4. Clear Chat */}
                 <button
                   onClick={() => setShowClearModal(true)}
-                  className="msg-header-btn msg-btn-danger"
+                  className="msg-header-btn msg-clear-btn"
                   title="Clear Conversation"
                 >
-                  <Trash2 size={13} /> Clear Chat
+                  <Trash2 size={14} />
+                  <span>Clear Chat</span>
                 </button>
 
+                {/* 5. Call Candidate */}
                 {callState === 'idle' && (
-                  <button onClick={startCall} className="msg-call-btn-start">
-                    <Phone size={14} /> Call Candidate
+                  <button onClick={startCall} className="msg-header-btn msg-call-btn" title="Call Candidate">
+                    <Phone size={14} />
+                    <span>Call Candidate</span>
                   </button>
                 )}
                 {(callState === 'calling' || callState === 'in-call') && (
@@ -1055,11 +1082,12 @@ export const HrMessages: React.FC = () => {
                       <Circle size={8} fill="currentColor" color="currentColor" style={{ animation: 'chatPulse 2s infinite' }} />
                       {callState === 'in-call' ? `In call with ${callWith}` : `Calling ${callWith}...`}
                     </div>
-                    <button onClick={toggleMute} className={`msg-mute-btn ${isMuted ? 'muted' : ''}`}>
-                      {isMuted ? <MicOff size={14} /> : <Mic size={14} />}
+                    <button onClick={toggleMute} className={`msg-mute-btn ${isMuted ? 'muted' : ''}`} title={isMuted ? 'Unmute' : 'Mute'}>
+                      {isMuted ? <MicOff size={13} /> : <Mic size={13} />}
                     </button>
-                    <button onClick={hangUp} className="msg-hangup-btn">
-                      <PhoneOff size={14} /> End
+                    <button onClick={hangUp} className="msg-hangup-btn" title="End call">
+                      <PhoneOff size={13} />
+                      <span>End</span>
                     </button>
                   </div>
                 )}

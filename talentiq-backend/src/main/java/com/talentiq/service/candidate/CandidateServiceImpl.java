@@ -87,7 +87,7 @@ public class CandidateServiceImpl implements CandidateService {
     );
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public CandidateDto.Response getProfileByUserId(Long userId) {
         Candidate candidate = getOrCreateCandidate(userId);
         return mapToResponse(candidate);
@@ -389,6 +389,16 @@ public class CandidateServiceImpl implements CandidateService {
 
     private CandidateDto.Response mapToResponse(Candidate candidate) {
         User user = candidate.getUser();
+        if (user == null && candidate.getId() != null) {
+            user = userRepository.findById(candidate.getId()).orElse(null);
+        }
+
+        Long userId = user != null ? user.getId() : null;
+        String email = user != null ? user.getEmail() : "";
+        String firstName = user != null ? user.getFirstName() : "Candidate";
+        String lastName = user != null ? user.getLastName() : "";
+        String phone = user != null ? user.getPhone() : null;
+        String avatarUrl = user != null ? user.getAvatarUrl() : null;
 
         List<CandidateDto.SkillResponse> skillResponses = candidate.getSkills().stream().map(s ->
                 CandidateDto.SkillResponse.builder()
@@ -454,12 +464,12 @@ public class CandidateServiceImpl implements CandidateService {
 
         return CandidateDto.Response.builder()
                 .id(candidate.getId())
-                .userId(user.getId())
-                .email(user.getEmail())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .phone(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
+                .userId(userId)
+                .email(email)
+                .firstName(firstName)
+                .lastName(lastName)
+                .phone(phone)
+                .avatarUrl(avatarUrl)
                 .headline(candidate.getHeadline())
                 .bio(candidate.getBio())
                 .location(candidate.getLocation())

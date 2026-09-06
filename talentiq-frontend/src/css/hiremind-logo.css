@@ -238,3 +238,30 @@
 .size-xl .hiremind-brand-line { font-size: 32px; }
 .size-xl .brand-ai { font-size: 32px; }
 .size-xl .brand-ngt-tag { font-size: 11px; top: -15px; }
+
+/* ── Mobile Responsive Logo Adjustments ── */
+@media (max-width: 520px) {
+  .brand-tagline {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .hiremind-nav-emblem {
+    width: 32px;
+    height: 32px;
+  }
+
+  .hiremind-brand-line {
+    font-size: 16px;
+  }
+
+  .brand-ai {
+    font-size: 16px;
+  }
+
+  .brand-ngt-tag {
+    font-size: 7px;
+    top: -8px;
+  }
+}

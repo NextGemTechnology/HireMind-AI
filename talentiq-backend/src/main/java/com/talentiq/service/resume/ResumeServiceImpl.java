@@ -30,7 +30,7 @@ public class ResumeServiceImpl implements ResumeService {
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
     private final ResumeParserService resumeParserService;
-    private final com.talentiq.service.ai.AiSecurityGateway aiSecurityGateway;
+    private final com.talentiq.ai.service.AiSecurityGateway aiSecurityGateway;
 
     private static final String SUBDIR = "resumes";
 

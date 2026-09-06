@@ -38,6 +38,8 @@ class ResumeParserServiceImplTest {
     @Mock private FileStorageService fileStorageService;
     @Mock private ResumeTextExtractor textExtractor;
     @Mock private AppProperties appProperties;
+    @Mock private com.talentiq.ai.service.AiSecurityGateway aiSecurityGateway;
+    @Mock private com.talentiq.ai.service.AiModelFactory aiModelFactory;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
     @InjectMocks

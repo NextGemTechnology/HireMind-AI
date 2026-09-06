@@ -950,26 +950,170 @@
 
 .msg-chat-header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
+/* ── All Chat Header Buttons: STRICTLY SAME SIZE & ALIGNMENT ── */
 .msg-header-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: inherit;
-  padding: 6px 12px;
+  height: 34px;
+  padding: 0 13px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  transition: all 0.2s;
+  white-space: nowrap;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #E2E8F0;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
 }
 
 .msg-header-btn:hover {
-  background: rgba(124, 58, 237, 0.25);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.msg-header-btn:active {
+  transform: translateY(0);
+}
+
+/* 1. Flag Candidate Button */
+.msg-header-btn.msg-flag-btn {
+  color: #F59E0B;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+}
+.msg-header-btn.msg-flag-btn:hover,
+.msg-header-btn.msg-flag-btn.flagged-active {
+  background: rgba(245, 158, 11, 0.22);
+  border-color: rgba(245, 158, 11, 0.65);
+  color: #FBBF24;
+}
+
+/* 2. Give Verified Tag Button */
+.msg-header-btn.msg-verify-btn {
+  color: #10B981;
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(16, 185, 129, 0.08);
+}
+.msg-header-btn.msg-verify-btn:hover {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(16, 185, 129, 0.65);
+  color: #34D399;
+}
+
+/* 3. Full Profile Button */
+.msg-header-btn.msg-profile-btn {
+  color: #818CF8;
+  border-color: rgba(129, 140, 248, 0.35);
+  background: rgba(129, 140, 248, 0.08);
+}
+.msg-header-btn.msg-profile-btn:hover {
+  background: rgba(129, 140, 248, 0.22);
+  border-color: rgba(129, 140, 248, 0.65);
+  color: #A5B4FC;
+}
+
+/* 4. Clear Chat Button */
+.msg-header-btn.msg-clear-btn {
+  color: #F87171;
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+.msg-header-btn.msg-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.65);
+  color: #FCA5A5;
+}
+
+/* 5. Call Candidate Button */
+.msg-header-btn.msg-call-btn {
+  color: #38BDF8;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.08);
+}
+.msg-header-btn.msg-call-btn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.65);
+  color: #7DD3FC;
+}
+
+/* 6. Active Call Bar */
+.msg-call-active-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-sizing: border-box;
+}
+
+.msg-call-status-pulse {
+  font-size: 12px;
+  font-weight: 600;
+  color: #10B981;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.msg-mute-btn {
+  height: 26px;
+  width: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #F1F5F9;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.msg-mute-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.msg-mute-btn.muted {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #EF4444;
+}
+
+.msg-hangup-btn {
+  height: 26px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.msg-hangup-btn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  border-color: rgba(239, 68, 68, 0.7);
 }
 
 /* Quick Inquiries Strip */
@@ -1466,3 +1610,104 @@
   transform: translateY(-1px);
 }
 
+
+/* ══════════════════════════════════════════════════════════════
+   HR & USER MESSAGES RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .messages-page-wrapper {
+    position: relative;
+    height: 100vh;
+    width: 100%;
+  }
+
+  .msg-contacts-panel {
+    width: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .messages-page-wrapper {
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+  }
+
+  /* Hide Candidate sidebar on mobile chat view */
+  .msg-sidebar {
+    display: none !important;
+  }
+
+  /* Single-panel toggling behavior */
+  .msg-contacts-panel {
+    width: 100% !important;
+    height: 100vh !important;
+    flex: 1 1 100% !important;
+  }
+
+  .msg-chat-panel {
+    width: 100% !important;
+    height: 100vh !important;
+    flex: 1 1 100% !important;
+  }
+
+  .has-active-chat .msg-contacts-panel {
+    display: none !important;
+  }
+
+  .no-active-chat .msg-chat-panel {
+    display: none !important;
+  }
+
+  .msg-chat-header {
+    padding: 10px 14px;
+  }
+
+  .msg-chat-header-actions {
+    gap: 4px;
+  }
+
+  .msg-chat-header-actions button {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+
+  .msg-chat-input-bar {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .msg-bubble {
+    max-width: 88% !important;
+    font-size: 13.5px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .msg-chat-header {
+    padding: 8px 10px;
+  }
+
+  .msg-chat-candidate-title {
+    font-size: 14px;
+  }
+
+  .msg-chat-input-bar {
+    padding: 8px;
+  }
+
+  .msg-send-btn {
+    padding: 8px 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .msg-mobile-back-btn {
+    display: inline-flex !important;
+  }
+}

@@ -8,6 +8,7 @@ import {
   Settings, LogOut, Sparkles
 } from 'lucide-react';
 import { AiLogo } from './AiLogo';
+import '../css/hr-sidebar.css';
 
 export type HrNavKey =
   | 'Dashboard'
@@ -70,21 +71,9 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
   const hrEmail = user?.email || 'hr.recruiter@hiremind.ai';
 
   return (
-    <aside style={{
-      width: '230px',
-      minWidth: '230px',
-      height: '100vh',
+    <aside className="hr-sidebar-aside" style={{
       background: isUniverse ? '#0F172A' : '#FFFFFF',
       borderRight: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '20px 12px 14px',
-      flexShrink: 0,
-      position: 'sticky',
-      top: 0,
-      zIndex: 40,
-      boxSizing: 'border-box',
-      userSelect: 'none',
     }}>
       {/* ── Brand / Logo ── */}
       <div
@@ -111,7 +100,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
         }}>
           <span style={{ fontSize: '17px' }}>🌌</span>
         </div>
-        <div>
+        <div className="hr-sidebar-brand-text">
           <div style={{ fontWeight: 800, fontSize: '15px', color: isUniverse ? '#F8FAFC' : '#1E293B', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
             HireMind AI
           </div>
@@ -299,7 +288,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
         paddingTop: '12px',
         borderTop: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
       }}>
-        <div style={{
+        <div className="hr-sidebar-user-badge" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
@@ -323,7 +312,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
           }}>
             {hrName.charAt(0).toUpperCase()}
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="hr-sidebar-user-details" style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: '12px',
               fontWeight: 700,
@@ -367,7 +356,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
           onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
         >
           <LogOut size={15} />
-          <span>Sign Out</span>
+          <span className="hr-sidebar-signout-text">Sign Out</span>
         </button>
       </div>
     </aside>

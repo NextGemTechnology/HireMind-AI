@@ -205,6 +205,87 @@
   box-shadow: 0 8px 28px rgba(124, 58, 237, 0.55);
 }
 
+.home-mobile-menu-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.home-mobile-nav-cta {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 960px) {
+  .home-navbar {
+    padding: 0 20px;
+  }
+
+  .home-mobile-menu-btn {
+    display: flex;
+  }
+
+  .home-nav-links {
+    display: none;
+    position: absolute;
+    top: 68px;
+    left: 0;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 24px;
+    gap: 16px;
+    box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+
+  .home-nav-links.mobile-open {
+    display: flex;
+  }
+
+  .home-nav-link-btn {
+    font-size: 16px;
+    padding: 10px 0;
+    text-align: left;
+  }
+
+  .home-mobile-nav-cta {
+    display: flex;
+  }
+
+  .home-nav-actions .home-hr-login-btn,
+  .home-nav-actions .home-candidate-login-btn,
+  .home-nav-actions .home-signup-btn {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-navbar {
+    padding: 0 12px;
+    height: 60px;
+  }
+  .home-theme-btn {
+    width: 38px;
+    height: 38px;
+  }
+  .home-mobile-menu-btn {
+    width: 38px;
+    height: 38px;
+  }
+}
+
 /* ── Hero Section ── */
 .home-hero-section {
   position: relative;
@@ -904,4 +985,152 @@
   color: #A78BFA;
   text-decoration: none;
   font-weight: 600;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HOME PAGE RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  .home-hero-section {
+    padding: 60px 24px 32px;
+    gap: 32px;
+  }
+  .home-search-section,
+  .home-stats-section,
+  .home-features-section,
+  .home-cta-section {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-hero-section {
+    padding: 36px 16px 24px;
+    min-height: auto;
+  }
+  .home-hero-left {
+    max-width: 100%;
+    text-align: center;
+  }
+  .home-hero-badge {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hero-sub {
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hero-btns {
+    justify-content: center;
+  }
+  .social-proof-bar {
+    justify-content: center;
+  }
+
+  /* Floating job cards hidden on mobile to eliminate overlap */
+  .float-card-wrapper {
+    display: none !important;
+  }
+
+  /* Search Section */
+  .home-search-section {
+    padding: 0 16px 40px;
+  }
+  .search-box-card {
+    padding: 20px 16px;
+  }
+  .search-inputs-grid {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .search-inputs-grid > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+  .search-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Stats Section */
+  .home-stats-section {
+    padding: 0 16px 50px;
+  }
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .stat-card {
+    padding: 16px 12px;
+  }
+  .stat-card-value {
+    font-size: 24px;
+  }
+
+  /* Features Section */
+  .home-features-section {
+    padding: 0 16px 60px;
+  }
+  .features-layout {
+    flex-direction: column;
+    gap: 24px;
+  }
+  .features-side-intro {
+    flex: 1 1 100%;
+    text-align: center;
+  }
+  .features-side-btn {
+    margin: 0 auto;
+  }
+  .features-grid-cards {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  /* CTA Section */
+  .home-cta-section {
+    padding: 0 16px 60px;
+  }
+  .cta-banner-card {
+    padding: 36px 20px;
+  }
+  .cta-banner-title {
+    font-size: clamp(22px, 5vw, 32px);
+  }
+  .cta-banner-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  .cta-banner-buttons button {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Footer */
+  .home-footer {
+    padding: 32px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-btns button {
+    width: 100%;
+    justify-content: center;
+  }
+  .stats-grid-4 {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .search-tabs-row {
+    flex-wrap: wrap;
+  }
+  .tab-btn {
+    flex: 1 1 45%;
+    text-align: center;
+    padding: 8px 12px;
+  }
 }

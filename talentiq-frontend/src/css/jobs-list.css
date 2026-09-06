@@ -615,3 +615,46 @@ body:not(.theme-light) .jobs-modal-error {
     grid-template-columns: 1fr;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   JOBS LIST RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .jobs-content-container {
+    padding: 20px 14px 0;
+  }
+
+  .jobs-hero-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .jobs-post-btn-hero {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .jobs-filter-panel {
+    padding: 16px;
+  }
+
+  .jobs-search-row {
+    flex-direction: column;
+  }
+
+  .jobs-search-wrapper {
+    min-width: 100%;
+  }
+
+  .jobs-pills-row {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    padding-bottom: 6px;
+  }
+
+  .jobs-pills-row button {
+    flex-shrink: 0;
+  }
+}

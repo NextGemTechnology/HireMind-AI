@@ -7,7 +7,7 @@ import {
   Sparkles, ArrowRight, Search, MapPin, Zap,
   Brain, Bell, BarChart3, Sun, Moon,
   Star, Users, Briefcase, TrendingUp,
-  ChevronDown, Play, Globe
+  ChevronDown, Play, Globe, Menu, X
 } from 'lucide-react';
 import { HireMindLogo } from '../components/HireMindLogo';
 import { AiLogo } from '../components/AiLogo';
@@ -132,6 +132,7 @@ export const Home: React.FC = () => {
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [appliedJobIds, setAppliedJobIds] = useState<number[]>([]);
   const [showMapInHero, setShowMapInHero] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
 
   /* Fetch Public Platform Stats from Redis & Jobs */
@@ -336,11 +337,13 @@ export const Home: React.FC = () => {
           <HireMindLogo variant="navbar" size="md" />
         </div>
 
-        <div className="home-nav-links">
+        {/* Desktop & Mobile Drawer Links */}
+        <div className={`home-nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`} style={mobileMenuOpen ? { background: T.navBg, borderBottom: `1px solid ${T.border}` } : {}}>
           {['Home', 'Find Jobs', 'For Employers', 'AI Recruiter', 'Pricing'].map((item, i) => (
             <button
               key={item}
               onClick={() => {
+                setMobileMenuOpen(false);
                 if (item === 'Find Jobs') navigate('/jobs');
                 else if (item === 'For Employers') navigate('/hr-login');
               }}
@@ -354,6 +357,18 @@ export const Home: React.FC = () => {
               {item}
             </button>
           ))}
+          {/* Mobile-only action shortcuts inside drawer */}
+          <div className="home-mobile-nav-cta">
+            <button onClick={() => { setMobileMenuOpen(false); navigate('/hr-login'); }} className="home-hr-login-btn" style={{ width: '100%', textAlign: 'center' }}>
+              HR Login
+            </button>
+            <button onClick={() => { setMobileMenuOpen(false); navigate('/user-login'); }} className="home-candidate-login-btn" style={{ width: '100%', border: `1px solid ${T.border}`, color: T.text, textAlign: 'center' }}>
+              Candidate Login
+            </button>
+            <button onClick={() => { setMobileMenuOpen(false); navigate('/user-login'); }} className="home-signup-btn" style={{ width: '100%', textAlign: 'center' }}>
+              Sign Up
+            </button>
+          </div>
         </div>
 
         <div className="home-nav-actions">
@@ -385,6 +400,16 @@ export const Home: React.FC = () => {
 
           <button onClick={() => navigate('/user-login')} className="home-signup-btn">
             Sign Up
+          </button>
+
+          {/* Mobile hamburger button */}
+          <button
+            className="home-mobile-menu-btn"
+            onClick={() => setMobileMenuOpen(prev => !prev)}
+            aria-label="Toggle Navigation Menu"
+            style={{ border: `1px solid ${T.border}`, background: T.surface, color: T.text }}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
         </div>
       </nav>

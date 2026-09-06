@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import {
   User, Mail, MapPin, Briefcase, GraduationCap, FolderGit2,
   ExternalLink, ArrowLeft, MessageSquare,
@@ -24,14 +25,18 @@ interface ProjectItem {
   title: string;
   description: string;
   technologies?: string[];
+  techStack?: string[];
   githubUrl?: string;
+  url?: string;
   liveUrl?: string;
 }
 
 interface ExperienceItem {
   id?: number;
-  companyName: string;
-  jobTitle: string;
+  companyName?: string;
+  company?: string;
+  jobTitle?: string;
+  title?: string;
   description?: string;
   startDate?: string;
   endDate?: string;
@@ -80,6 +85,8 @@ interface CandidateData {
 export const CandidateProfile: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isHr, isAdmin } = useAuth();
+  const { isUniverse } = useTheme();
   const [candidate, setCandidate] = useState<CandidateData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -88,14 +95,25 @@ export const CandidateProfile: React.FC = () => {
       try {
         setLoading(true);
         // Try fetching by user ID first, then fallback to candidate ID
-        let res;
+        let res: any = null;
         try {
           res = await apiClient.get(`/candidates/user/${id}`);
         } catch {
-          res = await apiClient.get(`/candidates/${id}`);
+          try {
+            res = await apiClient.get(`/candidates/${id}`);
+          } catch {
+            // Fallback: try fetching current user or me if looking at self
+            try {
+              res = await apiClient.get('/users/me');
+            } catch {
+              res = null;
+            }
+          }
         }
-        if (res?.data?.data) {
-          setCandidate(res.data.data);
+
+        const data = res?.data?.data || res?.data;
+        if (data && (data.id || data.userId || data.email || data.firstName)) {
+          setCandidate(data);
         } else {
           setCandidate(null);
         }
@@ -133,7 +151,6 @@ export const CandidateProfile: React.FC = () => {
     );
   }
 
-  const { isHr, isAdmin } = useAuth();
   const [showTagModal, setShowTagModal] = useState(false);
   const [tagJobTitle, setTagJobTitle] = useState('');
   const [tagDept, setTagDept] = useState('');
@@ -172,7 +189,7 @@ export const CandidateProfile: React.FC = () => {
   const fullName = `${candidate.firstName || ''} ${candidate.lastName || ''}`.trim() || 'Candidate Profile';
 
   return (
-    <div className="candidate-profile-page theme-universe">
+    <div className={`candidate-profile-page ${isUniverse ? 'theme-universe' : 'theme-light'}`}>
       <div className="candidate-profile-container">
         {/* Top navigation row */}
         <div className="cp-nav-bar">
@@ -204,7 +221,14 @@ export const CandidateProfile: React.FC = () => {
             )}
 
             <button
-              onClick={() => navigate(`/messages?recipientId=${candidate.userId || candidate.id}&recruiterName=${encodeURIComponent(fullName)}`)}
+              onClick={() => {
+                const targetId = candidate.userId || candidate.id;
+                if (isHr) {
+                  navigate(`/hr-messages?contactId=${targetId}`);
+                } else {
+                  navigate(`/messages?contactId=${targetId}`);
+                }
+              }}
               className="cp-message-btn"
             >
               <MessageSquare size={16} /> Message Candidate
@@ -390,12 +414,12 @@ export const CandidateProfile: React.FC = () => {
           <div className="cp-section-card">
             <h2 className="cp-section-title"><Briefcase size={18} /> Experience</h2>
             <div className="cp-timeline">
-              {candidate.experiences.map((exp, idx) => (
+              {candidate.experiences.map((exp: any, idx) => (
                 <div key={idx} className="cp-timeline-item">
                   <div className="cp-timeline-dot" />
                   <div className="cp-timeline-content">
-                    <h3 className="cp-role-title">{exp.jobTitle}</h3>
-                    <div className="cp-company-name">{exp.companyName}</div>
+                    <h3 className="cp-role-title">{exp.title || exp.jobTitle || 'Role / Position'}</h3>
+                    <div className="cp-company-name">{exp.company || exp.companyName || 'Company'}</div>
                     <div className="cp-date-range">
                       {exp.startDate} – {exp.current ? 'Present' : exp.endDate}
                     </div>
@@ -412,19 +436,22 @@ export const CandidateProfile: React.FC = () => {
           <div className="cp-section-card">
             <h2 className="cp-section-title"><FolderGit2 size={18} /> Projects &amp; Portfolio</h2>
             <div className="cp-projects-grid">
-              {candidate.projects.map((proj, idx) => (
-                <div key={idx} className="cp-project-card">
-                  <h3 className="cp-project-title">{proj.title}</h3>
-                  <p className="cp-project-desc">{proj.description}</p>
-                  {proj.technologies && (
-                    <div className="cp-tech-chips">
-                      {proj.technologies.map((tech, tIdx) => (
-                        <span key={tIdx} className="cp-tech-chip">{tech}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {candidate.projects.map((proj: any, idx) => {
+                const techs: string[] = proj.techStack || proj.technologies || [];
+                return (
+                  <div key={idx} className="cp-project-card">
+                    <h3 className="cp-project-title">{proj.title}</h3>
+                    <p className="cp-project-desc">{proj.description}</p>
+                    {techs.length > 0 && (
+                      <div className="cp-tech-chips">
+                        {techs.map((tech, tIdx) => (
+                          <span key={tIdx} className="cp-tech-chip">{tech}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

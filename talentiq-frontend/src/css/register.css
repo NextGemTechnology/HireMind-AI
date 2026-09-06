@@ -5,11 +5,12 @@
 .register-page-wrapper {
   position: relative;
   min-height: 100vh;
-  width: 100vw;
+  width: 100%;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px 80px;
+  padding: 40px 16px 80px;
   overflow-x: hidden;
   box-sizing: border-box;
 }
@@ -383,5 +384,33 @@
 @media (max-width: 600px) {
   .register-form-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   REGISTER PAGE RESPONSIVE MEDIA QUERIES
+   ══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .register-card {
+    padding: 24px 16px !important;
+    border-radius: 18px;
+  }
+
+  .register-role-selector {
+    grid-template-columns: 1fr !important;
+  }
+
+  .register-steps-bar {
+    gap: 6px;
+  }
+
+  .register-actions {
+    flex-direction: column;
+  }
+
+  .register-actions button {
+    width: 100%;
+    justify-content: center;
   }
 }
