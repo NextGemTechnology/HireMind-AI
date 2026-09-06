@@ -1,132 +1,280 @@
-# 🪐 HireMind AI (TalentIQ) — Next-Gen AI Recruitment & Talent Intelligence Platform
+# 🪐 HireMind AI (TalentIQ) — Enterprise AI Recruitment & Talent Intelligence Platform
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-emerald?style=for-the-badge&logo=github)](https://github.com/AbhayGupta002/HireMind-AI)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen?style=for-the-badge&logo=springboot)](https://spring.io/projects/spring-boot)
 [![React](https://img.shields.io/badge/React-18-blue?style=for-the-badge&logo=react)](https://react.dev/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.4-orange?style=for-the-badge&logo=mysql)](https://www.mysql.com/)
 [![Redis](https://img.shields.io/badge/Redis-7.4-red?style=for-the-badge&logo=redis)](https://redis.io/)
+[![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-7.5-black?style=for-the-badge&logo=apachekafka)](https://kafka.apache.org/)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue?style=for-the-badge&logo=kubernetes)](https://kubernetes.io/)
 [![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)](LICENSE)
 
-**HireMind AI** (formerly TalentIQ) is an enterprise-grade, full-stack AI recruitment intelligence platform designed to streamline hiring workflows, compute candidate-to-job match scores, parse resumes, provide RAG-powered HR AI interview assistance, offer real-time full-duplex chat messaging, automate applicant notifications, and deliver high-concurrency 4-digit OTP password recovery.
+**HireMind AI** (formerly TalentIQ) is an enterprise-grade, full-stack SaaS recruitment intelligence and talent management platform. Built with a Spring Boot 3 backend and React 18 frontend, HireMind AI provides real-time AI-powered candidate-to-job matching, automated resume parsing, interactive AI HR career copilot assistance, full-duplex WebSocket messaging, automated notification management, and dedicated role-isolated administrative governance centers.
 
 ---
 
-## 🚀 Core Platform Capabilities & Architecture
-
-### ⚡ 1. High-Concurrency Redis OTP Engine & Rate Limiting (`10,000+ Users`)
-- **$O(1)$ In-Memory Speed (`RedisOtpService.java`)**: OTPs are generated cryptographically and cached in Redis (`otp:code:<email>`) with an automated **10-minute TTL**, eliminating database lock contention during traffic surges.
-- **Single-Use Destruction**: OTP is invalidated immediately upon successful verification to eliminate replay attacks.
-- **Sliding-Window Rate Limiting in Redis**:
-  - **Per-Email Throttle**: Max 3 OTP generation requests per 2 minutes.
-  - **Per-IP Throttle**: Max 10 requests per minute from a single network.
-- **Brute-Force Lockout Defense**: 5 consecutive invalid entries triggers an automated 15-minute security lockout.
-
-### 📧 2. Automated Gmail SMTP Email Dispatch
-- **Google App Password Integration**: Full TLS/STARTTLS support over `smtp.gmail.com:587`.
-- **Asynchronous Fire-and-Forget Thread Pool**: Non-blocking email dispatch with zero impact on HTTP request latency.
-- **Automated HTML Email Notifications**:
-  - 🔑 **4-Digit OTP Password Reset Codes**
-  - 🎉 **Account Registration & Welcome Letters**
-  - 🛡️ **Login Security & Alert Notifications**
-
-### 🚪 3. Role-Based Access Control (RBAC) & Dedicated Portal Routing
-- **Candidate Portal** (`http://localhost:3000/user-login`): Candidate sign-in, profile building, 85%+ AI match scores, and application tracking.
-- **HR Recruiter Portal** (`http://localhost:3000/hr-login`): Job publishing, candidate applicant desk, resume review, and pipeline tracking.
-- **Dedicated Admin Portals** (`http://localhost:3000/admin-login`): Strict 1:1 RBAC isolation across 4 locked Admin roles (`/admin/developer`, `/admin/service-team`, `/admin/company`, `/admin/super-admin`).
-- **Cross-Portal Protection**: Clean `401 Unauthorized` error responses prevent user enumeration and enforce strict backend security boundaries.
+## 📌 Table of Contents
+1. [Project Overview](#-project-overview)
+2. [Technology Stack](#-technology-stack)
+3. [System Architecture](#-system-architecture)
+4. [User Roles & Permissions (RBAC)](#-user-roles--permissions-rbac)
+5. [Complete Application Workflow](#-complete-application-workflow)
+6. [Core Features & Modules](#-core-features--modules)
+7. [Authentication & Authorization Flow](#-authentication--authorization-flow)
+8. [Frontend / Backend / Database Data Flow](#-frontend--backend--database-data-flow)
+9. [Important API Groups](#-important-api-groups)
+10. [Project Directory Structure](#-project-directory-structure)
+11. [Local Development Setup](#-local-development-setup)
+12. [Docker & Kubernetes Deployment](#-docker--kubernetes-deployment)
+13. [Environment Variable Configuration](#-environment-variable-configuration)
+14. [Testing & Verification Commands](#-testing--verification-commands)
 
 ---
 
-## 👑 Enterprise Admin SaaS Platform Architecture & RBAC Isolation
+## 💡 Project Overview
 
-HireMind features a **hardened, multi-tenant Admin SaaS Architecture** built around 4 locked Admin roles, decoupled credential storage tables, strict backend Role-Based Access Control (RBAC), and dedicated, visually isolated admin portals.
+HireMind AI optimizes the end-to-end recruitment lifecycle for candidates, HR recruiters, company administrators, and platform operations teams:
 
-### 🔒 1. The 4 Locked Admin Roles & Dedicated Portals
-
-| Admin Role | Canonical Route | Database Table | Visual Theme & Architecture | Core Capabilities & Governance |
-|---|---|---|---|---|
-| **`ROLE_APP_DEVELOPER`** | `/admin/developer` | `app_dev_credentials` | **Cyberpunk / Matrix Dark Terminal** (`#10B981` Emerald / `#06B6D4` Cyan) | • **Cluster Telemetry**: JVM Heap, thread counts, GC pauses, MySQL HikariPool connection state, and live candidate/HR Redis presence.<br>• **AI Developer Terminal**: Real-time diagnostic terminal runner with ANSI syntax highlighting and tool execution chips (`READ_LOGS`, `READ_METRICS`, `CHECK_DATABASE`, `ANALYZE_QUERY`, `CHECK_DEPLOYMENT`).<br>• **Error Log Tracing**: Filterable Spring Boot log streamer.<br>• **Developer Provisioning**: Developer team invite dispatch. |
-| **`ROLE_SERVICE_TEAM`** | `/admin/service-team` | `service_team_credentials` | **Operations & Customer Success Desk** (`#6366F1` Indigo / `#F59E0B` Amber) | • **Corporate Verification Queue**: Pending company registrations with document preview, corporate registry validation, and 1-click "Approve & Issue Badge" or "Reject".<br>• **User & Recruiter Moderation Bureau**: Candidate & HR search, dossier inspect modal, and account block/unblock with audit notes.<br>• **Customer Support Tickets Desk**: Priority-tagged support queue (High/Medium/Low SLA urgency), official customer reply composer, and resolution tracking. |
-| **`ROLE_COMPANY_ADMIN`** | `/admin/company` | `company_credentials` | **Corporate Executive Workspace** (`#2563EB` Royal Blue / `#38BDF8` Sky) | • **Enterprise Branding & Seal**: Corporate profile management, employee size, industry, and Gold Verified Corporate Partner badge.<br>• **HR Recruiter Team Roster**: Recruiter management table with verified recruiter badge issuing.<br>• **Milestone Roadmap**: Kanban sprint goals and task assignment modal.<br>• **Recruitment Funnel**: Live job postings and candidate application metrics.<br>• **AI Executive Copilot**: Natural language team productivity assistant. |
-| **`ROLE_SUPER_ADMIN`** | `/admin/super-admin` | `user_credentials` | **Master Governance & Security Center** (`#8B5CF6` Violet / `#F43F5E` Rose Gold) | • **SaaS Financial Engine**: MRR ($14,200.00), ARR ($170,400.00), active tenant subscriptions, and plan tier breakdown.<br>• **TOTP 2FA Security Center**: RFC 6238 TOTP QR code generator, live 6-digit authenticator verification, and Step-Up enforcement.<br>• **Forensic Audit Trail**: Searchable immutable audit event ledger with IP address, actor, and outcome.<br>• **Global Tenant Directory**: Enterprise tenant registry and lockdown control. |
-
----
-
-### 🛡️ 2. Security Infrastructure & RBAC Mechanics
-- **Decoupled Credential Tables**: Admin accounts are stored in isolated database tables (`app_dev_credentials`, `service_team_credentials`, `company_credentials`, `user_credentials`), preventing privilege escalation across admin tiers.
-- **Server-Authenticated Routing**: Post-login and 2FA redirects derive exclusively from the server-authenticated `roles` array returned in the backend JSON payload, bypassing client dropdown state.
-- **Strict ProtectedRoute Barrier**: Navigating to an unauthorized admin URL renders an **Access Restricted** barrier displaying the user's active identity, active role, and a direct 1-click button to navigate to their authorized portal (`Go to My Portal →`).
-- **RFC 6238 TOTP Multi-Factor Authentication**: SuperAdmin accounts support 2FA using Google Authenticator, Authy, or 1Password with 6-digit validation and step-up verification.
-- **Immutable Forensic Audit Logging**: High-privilege administrative actions are automatically persisted to the `audit_logs` table with actor user ID, email, IP address, user agent, and timestamp.
-
-### 💬 4. Full-Duplex Real-Time Candidate-to-HR Chat Desk
-- **SockJS + STOMP Messaging**: WebSocket pipeline over Nginx with persistent fallback.
-- **HR Messaging Console (`/hr-messages`)**: WhatsApp-style bottom-anchored input bar, unread candidate counters, and verified candidate profile drawer.
-- **Global Toast Alerts (`HrGlobalNotificationToast`)**: Floating alerts notifying recruiters of new candidate messages across all pages.
-- **Permanent Database Retention**: Zero optimistic duplicate messages; guaranteed MySQL persistence across page reloads.
-
-### 🤖 5. AI Candidate Career Agent & 85%+ Instant Match Engine
-- **Conversational Career Agent (`/recommendations`)**: Natural language queries (*"suggest me java developer jobs"*, *"match my resume to active jobs"*).
-- **Safety Firewall**: Built-in prompt injection defense and query sanitization.
-- **Composite Indexing**: Optimized MySQL schema with multi-column composite indexes ensuring sub-millisecond query latency.
-
-### 🛡️ 6. Instant Token Revocation & Blacklisting on Logout
-- **Redis Token Destruction Engine (`TokenBlacklistService.java`)**: Revokes JWT access tokens in Redis for their remaining TTL.
-- **Filter-Level Interception**: `JwtAuthenticationFilter` rejects blacklisted tokens with `401 Unauthorized`. Frontend synchronously clears both `localStorage` and `sessionStorage`.
+- **Candidates** build smart profiles, parse resumes, explore jobs with composite search filtering, receive real-time 85%+ AI match scores, apply in one click, track pipelines, and chat directly with HR recruiters.
+- **HR Recruiters** post and manage job listings, review candidate pipelines, inspect applicant profiles, tag/flag top talent, schedule interviews, collaborate with internal teams, and engage candidates via real-time WebSocket messaging.
+- **Company & SaaS Executives** manage company seals, issue verified recruiter badges, inspect revenue telemetry, review RFC 6238 TOTP security logs, oversee tenant operations, and monitor platform health via isolated Admin portals.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer | Technologies & Tools |
+| Component | Technologies & Frameworks |
 |---|---|
-| **Backend Framework** | Java 17, Spring Boot 3.3.4, Spring Security 6, Spring Data JPA, Hibernate |
-| **Real-Time Communication** | STOMP, SockJS, WebSockets, Spring Messaging |
-| **Database & Caching** | MySQL 8.4, Redis 7.4 (OTP Caching, Token Blacklisting, Rate Limiting), Flyway Migrations |
-| **Frontend Framework** | React 18, TypeScript, Vite 8, Tailwind CSS, Lucide React Icons, Axios |
-| **Load Balancing & Proxy** | Nginx Reverse Proxy (Upstream keepalive, gzip compression, rate limiting) |
-| **Cloud & Orchestration** | Kubernetes (`k8s/`), Horizontal Pod Autoscalers (HPA), Docker Compose |
+| **Backend Core** | Java 17, Spring Boot 3.3.4, Spring Security 6, Spring Data JPA, Hibernate |
+| **Database & ORM** | MySQL 8.4 (InnoDB, Composite Indexing, Flyway Database Migrations V1–V13) |
+| **Caching & In-Memory Storage** | Redis 7.4 (OTP Storage, Sliding-Window Rate Limiting, Token Revocation Blacklist) |
+| **Distributed Messaging & Streaming** | Apache Kafka 7.5, Zookeeper 7.5 |
+| **Real-Time WebSockets** | STOMP protocol, SockJS client, Spring Messaging (`/ws-chat`, `/topic/messages`) |
+| **Frontend UI** | React 18, TypeScript, Vite 8, Lucide React Icons, Axios |
+| **Styling & Responsive System** | Pure Vanilla CSS modules with mobile-first `clamp()` dynamic layout scaling |
+| **Containerization & Orchestration** | Docker, Docker Compose, Kubernetes (`k8s/`), Nginx Ingress |
 
 ---
 
-## 📁 Directory Structure
+## 🏗️ System Architecture
+
+HireMind AI follows a **decoupled, multi-tiered microservices-ready architecture**:
 
 ```text
-HireMind-AI/
-├── docker-compose.yml              # Local multi-container Docker orchestration
-├── .env.example                    # Environment variable configuration template
-├── k8s/                            # Kubernetes production manifests
-│   ├── 01-namespace.yaml           # Dedicated hiremind-ai namespace
-│   ├── 02-configmap-secrets.yaml   # ConfigMaps and secret placeholders
-│   ├── 03-redis-cluster.yaml       # High-performance Redis deployment
-│   ├── 04-backend-deployment.yaml  # Spring Boot deployment with health probes
-│   ├── 05-frontend-deployment.yaml # Nginx static SPA frontend
-│   ├── 06-ingress-loadbalancer.yaml# Nginx Ingress with SSL & least_conn
-│   └── 07-hpa.yaml                 # Horizontal Pod Autoscalers (3 to 20 replicas)
-├── talentiq-backend/               # Spring Boot 3 Java Backend
-│   ├── src/main/java/com/talentiq/
-│   │   ├── config/                 # RedisConfig, SecurityConfig, WebSocketConfig
-│   │   ├── controller/             # AuthController, JobController, ChatController...
-│   │   ├── dto/                    # Request/Response Data Transfer Objects
-│   │   ├── infrastructure/         # MailService, RateLimitFilter
-│   │   ├── model/                  # JPA Entities (User, Candidate, Job, ChatMessage...)
-│   │   ├── repository/             # Spring Data JPA Repositories
-│   │   ├── security/               # JWT Token Service, Blacklist Service
-│   │   └── service/                # Business Logic (AuthServiceImpl, RedisOtpService...)
-│   └── src/main/resources/         # application.yml, Flyway migrations (V1 - V13)
-├── talentiq-frontend/              # React 18 + Vite Frontend
-│   ├── src/
-│   │   ├── components/             # Reusable UI components & navigation
-│   │   ├── pages/                  # Login, Register, HrMessages, UserMessages, Jobs...
-│   │   └── api/                    # Axios API client & WebSocket connections
-└── scripts/
-    └── test_all_apis.py            # Comprehensive 44-endpoint automated test suite
+               +-------------------------------------------------------+
+               |                  Client Applications                  |
+               |  (React 18 SPA / Mobile Browsers / Desktop Portals)   |
+               +---------------------------+---------------------------+
+                                           |
+                                   HTTP / REST / WS
+                                           v
+               +-------------------------------------------------------+
+               |                  Nginx Reverse Proxy                  |
+               |        (Rate Limiting, SSL Offloading, SPA Router)    |
+               +---------------------------+---------------------------+
+                                           |
+                        +------------------+------------------+
+                        |                                     |
+                REST API Requests                     WebSocket Messages
+                        v                                     v
+   +---------------------------------------+   +-----------------------------------+
+   |        Spring Boot 3 Backend          |   |       STOMP WebSocket Handler     |
+   | (SecurityFilter, Controllers, Service) |   |    (Real-Time Direct & Group Chat)|
+   +---+---------------+---------------+---+   +-----------------+-----------------+
+       |               |               |                         |
+       v               v               v                         v
++--------------+ +-----------+ +---------------+        +------------------+
+|  MySQL 8.4   | | Redis 7.4 | | Apache Kafka  |        | In-App & Email   |
+| (Database)   | | (Cache)   | | (Events Broker|        | Notifications    |
++--------------+ +-----------+ +---------------+        +------------------+
 ```
 
 ---
 
-## ⚙️ Quick Start (Local Setup)
+## 🔐 User Roles & Permissions (RBAC)
+
+HireMind AI enforces strict **Role-Based Access Control (RBAC)** across 6 distinct user roles:
+
+| Role | Access Scope | Portal Route | Primary Capabilities |
+|---|---|---|---|
+| `ROLE_CANDIDATE` | Candidate User | `/user-login` | Build profile, upload resume, view AI job recommendations, submit applications, track application status, chat with HR recruiters, build online portfolio. |
+| `ROLE_HR` | HR Recruiter | `/hr-login` | Create & manage job postings, review applicant pipelines, shortlist/flag candidates, schedule interviews, use AI Copilot, direct chat with candidates. |
+| `ROLE_APP_DEVELOPER` | Platform Operations | `/admin/developer` | **Cyberpunk Terminal**: View JVM heap, GC telemetry, connection pool state, Redis active presence, run real-time diagnostic terminal commands, stream error logs. |
+| `ROLE_SERVICE_TEAM` | Customer Support | `/admin/service-team` | **Support & Moderation Bureau**: Review pending company verification requests, inspect document proofs, issue verified badges, moderate users, handle support tickets. |
+| `ROLE_COMPANY_ADMIN` | Corporate Admin | `/admin/company` | **Corporate Executive Suite**: Manage corporate branding, manage HR recruiter roster, issue verified recruiter tags, inspect company recruitment pipeline metrics. |
+| `ROLE_SUPER_ADMIN` | SaaS Governance | `/admin/super-admin` | **Master Governance Center**: Inspect SaaS financial metrics (MRR/ARR), manage RFC 6238 TOTP 2FA security, view immutable forensic audit logs, manage platform tenants. |
+| `ROLE_GUEST` | Unauthenticated | `/` | Browse public home page, search job listings, view public platform statistics. |
+
+---
+
+## 🔄 Complete Application Workflow
+
+```text
+[Candidate Workflow]
+Register Account -> 4-Digit OTP Email Verification -> Complete Profile & Resume ->
+Explore Jobs / View AI Recommendations -> Apply to Job -> Track Pipeline -> Real-Time HR Chat
+
+[HR Recruiter Workflow]
+Register HR Account -> Submit Company Verification -> Access HR Dashboard ->
+Post Job Listing -> Review Applicant Profiles -> Shortlist / Flag Candidate ->
+Schedule Interview -> Chat via WebSockets
+
+[Admin Governance Workflow]
+Dedicated Admin Login -> Authenticate Role & Token -> Access Role-Specific Center ->
+Audit Telemetry / Moderate Verification / Manage Subscriptions & Security
+```
+
+---
+
+## 🌟 Core Features & Modules
+
+### 1. Real-Time Chat & Messaging System
+- **Full-Duplex Communication**: Built using STOMP over SockJS (`/ws-chat`).
+- **Database Retention**: All direct and group messages are permanently stored in MySQL.
+- **Responsive Layout**: Mobile-first single-panel switching with a "← Back" button for seamless chat on mobile screens.
+
+### 2. High-Concurrency Redis OTP & Rate Limiting Engine
+- **$O(1)$ Performance**: Cryptographic 4-digit OTP codes cached in Redis with an automated 10-minute TTL.
+- **Sliding-Window Rate Limiting**: Throttles OTP requests per email and per IP to prevent spam and abuse.
+- **Brute-Force Protection**: Locks accounts temporarily after 5 invalid verification attempts.
+
+### 3. AI Candidate Matching & Career Agent
+- **AI Recommendation Engine**: Calculates candidate-to-job compatibility scores based on skills, experience, and profile attributes.
+- **Prompt Safety Firewall**: Sanitizes natural language queries and defends against prompt injection.
+
+### 4. Enterprise Company Verification & Badges
+- **Verification Pipeline**: Service Team reviews submitted corporate documents.
+- **Verified Badges**: Approved companies and recruiters display official gold verification seals.
+
+### 5. Automated Notification Center
+- **In-App Notifications**: Real-time bell counter and unread message notifications.
+- **Transactional Emails**: Automated SMTP email dispatch for OTP verification, welcome messages, and password resets.
+
+---
+
+## 🔑 Authentication & Authorization Flow
+
+```text
+Client (Login Request) ---> AuthController (/v1/auth/login)
+                                   |
+                                   v
+                      AuthenticationManager (Spring Security)
+                                   |
+                     +-------------+-------------+
+                     |                           |
+               (Credentials Valid)       (Invalid Credentials)
+                     |                           |
+                     v                           v
+         Generate JWT Token + Roles        Return 401 Unauthorized
+                     |
+                     v
+         Client Stores JWT Token
+                     |
+                     v
+   Requests Include `Authorization: Bearer <token>`
+                     |
+                     v
+  JwtAuthenticationFilter Validates Token & Redis Blacklist
+```
+
+- **JWT Revocation on Logout**: Revokes active JWT tokens in Redis for their remaining TTL.
+
+---
+
+## 📊 Frontend / Backend / Database Data Flow
+
+```text
+[React UI Component] 
+        | (Axios Request)
+        v
+[Spring Boot Controller] 
+        | (Service Call)
+        v
+[Service Layer] <---> [Redis 7.4 Cache]
+        | (JPA Repository)
+        v
+[MySQL 8.4 Database]
+```
+
+---
+
+## 🌐 Important API Groups
+
+| API Path | Method | Description | Role Required |
+|---|---|---|---|
+| `/v1/auth/register` | `POST` | Register candidate or HR account | Public |
+| `/v1/auth/login` | `POST` | Authenticate user & receive JWT | Public |
+| `/v1/auth/send-otp` | `POST` | Dispatch 4-digit OTP code | Public |
+| `/v1/auth/verify-otp` | `POST` | Verify OTP code & activate account | Public |
+| `/v1/auth/logout` | `POST` | Revoke JWT token in Redis | Authenticated |
+| `/v1/jobs` | `GET` | List & filter active job postings | Public |
+| `/v1/jobs` | `POST` | Create a new job listing | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
+| `/v1/applications` | `POST` | Submit job application | `ROLE_CANDIDATE` |
+| `/v1/applications/my` | `GET` | Retrieve candidate's applications | `ROLE_CANDIDATE` |
+| `/v1/chat/contacts` | `GET` | Retrieve chat contact directory | Authenticated |
+| `/v1/chat/messages` | `GET` | Retrieve message history | Authenticated |
+| `/v1/recommendations/jobs` | `GET` | Get AI job match recommendations | `ROLE_CANDIDATE` |
+| `/v1/copilot/chat` | `POST` | Query AI HR Copilot assistant | `ROLE_HR` |
+| `/v1/admin/developer/metrics` | `GET` | Retrieve system telemetry metrics | `ROLE_APP_DEVELOPER` |
+| `/v1/admin/service-team/verifications`| `GET` | List company verification requests | `ROLE_SERVICE_TEAM` |
+| `/v1/admin/super-admin/audit-logs` | `GET` | Search forensic audit logs | `ROLE_SUPER_ADMIN` |
+| `/v1/public/stats` | `GET` | Get public platform statistics | Public |
+
+---
+
+## 📁 Project Directory Structure
+
+```text
+HireMind-AI/
+├── docker-compose.yml              # Local multi-container orchestration
+├── .env.example                    # Environment configuration template
+├── README.md                       # Project documentation
+├── k8s/                            # Production Kubernetes manifests
+│   ├── 01-namespace.yaml           # Dedicated namespace
+│   ├── 02-configmap-secrets.yaml   # ConfigMaps and secrets
+│   ├── 03-redis-cluster.yaml       # Redis cache deployment
+│   ├── 04-backend-deployment.yaml  # Spring Boot deployment
+│   ├── 05-frontend-deployment.yaml # Nginx static SPA deployment
+│   ├── 06-ingress-loadbalancer.yaml# Ingress controller configuration
+│   └── 07-hpa.yaml                 # Horizontal Pod Autoscaling
+├── talentiq-backend/               # Spring Boot 3 Backend Application
+│   ├── Dockerfile                  # Container build instructions
+│   ├── pom.xml                     # Maven dependencies
+│   └── src/
+│       ├── main/java/com/talentiq/
+│       │   ├── ai/                 # AI Copilot, Agents, & Usage Logging
+│       │   ├── config/             # Spring Security, Redis, WebSocket configs
+│       │   ├── controller/         # REST API Controllers
+│       │   ├── dto/                # Request/Response Data Objects
+│       │   ├── model/              # JPA Entities (User, Job, Chat, Candidate...)
+│       │   ├── repository/         # Spring Data Repositories
+│       │   └── service/            # Business Logic Layer
+│       └── main/resources/
+│           ├── application.yml     # Application configuration
+│           └── db/migration/       # Flyway SQL migrations (V1 - V13)
+├── talentiq-frontend/              # React 18 SPA Frontend Application
+│   ├── Dockerfile                  # Nginx production build
+│   ├── package.json                # Dependencies & scripts
+│   └── src/
+│       ├── api/                    # Axios HTTP client & WebSocket setup
+│       ├── components/             # Reusable UI components & Navigation
+│       ├── context/                # AuthContext & ThemeContext
+│       ├── css/                    # Modular Vanilla CSS styles
+│       ├── pages/                  # Application views (Candidate, HR, Admin)
+│       └── index.css               # Global responsive design system
+└── scripts/
+    └── test_all_apis.py            # Automated API testing script
+```
+
+---
+
+## 💻 Local Development Setup
+
+### Prerequisites
+- **Java**: JDK 17+
+- **Node.js**: v18+
+- **Database**: MySQL 8.4+ & Redis 7.4+ (or run via Docker)
+- **Build Tools**: Maven 3.8+ & npm 9+
 
 ### 1. Clone the Repository
 ```bash
@@ -135,86 +283,117 @@ cd HireMind-AI
 ```
 
 ### 2. Configure Environment Variables
-Copy `.env.example` to `.env` and configure your credentials:
+Copy `.env.example` to `.env`:
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
-```env
-SPRING_PROFILES_ACTIVE=dev
-MYSQL_HOST=mysql
-MYSQL_PORT=3306
-MYSQL_DATABASE=HireMeAI
-MYSQL_USER=talentiq_user
-MYSQL_PASSWORD=your_secure_db_password
-
-REDIS_HOST=redis
-REDIS_PORT=6379
-
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=your_gmail_address@gmail.com
-MAIL_PASSWORD=your_16_character_google_app_password
-MAIL_FROM=your_gmail_address@gmail.com
-MAIL_FROM_NAME="HireMind AI Platform"
-
-JWT_SECRET=your_ultra_secure_256_bit_jwt_secret_key
-```
-
-### 3. Launch with Docker Compose
+### 3. Run Backend (Spring Boot)
 ```bash
-docker compose up -d --build
+cd talentiq-backend
+mvn clean spring-boot:run
 ```
+*Backend runs on `http://localhost:8081`.*
 
-### 4. Access the Applications
-- 🌐 **Candidate Web Portal**: [http://localhost:3000/login](http://localhost:3000/login)
-- 🏢 **HR Recruiter Portal**: [http://localhost:3000/hr-login](http://localhost:3000/hr-login)
-- 🛡️ **Super Admin Portal**: [http://localhost:3000/admin-login](http://localhost:3000/admin-login)
-- 🔌 **Backend REST API**: [http://localhost:8081/api](http://localhost:8081/api)
-- 📊 **Actuator Health**: [http://localhost:8081/api/actuator/health](http://localhost:8081/api/actuator/health)
+### 4. Run Frontend (React + Vite)
+```bash
+cd talentiq-frontend
+npm install
+npm run dev
+```
+*Frontend runs on `http://localhost:3000`.*
 
 ---
 
-## ☸️ Kubernetes (Production Deployment)
+## 🐳 Docker & Kubernetes Deployment
 
-Deploy the entire high-availability architecture with Horizontal Pod Autoscaling (HPA) to a Kubernetes cluster:
-
+### Local Multi-Container Run with Docker Compose
 ```bash
-# 1. Apply Namespace, ConfigMaps & Secrets
+# Build and launch all services (MySQL, Redis, Zookeeper, Kafka, Backend, Frontend)
+docker compose up -d --build
+
+# Inspect running containers
+docker compose ps
+
+# View backend logs
+docker compose logs -f backend
+```
+
+### Kubernetes Production Deployment
+```bash
+# 1. Apply Namespace & Configs
 kubectl apply -f k8s/01-namespace.yaml
 kubectl apply -f k8s/02-configmap-secrets.yaml
 
-# 2. Deploy Redis Cache & Backend Services
+# 2. Deploy Redis & Backend
 kubectl apply -f k8s/03-redis-cluster.yaml
 kubectl apply -f k8s/04-backend-deployment.yaml
 
-# 3. Deploy Frontend & Ingress Load Balancer
+# 3. Deploy Frontend & Ingress
 kubectl apply -f k8s/05-frontend-deployment.yaml
 kubectl apply -f k8s/06-ingress-loadbalancer.yaml
 
-# 4. Enable Horizontal Pod Autoscalers (Autoscale from 3 to 20 Pods)
+# 4. Enable Horizontal Pod Autoscaling (HPA)
 kubectl apply -f k8s/07-hpa.yaml
 ```
 
 ---
 
-## 🧪 Automated Testing & Verification
+## ⚙️ Environment Variable Configuration
 
-Run the full automated test suite verifying all 44 endpoints:
+Below is a template for the `.env` file (**never commit real secret values**):
 
+```env
+# Spring Profile
+SPRING_PROFILES_ACTIVE=dev
+
+# MySQL Database Settings
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=HireMeAI
+MYSQL_USER=talentiq_user
+MYSQL_PASSWORD=${MYSQL_PASSWORD}
+
+# Redis Settings
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Kafka Broker Settings
+KAFKA_BOOTSTRAP_SERVERS=localhost:9092
+
+# JWT Configuration
+JWT_SECRET=${JWT_SECRET_KEY}
+JWT_EXPIRATION_MS=86400000
+
+# SMTP Mail Settings
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=${MAIL_USERNAME}
+MAIL_PASSWORD=${MAIL_PASSWORD}
+MAIL_FROM=${MAIL_FROM}
+MAIL_FROM_NAME="HireMind AI Platform"
+```
+
+---
+
+## 🧪 Testing & Build Commands
+
+### Backend Automated Unit Tests
+```bash
+cd talentiq-backend
+mvn test
+```
+
+### Frontend Production Build Test
+```bash
+cd talentiq-frontend
+npm run build
+```
+
+### Automated API Integration Test Suite
 ```bash
 python3 scripts/test_all_apis.py
 ```
-
-### Test Suite Coverage:
-- ✅ Candidate, HR & Admin Registration & Login
-- ✅ 4-Digit OTP Generation, Redis Caching, Verification & Password Reset
-- ✅ RBAC Cross-Portal Rejections (401 Invalid Credentials)
-- ✅ Job Publishing & Pipeline Status Updates
-- ✅ AI Job Recommendations & Safety Firewall
-- ✅ WebSocket Real-Time Chat & Contact Sync
-- ✅ Redis Token Blacklisting & Session Revocation
 
 ---
 
