@@ -35,13 +35,11 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
     private final HrProfileRepository hrProfileRepository;
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
+    private final CompanySecurityService companySecurityService;
 
     @Override
     public CompanyVerificationDto.Response requestCandidateTag(Long hrUserId, CompanyVerificationDto.RequestTag request) {
-        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
-                .or(() -> hrProfileRepository.findByUserId(hrUserId))
-                .orElseThrow(() -> new BadRequestException("You must have an active HR profile attached to a registered company to request candidate verification tags."));
-
+        HrProfile hrProfile = companySecurityService.enforceVerifiedHrAccess(hrUserId);
         Company company = hrProfile.getCompany();
         if (company == null) {
             throw new BadRequestException("HR Profile is not associated with any registered company.");
@@ -223,11 +221,13 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
             }
         }
 
-        targetHr.setCompanyVerified(request.isVerified());
         if (request.isVerified()) {
+            companySecurityService.validateSingleActiveBadge(hrProfileId, targetHr.getCompany().getId());
+            targetHr.setCompanyVerified(true);
             targetHr.setCompanyVerifiedAt(Instant.now());
             targetHr.setCompanyVerifiedTitle(request.getBadgeTitle() != null ? request.getBadgeTitle() : "Official Verified Recruiter");
         } else {
+            targetHr.setCompanyVerified(false);
             targetHr.setCompanyVerifiedAt(null);
             targetHr.setCompanyVerifiedTitle(null);
         }

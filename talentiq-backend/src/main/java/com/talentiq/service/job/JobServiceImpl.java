@@ -19,6 +19,7 @@ import com.talentiq.repository.job.JobSkillRepository;
 import com.talentiq.repository.job.SavedJobRepository;
 import com.talentiq.model.User;
 import com.talentiq.repository.user.UserRepository;
+import com.talentiq.service.company.CompanySecurityService;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
@@ -46,13 +47,11 @@ public class JobServiceImpl implements JobService {
     private final SavedJobRepository savedJobRepository;
     private final HrProfileRepository hrProfileRepository;
     private final UserRepository userRepository;
+    private final CompanySecurityService companySecurityService;
 
     @Override
     public JobDto.Response createJob(Long hrUserId, JobDto.CreateRequest request) {
-        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
-                .or(() -> hrProfileRepository.findByUserId(hrUserId))
-                .orElseThrow(() -> new ForbiddenException("Only company HR members can post jobs"));
-
+        HrProfile hrProfile = companySecurityService.enforceVerifiedHrAccess(hrUserId);
         Company company = hrProfile.getCompany();
 
         String slug = StringUtils.hasText(request.getSlug())
@@ -124,17 +123,10 @@ public class JobServiceImpl implements JobService {
 
     @Override
     public JobDto.Response updateJob(Long hrUserId, Long jobId, JobDto.UpdateRequest request) {
-        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
-                .or(() -> hrProfileRepository.findByUserId(hrUserId))
-                .orElseThrow(() -> new ForbiddenException("Only HR team members can update jobs"));
-
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job", "id", jobId));
 
-        // Enforce company boundary
-        if (!job.getCompany().getId().equals(hrProfile.getCompany().getId())) {
-            throw new ForbiddenException("You do not have permissions to modify another company's job posting");
-        }
+        HrProfile hrProfile = companySecurityService.enforceVerifiedHrAccess(hrUserId, job.getCompany().getId());
 
         if (request.getTitle() != null) job.setTitle(request.getTitle().trim());
         if (request.getDescription() != null) job.setDescription(request.getDescription().trim());
@@ -173,16 +165,10 @@ public class JobServiceImpl implements JobService {
 
     @Override
     public void deleteJob(Long hrUserId, Long jobId) {
-        HrProfile hrProfile = hrProfileRepository.findById(hrUserId)
-                .or(() -> hrProfileRepository.findByUserId(hrUserId))
-                .orElseThrow(() -> new ForbiddenException("Only HR team members can delete jobs"));
-
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job", "id", jobId));
 
-        if (!job.getCompany().getId().equals(hrProfile.getCompany().getId())) {
-            throw new ForbiddenException("You do not have permissions to delete another company's job posting");
-        }
+        HrProfile hrProfile = companySecurityService.enforceVerifiedHrAccess(hrUserId, job.getCompany().getId());
 
         job.setStatus(JobStatus.ARCHIVED);
         jobRepository.save(job);

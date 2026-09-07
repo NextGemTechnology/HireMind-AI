@@ -14,6 +14,8 @@ import com.talentiq.model.auth.*;
 import com.talentiq.repository.auth.*;
 import com.talentiq.repository.candidate.CandidateRepository;
 import com.talentiq.repository.company.CompanyRepository;
+import com.talentiq.repository.company.CompanyInvitationRepository;
+import com.talentiq.repository.company.CompanyCandidateVerificationRepository;
 import com.talentiq.repository.hr.HrProfileRepository;
 import com.talentiq.repository.user.UserRepository;
 import com.talentiq.security.jwt.JwtService;
@@ -30,6 +32,7 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -70,6 +73,8 @@ public class AuthServiceImpl implements AuthService {
     private final CompanyCredentialRepository companyCredentialRepository;
     private final AppDevCredentialRepository appDevCredentialRepository;
     private final ServiceTeamCredentialRepository serviceTeamCredentialRepository;
+    private final CompanyInvitationRepository invitationRepository;
+    private final CompanyCandidateVerificationRepository companyCandidateVerificationRepository;
 
     // ── Email Validation & Security Guard ──────────────────────────────────────
     private void validateEmailFormat(String email, Role role) {
@@ -141,21 +146,46 @@ public class AuthServiceImpl implements AuthService {
         String lastName = request.getLastName() != null ? request.getLastName().trim() : "";
         String phone = request.getPhone();
 
+        // ── Corporate Invitation Lookup ──────────────────────────────────────────
+        CompanyInvitation acceptedInvite = null;
+        if (StringUtils.hasText(request.getCompanyInviteToken())) {
+            acceptedInvite = invitationRepository.findByInviteTokenAndStatus(request.getCompanyInviteToken().trim(), "PENDING")
+                    .orElse(null);
+            if (acceptedInvite != null && acceptedInvite.isExpired()) {
+                acceptedInvite.setStatus("EXPIRED");
+                invitationRepository.save(acceptedInvite);
+                acceptedInvite = null;
+            }
+        }
+
         // ── SPECIAL CASE: HR RECRUITER (Zero rows in users table!) ────────────
         if (request.getRole().equals(Role.ROLE_HR)) {
-            String companyName = StringUtils.hasText(request.getCompanyName()) ? request.getCompanyName().trim() : "Company (" + firstName + ")";
-            String slug = companyName.toLowerCase().replaceAll("[^a-z0-9]", "-") + "-" + System.currentTimeMillis();
-            Company company = companyRepository.findByName(companyName).orElseGet(() ->
-                    companyRepository.save(Company.builder()
-                            .name(companyName)
-                            .slug(slug)
-                            .website(request.getCompanyWebsite())
-                            .industry(request.getIndustry())
-                            .companySize(request.getCompanySize())
-                            .verified(true)
-                            .active(true)
-                            .build())
-            );
+            Company company;
+            boolean badgeVerified = true;
+            String badgeTitle = "Verified Talent Partner";
+
+            if (acceptedInvite != null) {
+                company = acceptedInvite.getCompany();
+                badgeVerified = acceptedInvite.isAutoVerifyBadge();
+                badgeTitle = badgeVerified ? "Verified Talent Partner" : null;
+                acceptedInvite.setStatus("ACCEPTED");
+                acceptedInvite.setAcceptedAt(Instant.now());
+                invitationRepository.save(acceptedInvite);
+            } else {
+                String companyName = StringUtils.hasText(request.getCompanyName()) ? request.getCompanyName().trim() : "Company (" + firstName + ")";
+                String slug = companyName.toLowerCase().replaceAll("[^a-z0-9]", "-") + "-" + System.currentTimeMillis();
+                company = companyRepository.findByName(companyName).orElseGet(() ->
+                        companyRepository.save(Company.builder()
+                                .name(companyName)
+                                .slug(slug)
+                                .website(request.getCompanyWebsite())
+                                .industry(request.getIndustry())
+                                .companySize(request.getCompanySize())
+                                .verified(true)
+                                .active(true)
+                                .build())
+                );
+            }
 
             HrProfile hrProfile = HrProfile.builder()
                     .email(email)
@@ -163,12 +193,12 @@ public class AuthServiceImpl implements AuthService {
                     .lastName(lastName)
                     .phone(phone)
                     .company(company)
-                    .designation(StringUtils.hasText(request.getJobTitle()) ? request.getJobTitle() : "HR Recruiter")
+                    .designation(StringUtils.hasText(request.getJobTitle()) ? request.getJobTitle() : (acceptedInvite != null && StringUtils.hasText(acceptedInvite.getDesignation()) ? acceptedInvite.getDesignation() : "HR Recruiter"))
                     .department(request.getDepartment())
                     .companyAdmin(false)
-                    .companyVerified(true)
-                    .companyVerifiedAt(Instant.now())
-                    .companyVerifiedTitle("Verified Talent Partner")
+                    .companyVerified(badgeVerified)
+                    .companyVerifiedAt(badgeVerified ? Instant.now() : null)
+                    .companyVerifiedTitle(badgeTitle)
                     .active(true)
                     .build();
             HrProfile savedHrProfile = hrProfileRepository.save(hrProfile);
@@ -183,7 +213,8 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             HrCredential savedCred = hrCredentialRepository.save(credential);
 
-            log.info("New HR Recruiter registered strictly in hr_profiles and hr_credentials: {}", email);
+            log.info("New HR Recruiter registered strictly in hr_profiles and hr_credentials: {} [Company: {}, Verified: {}]",
+                    email, company.getName(), badgeVerified);
 
             // Dispatch Welcome email with role HR Recruiter
             mailService.sendAccountCreatedEmail(email, firstName, "ROLE_HR");
@@ -229,6 +260,30 @@ public class AuthServiceImpl implements AuthService {
                     .build();
             candidateRepository.save(candidate);
             principal = new UserPrincipal(savedUser, credential);
+
+            if (acceptedInvite != null) {
+                acceptedInvite.setStatus("ACCEPTED");
+                acceptedInvite.setAcceptedAt(Instant.now());
+                invitationRepository.save(acceptedInvite);
+
+                if (acceptedInvite.isAutoVerifyBadge()) {
+                    Company company = acceptedInvite.getCompany();
+                    String certId = "HM-" + company.getSlug().toUpperCase() + "-" + java.util.UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+                    CompanyCandidateVerification verification = CompanyCandidateVerification.builder()
+                            .company(company)
+                            .candidateUser(savedUser)
+                            .jobTitle(StringUtils.hasText(acceptedInvite.getDesignation()) ? acceptedInvite.getDesignation() : "Corporate Candidate")
+                            .department("Engineering / Talent Pool")
+                            .status("APPROVED")
+                            .requestedAt(Instant.now())
+                            .approvedAt(Instant.now())
+                            .badgeCertificateId(certId)
+                            .notes("Auto-awarded verified candidate badge via corporate invitation token")
+                            .build();
+                    companyCandidateVerificationRepository.save(verification);
+                    log.info("Auto-verified candidate badge {} awarded to candidate {} for company {}", certId, savedUser.getEmail(), company.getName());
+                }
+            }
 
         } else if (request.getRole().equals(Role.ROLE_COMPANY_ADMIN)) {
             String companyName = StringUtils.hasText(request.getCompanyName()) ? request.getCompanyName().trim() : "Company (" + savedUser.getFirstName() + ")";
@@ -443,20 +498,92 @@ public class AuthServiceImpl implements AuthService {
         String email = request.getEmail().toLowerCase().trim();
         validateEmailFormat(email, Role.ROLE_COMPANY_ADMIN);
 
-        CompanyCredential cred = companyCredentialRepository.findByEmail(email)
-                .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+        CompanyCredential compCred = null;
+        User user = null;
 
-        checkCredentialLockout(cred.isLocked(), cred.getLockedUntil());
+        Optional<CompanyCredential> compCredOpt = companyCredentialRepository.findByEmail(email);
+        if (compCredOpt.isPresent()) {
+            compCred = compCredOpt.get();
+            user = compCred.getUser();
+            checkCredentialLockout(compCred.isLocked(), compCred.getLockedUntil());
 
-        if (cred.getRole() != Role.ROLE_COMPANY_ADMIN && (cred.getUser() == null || !cred.getUser().hasRole(Role.ROLE_COMPANY_ADMIN))) {
-            throw new BadCredentialsException("Account is not authorized for Company Director portal.");
+            if (compCred.getRole() != Role.ROLE_COMPANY_ADMIN && (user == null || !user.hasRole(Role.ROLE_COMPANY_ADMIN))) {
+                throw new BadCredentialsException("Account is not authorized for Company Director portal.");
+            }
+
+            if (!passwordEncoder.matches(request.getPassword(), compCred.getPasswordHash())) {
+                throw handleFailedCompanyLogin(compCred);
+            }
+        } else {
+            // Fallback 1: Check user_credentials for users with ROLE_COMPANY_ADMIN
+            Optional<UserCredential> userCredOpt = userCredentialRepository.findByEmail(email);
+            if (userCredOpt.isPresent()) {
+                UserCredential uCred = userCredOpt.get();
+                User u = uCred.getUser();
+                if (uCred.getRole() == Role.ROLE_COMPANY_ADMIN || (u != null && u.hasRole(Role.ROLE_COMPANY_ADMIN))) {
+                    checkCredentialLockout(uCred.isLocked(), uCred.getLockedUntil());
+                    if (!passwordEncoder.matches(request.getPassword(), uCred.getPasswordHash())) {
+                        throw handleFailedCandidateLogin(uCred);
+                    }
+                    user = u;
+                    // Auto-sync into company_credentials for future direct lookups
+                    if (user != null && !companyCredentialRepository.existsByEmail(email)) {
+                        try {
+                            CompanyCredential syncedCred = CompanyCredential.builder()
+                                    .user(user)
+                                    .email(email)
+                                    .passwordHash(uCred.getPasswordHash())
+                                    .role(Role.ROLE_COMPANY_ADMIN)
+                                    .status(uCred.getStatus())
+                                    .emailVerified(uCred.isEmailVerified())
+                                    .build();
+                            compCred = companyCredentialRepository.save(syncedCred);
+                        } catch (Exception syncEx) {
+                            log.warn("Auto-sync company_credentials warning: {}", syncEx.getMessage());
+                        }
+                    }
+                }
+            }
+
+            // Fallback 2: Check hr_credentials for HR accounts with companyAdmin=true
+            if (user == null) {
+                Optional<HrCredential> hrCredOpt = hrCredentialRepository.findByEmail(email);
+                if (hrCredOpt.isPresent()) {
+                    HrCredential hrCred = hrCredOpt.get();
+                    User u = hrCred.getUser();
+                    Optional<HrProfile> hrProf = hrProfileRepository.findByEmail(email);
+                    boolean isCompAdmin = (hrCred.getRole() == Role.ROLE_COMPANY_ADMIN)
+                            || (u != null && u.hasRole(Role.ROLE_COMPANY_ADMIN))
+                            || (hrProf.isPresent() && hrProf.get().isCompanyAdmin());
+
+                    if (isCompAdmin) {
+                        checkCredentialLockout(hrCred.isLocked(), hrCred.getLockedUntil());
+                        if (!passwordEncoder.matches(request.getPassword(), hrCred.getPasswordHash())) {
+                            throw handleFailedHrLogin(hrCred);
+                        }
+                        user = u != null ? u : (hrProf.map(HrProfile::getUser).orElse(null));
+                    }
+                }
+            }
+
+            if (user == null && compCred == null) {
+                throw new BadCredentialsException("Invalid email or password");
+            }
         }
 
-        if (!passwordEncoder.matches(request.getPassword(), cred.getPasswordHash())) {
-            throw handleFailedCompanyLogin(cred);
+        if (user == null) {
+            user = userRepository.findByEmail(email).orElse(null);
         }
 
-        return initiateAdmin2FaFlow(cred.getUser(), Role.ROLE_COMPANY_ADMIN, httpRequest);
+        if (user == null && compCred != null && compCred.getUser() != null) {
+            user = compCred.getUser();
+        }
+
+        if (user == null) {
+            throw new BadCredentialsException("User account record could not be found.");
+        }
+
+        return initiateAdmin2FaFlow(user, Role.ROLE_COMPANY_ADMIN, httpRequest);
     }
 
     @Override
@@ -502,6 +629,58 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public AuthResponse loginSuperAdmin(LoginRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail().toLowerCase().trim();
+        validateEmailFormat(email, Role.ROLE_SUPER_ADMIN);
+
+        User user = null;
+        String passwordHash = null;
+        boolean locked = false;
+        Instant lockedUntil = null;
+
+        // 1. Check user_credentials
+        Optional<UserCredential> uCredOpt = userCredentialRepository.findByEmail(email);
+        if (uCredOpt.isPresent()) {
+            UserCredential uCred = uCredOpt.get();
+            User u = uCred.getUser();
+            if (uCred.getRole() == Role.ROLE_SUPER_ADMIN || uCred.getRole() == Role.ROLE_PLATFORM_ADMIN ||
+                    (u != null && (u.hasRole(Role.ROLE_SUPER_ADMIN) || u.hasRole(Role.ROLE_PLATFORM_ADMIN)))) {
+                user = u;
+                passwordHash = uCred.getPasswordHash();
+                locked = uCred.isLocked();
+                lockedUntil = uCred.getLockedUntil();
+            }
+        }
+
+        // 2. Check appDevCredentialRepository
+        if (passwordHash == null) {
+            Optional<AppDevCredential> devOpt = appDevCredentialRepository.findByEmail(email);
+            if (devOpt.isPresent()) {
+                AppDevCredential devCred = devOpt.get();
+                User u = devCred.getUser();
+                if (u != null && (u.hasRole(Role.ROLE_SUPER_ADMIN) || u.hasRole(Role.ROLE_PLATFORM_ADMIN))) {
+                    user = u;
+                    passwordHash = devCred.getPasswordHash();
+                    locked = devCred.isLocked();
+                    lockedUntil = devCred.getLockedUntil();
+                }
+            }
+        }
+
+        if (passwordHash == null || user == null) {
+            throw new BadCredentialsException("Account is not authorized for Super Administrator portal.");
+        }
+
+        checkCredentialLockout(locked, lockedUntil);
+
+        if (!passwordEncoder.matches(request.getPassword(), passwordHash)) {
+            throw new BadCredentialsException("Invalid email or password");
+        }
+
+        return initiateAdmin2FaFlow(user, Role.ROLE_SUPER_ADMIN, httpRequest);
+    }
+
+    @Override
     public AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest) {
         if (request.getRequiredRole() != null) {
             if (request.getRequiredRole() == Role.ROLE_COMPANY_ADMIN) {
@@ -510,31 +689,42 @@ public class AuthServiceImpl implements AuthService {
                 return loginAppDeveloper(request, httpRequest);
             } else if (request.getRequiredRole() == Role.ROLE_SERVICE_TEAM) {
                 return loginManagementTeam(request, httpRequest);
+            } else if (request.getRequiredRole() == Role.ROLE_SUPER_ADMIN || request.getRequiredRole() == Role.ROLE_PLATFORM_ADMIN) {
+                return loginSuperAdmin(request, httpRequest);
             }
         }
         return login(request, httpRequest);
     }
 
     private AuthResponse initiateAdmin2FaFlow(User user, Role role, HttpServletRequest httpRequest) {
-        String email = user.getEmail();
+        String email = user != null ? user.getEmail() : null;
+        if (email == null) {
+            throw new BadCredentialsException("User email could not be resolved for 2FA.");
+        }
 
         int randomPin = new java.security.SecureRandom().nextInt(10000);
         String otp = String.format("%04d", randomPin);
         String twoFactorToken = "2fa_sess_" + UUID.randomUUID().toString().replace("-", "");
 
         redisOtpService.store2FaSession(email, twoFactorToken, otp, 5);
-        mailService.sendAdmin2FaOtpEmail(email, user.getFirstName(), role.name(), otp);
+        mailService.sendAdmin2FaOtpEmail(email, user != null ? user.getFirstName() : "Admin", role.name(), otp);
 
-        log.info("🔐 [ADMIN 2FA SECURITY CODE DISPATCHED FOR {} ({})]", email, role);
+        log.info("🔐 [ADMIN 2FA SECURITY CODE DISPATCHED FOR {} ({})]: {}", email, role, otp);
+
+        Set<Role> roles = new HashSet<>();
+        if (user != null && user.getRoles() != null) {
+            roles.addAll(user.getRoles());
+        }
+        roles.add(role);
 
         return AuthResponse.builder()
                 .requires2Fa(true)
                 .twoFactorToken(twoFactorToken)
                 .twoFactorMethod("EMAIL_OTP")
                 .email(email)
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .roles(user.getRoles())
+                .firstName(user != null ? user.getFirstName() : "")
+                .lastName(user != null ? user.getLastName() : "")
+                .roles(roles)
                 .build();
     }
 
@@ -547,31 +737,49 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + email));
 
+        Set<Role> effectiveRoles = new HashSet<>();
+        if (user.getRoles() != null) {
+            effectiveRoles.addAll(user.getRoles());
+        }
+
         Optional<CompanyCredential> compOpt = companyCredentialRepository.findByEmail(email);
         if (compOpt.isPresent()) {
+            effectiveRoles.add(Role.ROLE_COMPANY_ADMIN);
             companyCredentialRepository.recordSuccessfulLogin(compOpt.get().getId(), Instant.now());
             UserPrincipal principal = new UserPrincipal(user, compOpt.get());
             String accessToken = jwtService.generateAccessToken(principal, user.getId());
             RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
-            return buildAuthResponse(user, accessToken, refreshToken.getToken());
+            return buildAuthResponse(user, accessToken, refreshToken.getToken(), effectiveRoles);
         }
 
         Optional<AppDevCredential> devOpt = appDevCredentialRepository.findByEmail(email);
         if (devOpt.isPresent()) {
+            effectiveRoles.add(Role.ROLE_APP_DEVELOPER);
             appDevCredentialRepository.recordSuccessfulLogin(devOpt.get().getId(), Instant.now());
             UserPrincipal principal = new UserPrincipal(user, devOpt.get());
             String accessToken = jwtService.generateAccessToken(principal, user.getId());
             RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
-            return buildAuthResponse(user, accessToken, refreshToken.getToken());
+            return buildAuthResponse(user, accessToken, refreshToken.getToken(), effectiveRoles);
         }
 
         Optional<ServiceTeamCredential> mgmtOpt = serviceTeamCredentialRepository.findByEmail(email);
         if (mgmtOpt.isPresent()) {
+            effectiveRoles.add(Role.ROLE_SERVICE_TEAM);
             serviceTeamCredentialRepository.recordSuccessfulLogin(mgmtOpt.get().getId(), Instant.now());
             UserPrincipal principal = new UserPrincipal(user, mgmtOpt.get());
             String accessToken = jwtService.generateAccessToken(principal, user.getId());
             RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
-            return buildAuthResponse(user, accessToken, refreshToken.getToken());
+            return buildAuthResponse(user, accessToken, refreshToken.getToken(), effectiveRoles);
+        }
+
+        Optional<UserCredential> userCredOpt = userCredentialRepository.findByEmail(email);
+        if (userCredOpt.isPresent() && userCredOpt.get().getRole() != null) {
+            effectiveRoles.add(userCredOpt.get().getRole());
+            userCredentialRepository.recordSuccessfulLogin(userCredOpt.get().getId(), Instant.now());
+            UserPrincipal principal = new UserPrincipal(user, userCredOpt.get());
+            String accessToken = jwtService.generateAccessToken(principal, user.getId());
+            RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
+            return buildAuthResponse(user, accessToken, refreshToken.getToken(), effectiveRoles);
         }
 
         UserPrincipal principal = new UserPrincipal(user);
@@ -579,7 +787,7 @@ public class AuthServiceImpl implements AuthService {
         RefreshToken refreshToken = createRefreshToken(user, email, httpRequest);
 
         log.info("Admin 2FA verification successful for: {}", email);
-        return buildAuthResponse(user, accessToken, refreshToken.getToken());
+        return buildAuthResponse(user, accessToken, refreshToken.getToken(), effectiveRoles);
     }
 
     @Override
@@ -939,13 +1147,44 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken) {
+        return buildAuthResponse(user, accessToken, refreshToken, null);
+    }
+
+    private AuthResponse buildAuthResponse(User user, String accessToken, String refreshToken, Set<Role> explicitRoles) {
         String companySlug = null;
         String companyName = null;
-        if (user != null && user.getRoles() != null && (user.getRoles().contains(Role.ROLE_COMPANY_ADMIN) || user.getRoles().contains(Role.ROLE_HR))) {
-            Optional<HrProfile> hrOpt = hrProfileRepository.findByUserId(user.getId());
+
+        Set<Role> roles = new HashSet<>();
+        if (user != null && user.getRoles() != null) {
+            roles.addAll(user.getRoles());
+        }
+        if (explicitRoles != null) {
+            roles.addAll(explicitRoles);
+        }
+        if (user != null) {
+            companyCredentialRepository.findByUserId(user.getId())
+                    .ifPresent(c -> roles.add(c.getRole() != null ? c.getRole() : Role.ROLE_COMPANY_ADMIN));
+            appDevCredentialRepository.findByUserId(user.getId())
+                    .ifPresent(c -> roles.add(c.getRole() != null ? c.getRole() : Role.ROLE_APP_DEVELOPER));
+            serviceTeamCredentialRepository.findByUserId(user.getId())
+                    .ifPresent(c -> roles.add(c.getRole() != null ? c.getRole() : Role.ROLE_SERVICE_TEAM));
+            hrCredentialRepository.findByUserId(user.getId())
+                    .ifPresent(c -> roles.add(c.getRole() != null ? c.getRole() : Role.ROLE_HR));
+        }
+
+        if (user != null && (roles.contains(Role.ROLE_COMPANY_ADMIN) || roles.contains(Role.ROLE_HR))) {
+            Optional<HrProfile> hrOpt = hrProfileRepository.findByUserId(user.getId())
+                    .or(() -> hrProfileRepository.findByEmail(user.getEmail()));
             if (hrOpt.isPresent() && hrOpt.get().getCompany() != null) {
                 companySlug = hrOpt.get().getCompany().getSlug();
                 companyName = hrOpt.get().getCompany().getName();
+            } else {
+                Optional<Company> compOpt = companyRepository.findByRegisteredByUserId(user.getId())
+                        .or(() -> companyRepository.findByEmail(user.getEmail()));
+                if (compOpt.isPresent()) {
+                    companySlug = compOpt.get().getSlug();
+                    companyName = compOpt.get().getName();
+                }
             }
         }
 
@@ -959,7 +1198,7 @@ public class AuthServiceImpl implements AuthService {
                 .firstName(user != null ? user.getFirstName() : "")
                 .lastName(user != null ? user.getLastName() : "")
                 .avatarUrl(user != null ? user.getAvatarUrl() : null)
-                .roles(user != null ? user.getRoles() : Collections.emptySet())
+                .roles(roles.isEmpty() ? (user != null && user.getRoles() != null ? user.getRoles() : Collections.emptySet()) : roles)
                 .emailVerified(user != null && user.isEmailVerified())
                 .companySlug(companySlug)
                 .companyName(companyName)

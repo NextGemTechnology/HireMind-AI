@@ -22,6 +22,10 @@ public interface JobRepository extends JpaRepository<Job, Long>, JpaSpecificatio
 
     long countByCreatedAtAfter(java.time.Instant after);
 
+    long countByCompanyId(Long companyId);
+
+    long countByCompanyIdAndStatus(Long companyId, com.talentiq.common.enums.JobStatus status);
+
     @EntityGraph(attributePaths = {"company", "requiredSkills"})
     Page<Job> findAllByCompanyId(Long companyId, Pageable pageable);
 

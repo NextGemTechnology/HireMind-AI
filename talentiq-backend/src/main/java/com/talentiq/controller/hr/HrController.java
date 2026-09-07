@@ -59,6 +59,10 @@ public class HrController {
             @AuthenticationPrincipal UserPrincipal principal) {
         // Fetch current user's HR profile to identify company id
         HrDto.Response me = hrService.getHrProfile(principal.getId());
+        if (!me.isCompanyVerified() && !me.isCompanyAdmin()) {
+            throw new com.talentiq.common.exception.ForbiddenException(
+                    "Access Denied: You must be officially verified with an active company badge to view company HR team members.");
+        }
         List<HrDto.Response> team = hrService.listCompanyHrProfiles(me.getCompany().getId());
         return ResponseEntity.ok(ApiResponse.success(team));
     }

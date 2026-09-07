@@ -78,11 +78,14 @@ public class UserServiceImpl implements UserService {
             Optional<CompanyCredential> credOpt = companyCredentialRepository.findByEmail(email);
             if (credOpt.isPresent()) {
                 CompanyCredential cred = credOpt.get();
+                User u = cred.getUser();
                 return UserDto.Response.builder()
                         .id(cred.getId())
                         .email(cred.getEmail())
-                        .firstName("Company")
-                        .lastName("Director")
+                        .firstName(u != null && u.getFirstName() != null ? u.getFirstName() : "Company")
+                        .lastName(u != null && u.getLastName() != null ? u.getLastName() : "Director")
+                        .phone(u != null ? u.getPhone() : null)
+                        .avatarUrl(u != null ? u.getAvatarUrl() : null)
                         .status(cred.getStatus())
                         .emailVerified(cred.isEmailVerified())
                         .roles(Set.of(Role.ROLE_COMPANY_ADMIN))
@@ -97,11 +100,14 @@ public class UserServiceImpl implements UserService {
             Optional<AppDevCredential> credOpt = appDevCredentialRepository.findByEmail(email);
             if (credOpt.isPresent()) {
                 AppDevCredential cred = credOpt.get();
+                User u = cred.getUser();
                 return UserDto.Response.builder()
                         .id(cred.getId())
                         .email(cred.getEmail())
-                        .firstName("App")
-                        .lastName("Developer")
+                        .firstName(u != null && u.getFirstName() != null ? u.getFirstName() : "App")
+                        .lastName(u != null && u.getLastName() != null ? u.getLastName() : "Developer")
+                        .phone(u != null ? u.getPhone() : null)
+                        .avatarUrl(u != null ? u.getAvatarUrl() : null)
                         .status(cred.getStatus())
                         .emailVerified(cred.isEmailVerified())
                         .roles(Set.of(Role.ROLE_APP_DEVELOPER))
@@ -111,16 +117,19 @@ public class UserServiceImpl implements UserService {
             }
         }
 
-        // 4. Management Team check
+        // 4. Management / Service Team check
         if (principal.hasRole(Role.ROLE_SERVICE_TEAM)) {
             Optional<ServiceTeamCredential> credOpt = serviceTeamCredentialRepository.findByEmail(email);
             if (credOpt.isPresent()) {
                 ServiceTeamCredential cred = credOpt.get();
+                User u = cred.getUser();
                 return UserDto.Response.builder()
                         .id(cred.getId())
                         .email(cred.getEmail())
-                        .firstName("Management")
-                        .lastName("Team")
+                        .firstName(u != null && u.getFirstName() != null ? u.getFirstName() : "Service")
+                        .lastName(u != null && u.getLastName() != null ? u.getLastName() : "Team")
+                        .phone(u != null ? u.getPhone() : null)
+                        .avatarUrl(u != null ? u.getAvatarUrl() : null)
                         .status(cred.getStatus())
                         .emailVerified(cred.isEmailVerified())
                         .roles(Set.of(Role.ROLE_SERVICE_TEAM))

@@ -36,6 +36,8 @@ public interface AuthService {
 
     AuthResponse loginAdmin(LoginRequest request, HttpServletRequest httpRequest);
 
+    AuthResponse loginSuperAdmin(LoginRequest request, HttpServletRequest httpRequest);
+
     AuthResponse registerCandidate(RegisterRequest request, HttpServletRequest httpRequest);
 
     AuthResponse registerHr(RegisterRequest request, HttpServletRequest httpRequest);

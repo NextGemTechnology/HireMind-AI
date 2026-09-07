@@ -14,6 +14,8 @@ import com.talentiq.model.auth.UserCredential;
 import com.talentiq.repository.auth.*;
 import com.talentiq.repository.candidate.CandidateRepository;
 import com.talentiq.repository.company.CompanyRepository;
+import com.talentiq.repository.company.CompanyInvitationRepository;
+import com.talentiq.repository.company.CompanyCandidateVerificationRepository;
 import com.talentiq.repository.hr.HrProfileRepository;
 import com.talentiq.repository.user.UserRepository;
 import com.talentiq.security.jwt.JwtService;
@@ -67,6 +69,8 @@ class AuthServiceImplTest {
     @Mock private CompanyCredentialRepository companyCredentialRepository;
     @Mock private AppDevCredentialRepository appDevCredentialRepository;
     @Mock private com.talentiq.repository.auth.ServiceTeamCredentialRepository serviceTeamCredentialRepository;
+    @Mock private CompanyInvitationRepository invitationRepository;
+    @Mock private CompanyCandidateVerificationRepository companyCandidateVerificationRepository;
 
     @InjectMocks
     private AuthServiceImpl authService;

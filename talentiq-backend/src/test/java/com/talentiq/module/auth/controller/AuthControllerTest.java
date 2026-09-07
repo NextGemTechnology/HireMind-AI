@@ -53,6 +53,9 @@ class AuthControllerTest {
     @MockBean
     private com.talentiq.security.jwt.JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @MockBean
+    private com.talentiq.service.company.CompanyInvitationService companyInvitationService;
+
     // ── Register Tests ────────────────────────────────────────────────────────
 
     @Test

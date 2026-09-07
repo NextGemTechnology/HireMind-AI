@@ -1,14 +1,14 @@
 /* ============================================================
-   TalentIQ / HireMind — HR Sidebar Responsive Styles
+   TalentIQ / HireMind — HR Sidebar Responsive & Dropdown Styles
    ============================================================ */
 
 .hr-sidebar-aside {
-  width: 230px;
-  min-width: 230px;
+  width: 260px;
+  min-width: 260px;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 20px 12px 14px;
+  padding: 18px 14px 14px;
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -18,21 +18,112 @@
   transition: width 0.25s ease, transform 0.25s ease;
 }
 
+/* ── Menu Group Container ── */
+.hr-menu-group {
+  margin-bottom: 6px;
+  position: relative;
+  border-radius: 12px;
+  transition: background-color 0.2s ease;
+}
+
+/* ── Parent Menu Header Button ── */
+.hr-menu-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  user-select: none;
+}
+
+.hr-menu-header-btn:hover {
+  transform: translateX(2px);
+}
+
+/* ── Pin (Stable Lock) Button ── */
+.hr-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+  opacity: 0.7;
+}
+
+.hr-pin-btn:hover {
+  opacity: 1;
+  transform: scale(1.12);
+}
+
+.hr-pin-btn.pinned {
+  opacity: 1;
+  background: rgba(99, 102, 241, 0.25);
+  color: #818CF8;
+}
+
+/* ── Submenu Container ── */
+.hr-submenu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 0 6px 14px;
+  margin-left: 12px;
+  border-left: 2px solid rgba(99, 102, 241, 0.25);
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Submenu Item Button ── */
+.hr-submenu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.18s ease;
+  text-decoration: none;
+}
+
+.hr-submenu-item:hover {
+  padding-left: 15px;
+}
+
 @media (max-width: 1024px) {
   .hr-sidebar-aside {
-    width: 72px;
-    min-width: 72px;
+    width: 76px;
+    min-width: 76px;
     padding: 16px 8px 12px;
   }
 
   .hr-sidebar-brand-text,
   .hr-sidebar-nav-label,
   .hr-sidebar-user-details,
-  .hr-sidebar-signout-text {
+  .hr-sidebar-signout-text,
+  .hr-menu-header-title,
+  .hr-menu-header-actions,
+  .hr-submenu-list {
     display: none !important;
   }
 
-  .hr-sidebar-aside nav button {
+  .hr-menu-header-btn {
     justify-content: center !important;
     padding: 10px 0 !important;
   }

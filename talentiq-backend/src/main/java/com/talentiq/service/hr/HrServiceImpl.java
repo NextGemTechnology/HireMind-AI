@@ -18,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import com.talentiq.common.exception.ConflictException;
+import java.util.ArrayList;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -35,6 +38,15 @@ public class HrServiceImpl implements HrService {
         }
 
         User user = userRepository.findById(userId).orElse(null);
+        if (user != null) {
+            hrProfileRepository.findByEmail(user.getEmail()).ifPresent(existing -> {
+                if (existing.isCompanyVerified()) {
+                    throw new ConflictException("HR user already holds an active corporate verification badge with "
+                            + existing.getCompany().getName() + ". Only one active company verification badge is allowed per HR.");
+                }
+            });
+        }
+
         Company company = companyRepository.findById(request.getCompanyId())
                 .orElseThrow(() -> new ResourceNotFoundException("Company", "id", request.getCompanyId()));
 
@@ -47,6 +59,7 @@ public class HrServiceImpl implements HrService {
                 .designation(request.getDesignation())
                 .department(request.getDepartment())
                 .companyAdmin(false)
+                .companyVerified(false)
                 .build();
 
         HrProfile saved = hrProfileRepository.save(profile);
@@ -110,6 +123,40 @@ public class HrServiceImpl implements HrService {
         String firstName = profile.getFirstName() != null ? profile.getFirstName() : (profile.getUser() != null ? profile.getUser().getFirstName() : "");
         String lastName = profile.getLastName() != null ? profile.getLastName() : (profile.getUser() != null ? profile.getUser().getLastName() : "");
         Long userId = profile.getUser() != null ? profile.getUser().getId() : profile.getId();
+
+        boolean isVerified = profile.isCompanyVerified() || profile.isCompanyAdmin();
+        HrDto.HrAchievementDto activeBadgeAchievement = null;
+        List<HrDto.HrAchievementDto> achievements = new ArrayList<>();
+
+        if (isVerified && profile.getCompany() != null) {
+            String title = profile.getCompanyVerifiedTitle() != null && !profile.getCompanyVerifiedTitle().isBlank()
+                    ? profile.getCompanyVerifiedTitle().trim()
+                    : (profile.isCompanyAdmin() ? "Company Creator & Administrator" : "Official Verified Recruiter");
+
+            java.time.Instant earnedAt = profile.getCompanyVerifiedAt() != null
+                    ? profile.getCompanyVerifiedAt()
+                    : profile.getCreatedAt();
+
+            String desc = "Officially verified and authorized talent recruiter for " + profile.getCompany().getName()
+                    + ". Authorized for candidate pipeline management, interview scheduling, team collaboration chat, and employee lifecycle.";
+
+            activeBadgeAchievement = HrDto.HrAchievementDto.builder()
+                    .id("ACH-VERIFIED-HR-" + profile.getId())
+                    .title(title)
+                    .badgeType("COMPANY_VERIFIED_BADGE")
+                    .companyName(profile.getCompany().getName())
+                    .companyId(profile.getCompany().getId())
+                    .companyLogoUrl(profile.getCompany().getLogoUrl())
+                    .designation(profile.getDesignation())
+                    .earnedAt(earnedAt)
+                    .description(desc)
+                    .status("ACTIVE")
+                    .verified(true)
+                    .build();
+
+            achievements.add(activeBadgeAchievement);
+        }
+
         return HrDto.Response.builder()
                 .id(profile.getId())
                 .userId(userId)
@@ -121,6 +168,11 @@ public class HrServiceImpl implements HrService {
                 .department(profile.getDepartment())
                 .companyAdmin(profile.isCompanyAdmin())
                 .active(profile.isActive())
+                .companyVerified(isVerified)
+                .companyVerifiedAt(profile.getCompanyVerifiedAt())
+                .companyVerifiedTitle(profile.getCompanyVerifiedTitle())
+                .activeBadgeAchievement(activeBadgeAchievement)
+                .achievements(achievements)
                 .build();
     }
 }

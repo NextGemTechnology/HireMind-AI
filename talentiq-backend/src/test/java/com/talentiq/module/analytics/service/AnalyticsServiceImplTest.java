@@ -73,6 +73,7 @@ class AnalyticsServiceImplTest {
                 .id(10L)
                 .user(hrUser)
                 .company(company)
+                .companyVerified(true)
                 .build();
     }
 

@@ -6,14 +6,15 @@ import { apiClient } from '../api/client';
 import {
   Search, TrendingUp, ChevronDown,
   Plus, MoreVertical, RefreshCw, Sun, Moon,
-  Star, UserCircle2, BarChart2, Settings,
-  Calendar, ShieldCheck, Download, Award
+  Star, BarChart2, Settings,
+  Calendar, Download, Award, ShieldCheck, AlertTriangle
 } from 'lucide-react';
 import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
 import { NotificationBell } from '../components/NotificationBell';
+import { HrEmployeeManagement } from '../components/HrEmployeeManagement';
 import '../css/hr-analytics.css';
 
 /* ─── Types ─── */
@@ -139,6 +140,7 @@ export const HrAnalytics: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter] = useState('Month');
   const [loading, setLoading] = useState(true);
+  const [hrProfile, setHrProfile] = useState<any>(null);
 
   const stompRef = useRef<StompClient | null>(null);
 
@@ -165,13 +167,18 @@ export const HrAnalytics: React.FC = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [analyticsRes, appsRes, calRes, jobsRes, chatRes] = await Promise.all([
+      const [analyticsRes, appsRes, calRes, jobsRes, chatRes, hrMeRes] = await Promise.all([
         apiClient.get('/analytics/hr').catch(() => null),
         apiClient.get('/applications/hr?size=5&sort=appliedAt,desc').catch(() => null),
         apiClient.get('/interviews/calendar').catch(() => null),
         apiClient.get('/jobs?size=4').catch(() => null),
         apiClient.get('/chat/contacts').catch(() => null),
+        apiClient.get('/hr/me').catch(() => null),
       ]);
+
+      if (hrMeRes?.data?.data) {
+        setHrProfile(hrMeRes.data.data);
+      }
 
       if (analyticsRes?.data?.data) {
         const d = analyticsRes.data.data;
@@ -428,6 +435,61 @@ export const HrAnalytics: React.FC = () => {
             />
           </div>
 
+          {/* Corporate Verification Badge Pill */}
+          {hrProfile && (
+            hrProfile.companyVerified ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: isUniverse ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                  border: isUniverse ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid #A7F3D0',
+                  color: '#10B981',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  boxShadow: isUniverse ? '0 0 12px rgba(16, 185, 129, 0.2)' : 'none',
+                }}
+                title={`Officially Verified by ${hrProfile.company?.name || 'Company'}. Single active corporate badge enforced.`}
+              >
+                <ShieldCheck size={15} color="#10B981" />
+                <span>{hrProfile.company?.name || 'Verified HR'}</span>
+                <span style={{
+                  fontSize: '9px',
+                  background: '#10B981',
+                  color: '#FFFFFF',
+                  padding: '1px 6px',
+                  borderRadius: '8px',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em'
+                }}>
+                  ACTIVE (1/1)
+                </span>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: isUniverse ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2',
+                  border: isUniverse ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid #FECACA',
+                  color: '#EF4444',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                }}
+                title="Unverified Recruiter: Awaiting official corporate verification badge. Company operations are restricted."
+              >
+                <AlertTriangle size={15} color="#EF4444" />
+                <span>Unverified Recruiter</span>
+              </div>
+            )
+          )}
+
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
@@ -514,48 +576,9 @@ export const HrAnalytics: React.FC = () => {
           </div>
         )}
 
-        {/* ── Sub-view 2: Employee Verification Tab ── */}
+        {/* ── Sub-view 2: Employee Verification & Management Tab ── */}
         {activeNav === 'Employee' && (
-          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow, marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <UserCircle2 size={20} color="#38BDF8" /> Verified Internal Team & Badge Registry
-                  </h2>
-                  <p style={{ margin: 0, fontSize: '13px', color: styles.subtext }}>
-                    Official employee and candidate badge verifications approved by company director
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate('/team-chat')}
-                  style={{
-                    padding: '10px 18px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                    color: '#FFF', border: 'none', fontWeight: 700, fontSize: '13px',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-                  }}
-                >
-                  <ShieldCheck size={16} /> Open Verified Group Channel
-                </button>
-              </div>
-
-              <div style={{ padding: '20px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                  <ShieldCheck size={18} color="#10B981" />
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: styles.heading }}>
-                    Verified Recruiter Badge Active
-                  </span>
-                  <span style={{ fontSize: '11px', background: 'rgba(16,185,129,0.15)', color: '#10B981', padding: '2px 8px', borderRadius: '999px', fontWeight: 700 }}>
-                    OFFICIALLY AUTHENTICATED
-                  </span>
-                </div>
-                <p style={{ margin: 0, fontSize: '12.5px', color: styles.subtext, lineHeight: 1.5 }}>
-                  Your HR Recruiter account has an official Company Verification badge. You are authorized to initiate direct candidate conversations, issue invite links, and participate in corporate communication groups.
-                </p>
-              </div>
-            </div>
-          </div>
+          <HrEmployeeManagement styles={styles} theme={theme} />
         )}
 
         {/* ── Sub-view 3: Telemetry Report Tab ── */}
@@ -634,6 +657,124 @@ export const HrAnalytics: React.FC = () => {
                   <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: '#6366F1' }} />
                 </div>
               </div>
+            </div>
+
+            {/* Corporate Verification & Achievements Card */}
+            <div style={{
+              background: styles.cardBg,
+              borderRadius: '16px',
+              padding: '28px',
+              border: styles.cardBorder,
+              boxShadow: styles.cardShadow,
+              marginTop: '20px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+                <div>
+                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Award size={20} color="#10B981" /> Corporate Verification & Achievements
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '13px', color: styles.subtext }}>
+                    Platform policy: An HR user may access only the company that has officially verified them. Exactly 1 active company badge is permitted.
+                  </p>
+                </div>
+                <span style={{
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  background: hrProfile?.companyVerified ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.12)',
+                  color: hrProfile?.companyVerified ? '#10B981' : '#EF4444',
+                  border: hrProfile?.companyVerified ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(239, 68, 68, 0.25)',
+                }}>
+                  {hrProfile?.companyVerified ? 'VERIFIED · 1 of 1 Badge Active' : 'UNVERIFIED · 0 of 1 Badges'}
+                </span>
+              </div>
+
+              {hrProfile?.companyVerified ? (
+                <div style={{
+                  padding: '20px',
+                  borderRadius: '12px',
+                  background: isUniverse ? 'rgba(16, 185, 129, 0.06)' : '#F0FDF4',
+                  border: isUniverse ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid #BBF7D0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '14px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #10B981, #059669)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FFFFFF',
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+                    }}>
+                      <Award size={24} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '16px', fontWeight: 800, color: styles.heading }}>
+                        {hrProfile.activeBadgeAchievement?.title || `${hrProfile.company?.name || 'Company'} Official Recruiter Badge`}
+                      </div>
+                      <div style={{ fontSize: '12px', color: styles.subtext }}>
+                        Affiliated with <strong>{hrProfile.company?.name || 'Verified Corporate Tenant'}</strong> (Company ID: #{hrProfile.company?.id})
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '4px' }}>
+                    <div style={{ padding: '12px', borderRadius: '8px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                      <div style={{ fontSize: '11px', color: styles.subtext }}>Badge Status</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#10B981', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <ShieldCheck size={14} /> Active & Verified
+                      </div>
+                    </div>
+                    <div style={{ padding: '12px', borderRadius: '8px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                      <div style={{ fontSize: '11px', color: styles.subtext }}>Authorized Tenant</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: styles.heading, marginTop: '2px' }}>
+                        {hrProfile.company?.name || 'Company Workspace'}
+                      </div>
+                    </div>
+                    <div style={{ padding: '12px', borderRadius: '8px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                      <div style={{ fontSize: '11px', color: styles.subtext }}>Single Badge Policy</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#6366F1', marginTop: '2px' }}>
+                        1 / 1 (Max Allowed)
+                      </div>
+                    </div>
+                    <div style={{ padding: '12px', borderRadius: '8px', background: styles.cardSubBg, border: styles.cardBorder }}>
+                      <div style={{ fontSize: '11px', color: styles.subtext }}>Backend Authorization</div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: '#059669', marginTop: '2px' }}>
+                        Enforced by CompanySecurityService
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{
+                  padding: '20px',
+                  borderRadius: '12px',
+                  background: isUniverse ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2',
+                  border: isUniverse ? '1px solid rgba(239, 68, 68, 0.25)' : '1px solid #FECACA',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '14px'
+                }}>
+                  <AlertTriangle size={24} color="#EF4444" style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#EF4444' }}>
+                      No Active Corporate Verification Badge
+                    </div>
+                    <p style={{ margin: '4px 0 8px', fontSize: '12px', color: styles.subtext, lineHeight: 1.5 }}>
+                      Your HR recruiter account does not currently hold an active verification badge. Under strict backend authorization, you cannot create jobs, view applicants, or access corporate employee data until verified by a Company Manager.
+                    </p>
+                    <div style={{ fontSize: '11px', color: styles.subtext }}>
+                      💡 To obtain a badge, contact your organization's Company Manager (SaaS Admin) to verify your account or send you an official corporate invitation.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -905,6 +1046,46 @@ export const HrAnalytics: React.FC = () => {
                 </div>
                 <p style={{ fontWeight: 700, fontSize: '16px', color: styles.heading, margin: '0 0 4px' }}>{hrName}</p>
                 <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>{hrRole}</p>
+
+                {hrProfile?.companyVerified && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '10px 12px',
+                    borderRadius: '12px',
+                    background: isUniverse ? 'rgba(16, 185, 129, 0.08)' : '#ECFDF5',
+                    border: isUniverse ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #A7F3D0',
+                    textAlign: 'center',
+                  }}>
+                    <div style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      color: '#10B981',
+                      fontWeight: 800,
+                      fontSize: '11.5px',
+                      marginBottom: '3px'
+                    }}>
+                      <Award size={14} />
+                      <span>{hrProfile.activeBadgeAchievement?.title || 'Verified Recruiter'}</span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: styles.subtext, fontWeight: 500 }}>
+                      {hrProfile.company?.name || 'Verified Company'}
+                    </div>
+                    <div style={{
+                      marginTop: '6px',
+                      display: 'inline-block',
+                      fontSize: '9px',
+                      fontWeight: 800,
+                      color: '#059669',
+                      background: isUniverse ? 'rgba(16, 185, 129, 0.15)' : '#D1FAE5',
+                      padding: '2px 8px',
+                      borderRadius: '10px',
+                      letterSpacing: '0.03em'
+                    }}>
+                      🏆 1 OF 1 ACTIVE BADGE
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Messages */}

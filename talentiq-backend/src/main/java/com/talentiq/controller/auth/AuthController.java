@@ -3,6 +3,8 @@ package com.talentiq.controller.auth;
 import com.talentiq.common.enums.Role;
 import com.talentiq.common.response.ApiResponse;
 import com.talentiq.dto.auth.*;
+import com.talentiq.dto.company.CompanyInvitationDto;
+import com.talentiq.service.company.CompanyInvitationService;
 import com.talentiq.service.auth.AuthService;
 import com.talentiq.security.userdetails.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +36,18 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final CompanyInvitationService companyInvitationService;
+
+    // ── Public Invitation Token Validation ──────────────────────────────────────
+
+    @GetMapping("/invitation/validate/{token}")
+    @SecurityRequirements
+    @Operation(summary = "Validate Company Invitation Token", description = "Validates an invitation link for a new HR or Candidate.")
+    public ResponseEntity<ApiResponse<CompanyInvitationDto.ValidateResponse>> validateInvitation(
+            @PathVariable String token) {
+        CompanyInvitationDto.ValidateResponse response = companyInvitationService.validateInvitationToken(token);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
 
     // ── 1. CANDIDATE AUTHENTICATION ENDPOINTS ─────────────────────────────────
 
@@ -278,7 +292,7 @@ public class AuthController {
 
     // ── 5. MANAGEMENT TEAM AUTHENTICATION ENDPOINTS ───────────────────────────
 
-    @PostMapping("/management/send-otp")
+    @PostMapping({"/management/send-otp", "/service-team/send-otp"})
     @SecurityRequirements
     public ResponseEntity<ApiResponse<Void>> sendManagementOtp(
             @Valid @RequestBody SendRegistrationOtpRequest request,
@@ -289,7 +303,7 @@ public class AuthController {
                 "A 4-digit verification code has been dispatched to " + request.getEmail() + ". Please enter the code to complete registration."));
     }
 
-    @PostMapping("/management/register")
+    @PostMapping({"/management/register", "/service-team/register"})
     @SecurityRequirements
     public ResponseEntity<ApiResponse<AuthResponse>> registerManagementTeam(
             @Valid @RequestBody RegisterRequest request,
@@ -297,10 +311,10 @@ public class AuthController {
         request.setRole(Role.ROLE_SERVICE_TEAM);
         AuthResponse response = authService.registerManagementTeam(request, httpRequest);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Management Team registration successful. Account created!", response));
+                .body(ApiResponse.success("Management / Service Team registration successful. Account created!", response));
     }
 
-    @PostMapping("/management/login")
+    @PostMapping({"/management/login", "/service-team/login"})
     @SecurityRequirements
     public ResponseEntity<ApiResponse<AuthResponse>> loginManagementTeam(
             @Valid @RequestBody LoginRequest request,
@@ -308,25 +322,25 @@ public class AuthController {
         AuthResponse response = authService.loginManagementTeam(request, httpRequest);
         String msg = response.isRequires2Fa()
                 ? "Two-Factor Authentication required. A 4-digit 2FA code has been dispatched to your email."
-                : "Management Team login successful";
+                : "Service Team login successful";
         return ResponseEntity.ok(ApiResponse.success(msg, response));
     }
 
-    @PostMapping("/management/forgot-password")
+    @PostMapping({"/management/forgot-password", "/service-team/forgot-password"})
     @SecurityRequirements
     public ResponseEntity<ApiResponse<Void>> forgotPasswordManagement(@Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
         return ResponseEntity.ok(ApiResponse.success("A 4-digit OTP has been sent to your email. Please check your inbox."));
     }
 
-    @PostMapping("/management/verify-otp")
+    @PostMapping({"/management/verify-otp", "/service-team/verify-otp"})
     @SecurityRequirements
     public ResponseEntity<ApiResponse<Void>> verifyOtpManagement(@Valid @RequestBody VerifyOtpRequest request) {
         authService.verifyPasswordResetOtp(request);
         return ResponseEntity.ok(ApiResponse.success("OTP verified successfully. You may now set a new password."));
     }
 
-    @PostMapping("/management/reset-password")
+    @PostMapping({"/management/reset-password", "/service-team/reset-password"})
     @SecurityRequirements
     public ResponseEntity<ApiResponse<Void>> resetPasswordManagement(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request);
@@ -410,7 +424,7 @@ public class AuthController {
         return verify2FaAdmin(request, httpRequest);
     }
 
-    @PostMapping("/management/2fa-verify")
+    @PostMapping({"/management/2fa-verify", "/service-team/2fa-verify"})
     @SecurityRequirements
     public ResponseEntity<ApiResponse<AuthResponse>> verify2FaManagement(
             @Valid @RequestBody TwoFactorVerifyRequest request,

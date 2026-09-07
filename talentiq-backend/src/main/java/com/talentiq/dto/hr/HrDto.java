@@ -31,6 +31,22 @@ public class HrDto {
 
     @Data
     @Builder
+    public static class HrAchievementDto {
+        private String id;
+        private String title;
+        private String badgeType;
+        private String companyName;
+        private Long companyId;
+        private String companyLogoUrl;
+        private String designation;
+        private java.time.Instant earnedAt;
+        private String description;
+        private String status;
+        private boolean verified;
+    }
+
+    @Data
+    @Builder
     public static class Response {
         private Long id;
         private Long userId;
@@ -42,5 +58,10 @@ public class HrDto {
         private String department;
         private boolean companyAdmin;
         private boolean active;
+        private boolean companyVerified;
+        private java.time.Instant companyVerifiedAt;
+        private String companyVerifiedTitle;
+        private HrAchievementDto activeBadgeAchievement;
+        private java.util.List<HrAchievementDto> achievements;
     }
 }

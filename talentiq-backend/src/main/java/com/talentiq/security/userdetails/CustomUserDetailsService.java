@@ -59,7 +59,13 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Transactional(readOnly = true)
     @Cacheable(value = CACHE_USER, key = "#userId", unless = "#result == null")
     public UserPrincipal loadUserById(Long userId) {
-        // 1. Check HR Profile by ID
+        // 1. Check general users table first (candidates, developers, service team, company admins)
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isPresent()) {
+            return buildPrincipal(userOpt.get());
+        }
+
+        // 2. Fallback to decoupled HR Profile by ID
         Optional<HrProfile> hrOpt = hrProfileRepository.findById(userId);
         if (hrOpt.isPresent()) {
             HrProfile profile = hrOpt.get();
@@ -70,10 +76,18 @@ public class CustomUserDetailsService implements UserDetailsService {
             });
         }
 
-        // 2. Check general users table
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + userId));
-        return buildPrincipal(user);
+        throw new UsernameNotFoundException("User not found with id: " + userId);
+    }
+
+    @Transactional(readOnly = true)
+    public UserPrincipal loadHrById(Long hrProfileId) {
+        HrProfile profile = hrProfileRepository.findById(hrProfileId)
+                .orElseThrow(() -> new UsernameNotFoundException("HR Profile not found with id: " + hrProfileId));
+        Optional<HrCredential> hrCred = hrCredentialRepository.findByEmail(profile.getEmail());
+        return hrCred.map(cred -> new UserPrincipal(profile, cred)).orElseGet(() -> {
+            HrCredential dummy = HrCredential.builder().email(profile.getEmail()).build();
+            return new UserPrincipal(profile, dummy);
+        });
     }
 
     private UserPrincipal buildPrincipal(User user) {

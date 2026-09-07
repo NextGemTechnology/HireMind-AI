@@ -90,10 +90,10 @@ public class AnalyticsServiceImpl implements AnalyticsService {
                 .orElse(null);
         Company company = hrProfile != null ? hrProfile.getCompany() : null;
 
-        if (company == null) {
+        if (company == null || (!hrProfile.isCompanyVerified() && !hrProfile.isCompanyAdmin())) {
             return AnalyticsDto.HrDashboardResponse.builder()
-                    .companyId(0L)
-                    .companyName("My Organization")
+                    .companyId(company != null ? company.getId() : 0L)
+                    .companyName(company != null ? company.getName() : "Unverified Workspace")
                     .activeJobsCount(0)
                     .totalApplicationsCount(0)
                     .shortlistedCount(0)

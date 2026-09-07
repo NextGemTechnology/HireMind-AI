@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -47,7 +48,10 @@ public class UserPrincipal implements UserDetails {
         this.id = user.getId();
         this.email = user.getEmail();
         this.fullName = user.getFullName();
-        this.roles = user.getRoles() != null ? user.getRoles() : Collections.emptySet();
+        Set<Role> combined = new HashSet<>();
+        if (user.getRoles() != null) combined.addAll(user.getRoles());
+        if (credential != null && credential.getRole() != null) combined.add(credential.getRole());
+        this.roles = Collections.unmodifiableSet(combined);
         this.user = user;
         this.hrProfile = null;
         this.credential = credential;
@@ -60,7 +64,16 @@ public class UserPrincipal implements UserDetails {
         this.id = hrProfile.getId();
         this.email = hrProfile.getEmail();
         this.fullName = hrProfile.getFullName();
-        this.roles = credential != null ? Set.of(credential.getRole()) : Set.of(Role.ROLE_HR);
+        Set<Role> combined = new HashSet<>();
+        if (credential != null && credential.getRole() != null) {
+            combined.add(credential.getRole());
+        } else {
+            combined.add(Role.ROLE_HR);
+        }
+        if (hrProfile.isCompanyAdmin()) {
+            combined.add(Role.ROLE_COMPANY_ADMIN);
+        }
+        this.roles = Collections.unmodifiableSet(combined);
         this.user = hrProfile.getUser();
         this.hrProfile = hrProfile;
         this.credential = null;
@@ -73,7 +86,14 @@ public class UserPrincipal implements UserDetails {
         this.id = user.getId();
         this.email = user.getEmail();
         this.fullName = user.getFullName();
-        this.roles = user.getRoles() != null ? user.getRoles() : Set.of(Role.ROLE_HR);
+        Set<Role> combined = new HashSet<>();
+        if (user.getRoles() != null) combined.addAll(user.getRoles());
+        if (credential != null && credential.getRole() != null) {
+            combined.add(credential.getRole());
+        } else {
+            combined.add(Role.ROLE_HR);
+        }
+        this.roles = Collections.unmodifiableSet(combined);
         this.user = user;
         this.hrProfile = null;
         this.credential = null;
@@ -86,7 +106,14 @@ public class UserPrincipal implements UserDetails {
         this.id = user.getId();
         this.email = user.getEmail();
         this.fullName = user.getFullName();
-        this.roles = user.getRoles() != null ? user.getRoles() : Set.of(Role.ROLE_COMPANY_ADMIN);
+        Set<Role> combined = new HashSet<>();
+        if (user.getRoles() != null) combined.addAll(user.getRoles());
+        if (credential != null && credential.getRole() != null) {
+            combined.add(credential.getRole());
+        } else {
+            combined.add(Role.ROLE_COMPANY_ADMIN);
+        }
+        this.roles = Collections.unmodifiableSet(combined);
         this.user = user;
         this.hrProfile = null;
         this.credential = null;
@@ -99,7 +126,14 @@ public class UserPrincipal implements UserDetails {
         this.id = user.getId();
         this.email = user.getEmail();
         this.fullName = user.getFullName();
-        this.roles = user.getRoles() != null ? user.getRoles() : Set.of(Role.ROLE_APP_DEVELOPER);
+        Set<Role> combined = new HashSet<>();
+        if (user.getRoles() != null) combined.addAll(user.getRoles());
+        if (credential != null && credential.getRole() != null) {
+            combined.add(credential.getRole());
+        } else {
+            combined.add(Role.ROLE_APP_DEVELOPER);
+        }
+        this.roles = Collections.unmodifiableSet(combined);
         this.user = user;
         this.hrProfile = null;
         this.credential = null;
@@ -112,7 +146,14 @@ public class UserPrincipal implements UserDetails {
         this.id = user.getId();
         this.email = user.getEmail();
         this.fullName = user.getFullName();
-        this.roles = user.getRoles() != null ? user.getRoles() : Set.of(Role.ROLE_SERVICE_TEAM);
+        Set<Role> combined = new HashSet<>();
+        if (user.getRoles() != null) combined.addAll(user.getRoles());
+        if (credential != null && credential.getRole() != null) {
+            combined.add(credential.getRole());
+        } else {
+            combined.add(Role.ROLE_SERVICE_TEAM);
+        }
+        this.roles = Collections.unmodifiableSet(combined);
         this.user = user;
         this.hrProfile = null;
         this.credential = null;

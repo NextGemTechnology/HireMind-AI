@@ -36,12 +36,34 @@ public class CompanyTaskServiceImpl implements CompanyTaskService {
                 .or(() -> hrProfileRepository.findByUserId(userId))
                 .orElse(null);
         if (hrProfile != null && hrProfile.getCompany() != null) {
+            if (!hrProfile.isCompanyVerified() && !hrProfile.isCompanyAdmin()) {
+                throw new ForbiddenException("Access Denied: You must be an officially verified HR recruiter for "
+                        + hrProfile.getCompany().getName() + " to access corporate task roadmaps.");
+            }
             return hrProfile.getCompany();
         }
-        // Fallback: check if first registered company exists for user or platform
-        return companyRepository.findAll().stream().findFirst().orElseThrow(
-                () -> new ResourceNotFoundException("Company", "userId", userId)
-        );
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", userId));
+
+        // Check if Company Admin
+        Company company = companyRepository.findAll().stream()
+                .filter(c -> (c.getRegisteredByUserId() != null && c.getRegisteredByUserId().equals(userId))
+                        || user.getEmail().equalsIgnoreCase(c.getEmail()))
+                .findFirst()
+                .orElse(null);
+
+        if (company != null) {
+            return company;
+        }
+
+        if (user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_SUPER_ADMIN)
+                || user.getRoles().contains(com.talentiq.common.enums.Role.ROLE_PLATFORM_ADMIN)) {
+            return companyRepository.findAll().stream().filter(Company::isActive).findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Company", "userId", userId));
+        }
+
+        throw new ForbiddenException("Access Denied: You are not associated with any corporate workspace.");
     }
 
     @Override

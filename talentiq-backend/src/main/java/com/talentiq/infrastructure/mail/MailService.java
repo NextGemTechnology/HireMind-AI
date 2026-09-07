@@ -186,6 +186,67 @@ public class MailService {
         log.info("Interview schedule email dispatched to: {} for job: {}", toEmail, jobTitle);
     }
 
+    /**
+     * Sends an employee onboarding email to a candidate.
+     */
+    @Async("mailExecutor")
+    public void sendEmployeeOnboardingEmail(String toEmail, String candidateName, String companyName, String jobTitle) {
+        String subject = "📋 Employment Offer & Onboarding — " + companyName;
+        String body = buildEmployeeOnboardingHtml(candidateName, companyName, jobTitle);
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Employee onboarding email dispatched to: {} for company: {}", toEmail, companyName);
+    }
+
+    /**
+     * Sends an official verified employee welcome email.
+     */
+    @Async("mailExecutor")
+    public void sendEmployeeVerifiedEmail(String toEmail, String candidateName, String companyName,
+                                          String jobTitle, String employeeCode) {
+        String subject = "🎉 Welcome to the Team — You are now a Verified Employee at " + companyName;
+        String body = buildEmployeeVerifiedHtml(candidateName, companyName, jobTitle, employeeCode);
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Employee verified confirmation email dispatched to: {} [{}]", toEmail, employeeCode);
+    }
+
+    /**
+     * Sends an employment termination notice email.
+     */
+    @Async("mailExecutor")
+    public void sendTerminationNoticeEmail(String toEmail, String candidateName, String companyName,
+                                           String reason, String lastWorkingDate) {
+        String subject = "Notice of Employment Status Update — " + companyName;
+        String body = buildTerminationNoticeHtml(candidateName, companyName, reason, lastWorkingDate);
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Termination notice email dispatched to: {} for company: {}", toEmail, companyName);
+    }
+
+    /**
+     * Sends a salary disbursement confirmation email.
+     */
+    @Async("mailExecutor")
+    public void sendSalaryDisbursementEmail(String toEmail, String candidateName, String companyName,
+                                            String amount, String currency, String periodLabel) {
+        String subject = "💵 Salary Disbursement Processed — " + periodLabel + " [" + companyName + "]";
+        String body = buildSalaryDisbursementHtml(candidateName, companyName, amount, currency, periodLabel);
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Salary disbursement email dispatched to: {} for period: {}", toEmail, periodLabel);
+    }
+
+    /**
+     * Sends a company invitation email for HR Recruiters or Candidates.
+     */
+    @Async("mailExecutor")
+    public void sendCompanyInvitationEmail(String toEmail, String recipientName, String companyName,
+                                           String role, String designation, String inviteLink, boolean autoVerifyBadge) {
+        String roleDisplay = "ROLE_HR".equalsIgnoreCase(role) ? "Official HR Recruiter" : "Direct Candidate / Talent Partner";
+        String displayTitle = designation != null && !designation.isBlank() ? designation : roleDisplay;
+        String subject = "🏢 Invitation to Join " + companyName + " as " + displayTitle;
+        String body = buildCompanyInvitationHtml(recipientName, companyName, roleDisplay, displayTitle, inviteLink, autoVerifyBadge);
+        sendHtmlEmail(toEmail, subject, body);
+        log.info("Company invitation email dispatched to: {} for company: {} as {}", toEmail, companyName, roleDisplay);
+    }
+
     // ── Anti-Disposable / Temp-Mail Prohibited Domain Blacklist ────────────────
     private static final java.util.Set<String> DISPOSABLE_EMAIL_DOMAINS = java.util.Set.of(
             "temp-mail.org", "tmpmail.com", "tmpmail.net", "tmpmail.org",
@@ -644,5 +705,191 @@ public class MailService {
                 </body></html>
                 """.formatted(firstName, roleDisplay, otp, expiryMinutes);
     }
-}
 
+    private String buildEmployeeOnboardingHtml(String candidateName, String companyName, String jobTitle) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Employment Offer & Onboarding</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(129,140,248,0.25);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:36px;margin-bottom:8px;">📋</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:800;">Employment Offer & Onboarding</h1>
+                  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">%s</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 14px;font-size:20px;font-weight:700;">Hello %s! 👋</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 20px;font-size:15px;">
+                    You have been onboarded as an employee for the role of <strong style="color:#818cf8;">%s</strong> at <strong style="color:#f1f5f9;">%s</strong>.
+                  </p>
+                  <div style="background:rgba(30,41,59,0.7);border-left:4px solid #818cf8;padding:16px 20px;border-radius:8px;margin:20px 0;">
+                    <p style="color:#cbd5e1;margin:0;font-size:14px;line-height:1.5;">
+                      Your employment record is currently pending executive verification by the Company Manager. Once verified, your status will become Active and your official employee badge will be issued.
+                    </p>
+                  </div>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · Corporate Workspace Platform</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(companyName, candidateName, jobTitle, companyName);
+    }
+
+    private String buildEmployeeVerifiedHtml(String candidateName, String companyName, String jobTitle, String employeeCode) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Employment Verified</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(16,185,129,0.3);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#10b981,#059669);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:36px;margin-bottom:8px;">🎖️</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:26px;font-weight:800;">Official Employment Verified!</h1>
+                  <p style="color:rgba(255,255,255,0.9);margin:6px 0 0;font-size:14px;">%s · Corporate Registry</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 14px;font-size:20px;font-weight:700;">Congratulations, %s! 🎉</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 20px;font-size:15px;">
+                    Your employment has been officially verified and approved by the Company Leadership of <strong style="color:#f1f5f9;">%s</strong>.
+                  </p>
+                  <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:20px;margin:20px 0;">
+                    <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong>💼 Role:</strong> <span style="color:#e2e8f0;">%s</span></p>
+                    <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong>🏢 Company:</strong> <span style="color:#e2e8f0;">%s</span></p>
+                    <p style="color:#94a3b8;font-size:13px;margin:0;"><strong>🆔 Employee Code:</strong> <span style="color:#10b981;font-family:monospace;font-weight:700;">%s</span></p>
+                  </div>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · Corporate Workspace Platform</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(companyName, candidateName, companyName, jobTitle, companyName, employeeCode != null ? employeeCode : "N/A");
+    }
+
+    private String buildTerminationNoticeHtml(String candidateName, String companyName, String reason, String lastWorkingDate) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Employment Status Notice</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(239,68,68,0.3);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#dc2626,#b91c1c);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:36px;margin-bottom:8px;">📄</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:800;">Notice of Employment Status Update</h1>
+                  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">%s</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 14px;font-size:18px;font-weight:700;">Dear %s,</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 20px;font-size:14px;">
+                    This email is to inform you that your employment with <strong style="color:#f1f5f9;">%s</strong> has been concluded.
+                  </p>
+                  <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:16px 20px;margin:16px 0;">
+                    <p style="color:#94a3b8;font-size:13px;margin:0 0 8px;"><strong>Reason / Notes:</strong> <span style="color:#e2e8f0;">%s</span></p>
+                    <p style="color:#94a3b8;font-size:13px;margin:0;"><strong>Last Working Date:</strong> <span style="color:#f87171;">%s</span></p>
+                  </div>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · Corporate Workspace Platform</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(companyName, candidateName, companyName, reason != null ? reason : "Standard separation", lastWorkingDate != null ? lastWorkingDate : "Immediate");
+    }
+
+    private String buildSalaryDisbursementHtml(String candidateName, String companyName, String amount, String currency, String periodLabel) {
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Salary Disbursement Confirmation</title></head>
+                <body style="margin:0;padding:0;background:#0b0f19;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0f19;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,23,42,0.95);border:1px solid rgba(56,189,248,0.3);border-radius:18px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+                <tr><td style="background:linear-gradient(135deg,#0284c7,#0369a1);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:36px;margin-bottom:8px;">💵</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:800;">Salary Disbursement Confirmed</h1>
+                  <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">%s · Payroll Department</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 14px;font-size:18px;font-weight:700;">Hello %s 👋</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 20px;font-size:14px;">
+                    Your salary disbursement for <strong style="color:#38bdf8;">%s</strong> has been approved and processed by <strong style="color:#f1f5f9;">%s</strong>.
+                  </p>
+                  <div style="background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.25);border-radius:12px;padding:20px;text-align:center;margin:20px 0;">
+                    <p style="color:#94a3b8;font-size:13px;margin:0 0 6px;">Disbursed Amount</p>
+                    <div style="font-size:36px;font-weight:900;color:#38bdf8;font-family:monospace;">
+                      %s %s
+                    </div>
+                  </div>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.5);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">© 2026 HireMind AI · Corporate Workspace Platform</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(companyName, candidateName, periodLabel, companyName, currency, amount);
+    }
+
+    private String buildCompanyInvitationHtml(String recipientName, String companyName, String roleDisplay,
+                                             String displayTitle, String inviteLink, boolean autoVerifyBadge) {
+        String greeting = (recipientName != null && !recipientName.isBlank()) ? "Hello " + recipientName : "Hello";
+        String badgeHtml = autoVerifyBadge
+                ? """
+                  <div style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);border-radius:10px;padding:14px 18px;margin:20px 0;text-align:left;">
+                    <span style="font-size:16px;vertical-align:middle;">🎖️</span>
+                    <strong style="color:#10b981;font-size:13px;margin-left:6px;">Official Company Verification Badge Included</strong>
+                    <p style="color:#94a3b8;font-size:12px;margin:4px 0 0;line-height:1.5;">Upon accepting this invitation and completing registration, you will be automatically awarded the verified corporate badge with full access to company pipelines and team collaboration.</p>
+                  </div>
+                  """
+                : "";
+
+        return """
+                <!DOCTYPE html>
+                <html lang="en">
+                <head><meta charset="UTF-8"><title>Company Invitation — HireMind AI</title></head>
+                <body style="margin:0;padding:0;background:#070d18;font-family:'Segoe UI',Arial,sans-serif;color:#f8fafc;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background:#070d18;min-height:100vh;">
+                <tr><td align="center" style="padding:40px 20px;">
+                <table width="600" cellpadding="0" cellspacing="0" style="background:rgba(15,28,54,0.95);border:1px solid rgba(56,189,248,0.3);border-radius:18px;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,0.7);">
+                <tr><td style="background:linear-gradient(135deg,#1e40af,#0284c7);padding:36px 40px 28px;text-align:center;">
+                  <div style="font-size:40px;margin-bottom:8px;">🏢</div>
+                  <h1 style="color:#ffffff;margin:0;font-size:24px;font-weight:800;letter-spacing:-0.02em;">Corporate Workspace Invitation</h1>
+                  <p style="color:rgba(255,255,255,0.88);margin:6px 0 0;font-size:14px;font-weight:600;">%s · Executive Team</p>
+                </td></tr>
+                <tr><td style="padding:36px 40px;">
+                  <h2 style="color:#f8fafc;margin:0 0 14px;font-size:18px;font-weight:700;">%s 👋</h2>
+                  <p style="color:#94a3b8;line-height:1.6;margin:0 0 20px;font-size:14px;">
+                    You have been officially invited by <strong style="color:#38bdf8;">%s</strong> to join their corporate workspace as:
+                  </p>
+                  <div style="background:rgba(0,0,0,0.4);border:1px solid rgba(56,189,248,0.25);border-radius:12px;padding:20px;text-align:center;margin:20px 0;">
+                    <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Designated Role & Title</div>
+                    <div style="font-size:22px;font-weight:800;color:#f8fafc;">%s</div>
+                    <div style="font-size:13px;color:#38bdf8;margin-top:4px;font-weight:600;">%s</div>
+                  </div>
+                  %s
+                  <div style="text-align:center;margin:32px 0 24px;">
+                    <a href="%s" style="display:inline-block;padding:14px 36px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#38bdf8);color:#ffffff;text-decoration:none;font-size:15px;font-weight:800;box-shadow:0 8px 24px rgba(37,99,235,0.4);">
+                      Accept Invitation & Join Workspace →
+                    </a>
+                  </div>
+                  <p style="color:#64748b;font-size:12px;line-height:1.5;margin:24px 0 0;word-break:break-all;">
+                    Or paste this URL in your browser: <br/>
+                    <span style="color:#38bdf8;">%s</span>
+                  </p>
+                </td></tr>
+                <tr><td style="padding:20px 40px;border-top:1px solid rgba(255,255,255,0.08);background:rgba(10,15,30,0.6);text-align:center;">
+                  <p style="color:#64748b;font-size:12px;margin:0;">This invitation is confidential and expires in 7 days · © 2026 HireMind AI Enterprise</p>
+                </td></tr>
+                </table></td></tr></table>
+                </body></html>
+                """.formatted(companyName, greeting, companyName, displayTitle, roleDisplay, badgeHtml, inviteLink, inviteLink);
+    }
+}

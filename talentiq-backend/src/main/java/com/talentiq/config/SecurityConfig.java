@@ -66,7 +66,8 @@ public class SecurityConfig {
             "/ws/info/**",
             // Public candidate verification certificate endpoints
             "/v1/company/verifications/candidate/**",
-            "/v1/company/verifications/certificate/**"
+            "/v1/company/verifications/certificate/**",
+            "/v1/company/invitations/validate/**"
     };
 
     @Bean
@@ -90,6 +91,8 @@ public class SecurityConfig {
                         .requestMatchers("/v1/admin/company/**").hasAnyRole("COMPANY_ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN")
                         .requestMatchers("/v1/admin/super/**").hasAnyRole("SUPER_ADMIN", "PLATFORM_ADMIN")
                         .requestMatchers("/v1/admin/**").hasAnyRole("PLATFORM_ADMIN", "SUPER_ADMIN", "SERVICE_TEAM", "APP_DEVELOPER", "COMPANY_ADMIN")
+                        .requestMatchers("/v1/employees/**").authenticated()
+                        .requestMatchers("/v1/salary/**").authenticated()
                         .anyRequest().authenticated()
                 )
 

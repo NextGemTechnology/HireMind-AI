@@ -41,6 +41,7 @@ class JobServiceImplTest {
     @Mock private SavedJobRepository savedJobRepository;
     @Mock private HrProfileRepository hrProfileRepository;
     @Mock private UserRepository userRepository;
+    @Mock private com.talentiq.service.company.CompanySecurityService companySecurityService;
 
     @InjectMocks
     private JobServiceImpl jobService;
@@ -81,7 +82,7 @@ class JobServiceImplTest {
     @Test
     @DisplayName("should post job successfully and link company context")
     void shouldCreateJobSuccessfully() {
-        when(hrProfileRepository.findByUserId(1L)).thenReturn(Optional.of(hrProfile));
+        when(companySecurityService.enforceVerifiedHrAccess(1L)).thenReturn(hrProfile);
         when(jobRepository.existsBySlug("backend-engineer")).thenReturn(false);
         when(jobRepository.save(any(Job.class))).thenAnswer(i -> {
             Job j = i.getArgument(0);
@@ -102,7 +103,8 @@ class JobServiceImplTest {
     @Test
     @DisplayName("should throw ForbiddenException if user has no HR Profile context")
     void shouldThrowForbiddenIfUserNotHr() {
-        when(hrProfileRepository.findByUserId(2L)).thenReturn(Optional.empty());
+        when(companySecurityService.enforceVerifiedHrAccess(2L))
+                .thenThrow(new ForbiddenException("Access Denied: Only company HR members can post jobs"));
 
         assertThatThrownBy(() -> jobService.createJob(2L, createReq))
                 .isInstanceOf(ForbiddenException.class)

@@ -59,6 +59,7 @@ public class JobApplicationServiceImpl implements JobApplicationService {
     private final JobRecommendationRepository recommendationRepository;
     private final RecommendationService recommendationService;
     private final NotificationService notificationService;
+    private final com.talentiq.service.company.CompanySecurityService companySecurityService;
 
     @Override
     public JobApplicationDto.Response applyForJob(Long userId, JobApplicationDto.ApplyRequest request) {
@@ -142,22 +143,16 @@ public class JobApplicationServiceImpl implements JobApplicationService {
     }
 
     private HrProfile resolveHrProfile(Long hrUserId) {
-        return hrProfileRepository.findById(hrUserId)
-                .or(() -> hrProfileRepository.findByUserId(hrUserId))
-                .orElseThrow(() -> new ForbiddenException("Only company HR members can access recruitment applications"));
+        return companySecurityService.enforceVerifiedHrAccess(hrUserId);
     }
 
     @Override
     public JobApplicationDto.Response updateApplicationStatus(Long hrUserId, Long applicationId, JobApplicationDto.StatusUpdateRequest request) {
-        HrProfile hrProfile = resolveHrProfile(hrUserId);
-
         JobApplication application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("JobApplication", "id", applicationId));
 
-        // Enforce company boundary
-        if (!application.getJob().getCompany().getId().equals(hrProfile.getCompany().getId())) {
-            throw new ForbiddenException("You cannot modify job applications from another company");
-        }
+        // Enforce company boundary and verified HR authorization
+        HrProfile hrProfile = companySecurityService.enforceVerifiedHrAccess(hrUserId, application.getJob().getCompany().getId());
 
         ApplicationStatus originalStatus = application.getStatus();
         ApplicationStatus newStatus = request.getStatus();
@@ -219,14 +214,10 @@ public class JobApplicationServiceImpl implements JobApplicationService {
     @Override
     @Transactional(readOnly = true)
     public PagedResponse<JobApplicationDto.Response> getApplicationsForJob(Long hrUserId, Long jobId, ApplicationStatus status, Pageable pageable) {
-        HrProfile hrProfile = resolveHrProfile(hrUserId);
-
         Job job = jobRepository.findById(jobId)
                 .orElseThrow(() -> new ResourceNotFoundException("Job", "id", jobId));
 
-        if (!job.getCompany().getId().equals(hrProfile.getCompany().getId())) {
-            throw new ForbiddenException("You do not have permissions to view applications for this job posting");
-        }
+        companySecurityService.enforceVerifiedHrAccess(hrUserId, job.getCompany().getId());
 
         Page<JobApplication> applications;
         if (status != null) {
@@ -253,11 +244,13 @@ public class JobApplicationServiceImpl implements JobApplicationService {
         JobApplication application = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("JobApplication", "id", applicationId));
 
-        // Check if caller is HR
+        // Check if caller is verified HR for this company
         Optional<HrProfile> hrProfileOpt = hrProfileRepository.findById(userId).or(() -> hrProfileRepository.findByUserId(userId));
         if (hrProfileOpt.isPresent()) {
             HrProfile hr = hrProfileOpt.get();
-            if (hr.getCompany() != null && hr.getCompany().getId().equals(application.getJob().getCompany().getId())) {
+            if ((hr.isCompanyVerified() || hr.isCompanyAdmin())
+                    && hr.getCompany() != null
+                    && hr.getCompany().getId().equals(application.getJob().getCompany().getId())) {
                 return mapToResponse(application);
             }
         }

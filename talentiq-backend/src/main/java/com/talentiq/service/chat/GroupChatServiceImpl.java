@@ -8,6 +8,7 @@ import com.talentiq.model.ChatGroup;
 import com.talentiq.model.ChatGroupMember;
 import com.talentiq.model.GroupChatMessage;
 import com.talentiq.model.GroupChatInvitation;
+import com.talentiq.model.HrProfile;
 import com.talentiq.model.User;
 import com.talentiq.repository.chat.ChatGroupMemberRepository;
 import com.talentiq.repository.chat.ChatGroupRepository;
@@ -54,6 +55,19 @@ public class GroupChatServiceImpl implements GroupChatService {
     public GroupChatDto.GroupResponse createGroup(Long currentUserId, GroupChatDto.CreateGroupRequest request) {
         User creator = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", currentUserId));
+
+        // Enforce verified HR authorization for company chat groups
+        if (creator.getRoles().contains(Role.ROLE_HR)) {
+            hrProfileRepository.findByUserId(currentUserId).or(() -> hrProfileRepository.findById(currentUserId))
+                    .ifPresent(hr -> {
+                        if (!hr.isCompanyVerified() && !hr.isCompanyAdmin()) {
+                            throw new ForbiddenException("Access Denied: Only officially verified HR recruiters can create company team chat groups.");
+                        }
+                        if (request.getCompanyId() != null && !hr.getCompany().getId().equals(request.getCompanyId())) {
+                            throw new ForbiddenException("Cross-company access violation: HR recruiter cannot create team chat for another company.");
+                        }
+                    });
+        }
 
         ChatGroup group = ChatGroup.builder()
                 .name(request.getName().trim())
@@ -315,6 +329,21 @@ public class GroupChatServiceImpl implements GroupChatService {
                 if (!isVerified) {
                     throw new ForbiddenException("Access Denied: Only candidates with an official APPROVED verification badge from this company can join company collaboration groups. Please obtain company verification first.");
                 }
+            }
+        }
+
+        // Check verification gate for HR recruiters:
+        // An HR recruiter must be officially verified for THIS company, never other companies
+        if (user.getRoles().contains(Role.ROLE_HR) && group.getCompanyId() != null) {
+            HrProfile hr = hrProfileRepository.findByUserId(currentUserId)
+                    .or(() -> hrProfileRepository.findById(currentUserId))
+                    .orElseThrow(() -> new ForbiddenException("Access Denied: No HR profile found for user."));
+            if (!hr.getCompany().getId().equals(group.getCompanyId())) {
+                throw new ForbiddenException("Cross-company access violation: HR recruiter cannot join collaboration groups of another company.");
+            }
+            if (!hr.isCompanyVerified() && !hr.isCompanyAdmin()) {
+                throw new ForbiddenException("Access Denied: You must be an officially verified HR recruiter for "
+                        + hr.getCompany().getName() + " to join company team chats.");
             }
         }
 

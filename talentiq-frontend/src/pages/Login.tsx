@@ -127,6 +127,56 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
     return () => clearTimeout(timer);
   }, [twoFactorCountdown]);
 
+  // Corporate Invitation State
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteData, setInviteData] = useState<any | null>(null);
+  const [inviteValidating, setInviteValidating] = useState<boolean>(false);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const token = searchParams.get('companyInvite') || searchParams.get('invite');
+    const roleParam = searchParams.get('role');
+
+    if (token) {
+      setInviteToken(token);
+      setAuthCardMode('REGISTER');
+      setInviteValidating(true);
+
+      apiClient.get(`/auth/invitation/validate/${token}`)
+        .then((res) => {
+          const data = res.data?.data;
+          if (data && data.valid) {
+            setInviteData(data);
+            if (data.email) setRegEmail(data.email);
+            if (data.companyName) setRegCompany(data.companyName);
+            if (data.designation) {
+              setRegJobTitle(data.designation);
+              setRegDesiredRole(data.designation);
+            }
+            if (data.role === 'ROLE_HR' || roleParam === 'HR') {
+              setSelectedRole('HR');
+            } else if (data.role === 'ROLE_CANDIDATE' || roleParam === 'CANDIDATE') {
+              setSelectedRole('CANDIDATE');
+            }
+          } else {
+            setInviteData({
+              valid: false,
+              message: data?.message || 'This invitation is invalid or has expired.'
+            });
+          }
+        })
+        .catch((err) => {
+          setInviteData({
+            valid: false,
+            message: err?.response?.data?.message || 'Could not validate invitation token.'
+          });
+        })
+        .finally(() => {
+          setInviteValidating(false);
+        });
+    }
+  }, [location.search]);
+
   // Quick Register Form State (Back Face)
   const [regFirstName, setRegFirstName] = useState('');
   const [regLastName, setRegLastName] = useState('');
@@ -421,7 +471,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         navigate('/jobs');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email, password, or role');
+      const serverMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+      setError(serverMsg || 'Invalid email, password, or role');
     } finally {
       setLoading(false);
     }
@@ -584,8 +635,9 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
           email: trimmedEmail,
           password: regPassword,
           role: 'ROLE_HR',
-          companyName: regCompany || 'Enterprise Talent Corp',
-          jobTitle: 'Recruitment Lead',
+          companyName: inviteData?.companyName || regCompany || 'Enterprise Talent Corp',
+          jobTitle: inviteData?.designation || regJobTitle || 'Recruitment Lead',
+          companyInviteToken: inviteToken || undefined,
           otp: otpCode
         });
         navigate('/hr-analytics');
@@ -596,7 +648,8 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
           email: trimmedEmail,
           password: regPassword,
           role: 'ROLE_CANDIDATE',
-          desiredRole: regDesiredRole || 'Software Engineer',
+          desiredRole: inviteData?.designation || regDesiredRole || 'Software Engineer',
+          companyInviteToken: inviteToken || undefined,
           yearsExperience: 2,
           otp: otpCode
         });
@@ -1376,6 +1429,65 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
                 <span>Admin</span>
               </button>
             </div>
+
+            {/* Corporate Invitation Validating Indicator */}
+            {inviteValidating && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                color: '#38BDF8',
+                fontSize: '12px',
+                marginBottom: '12px',
+                background: 'rgba(56, 189, 248, 0.1)',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                border: '1px solid rgba(56, 189, 248, 0.2)'
+              }}>
+                <Loader2 size={14} className="spin" /> Validating official corporate invitation...
+              </div>
+            )}
+
+            {/* Corporate Invitation Banner */}
+            {inviteData && (
+              <div style={{
+                background: inviteData.valid
+                  ? 'linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(16, 185, 129, 0.2))'
+                  : 'rgba(239, 68, 68, 0.15)',
+                border: inviteData.valid
+                  ? '1px solid rgba(56, 189, 248, 0.4)'
+                  : '1px solid rgba(239, 68, 68, 0.4)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px'
+              }}>
+                <span style={{ fontSize: '18px' }}>{inviteData.valid ? '🏢' : '⚠️'}</span>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#F8FAFC' }}>
+                    {inviteData.valid
+                      ? `Corporate Invitation: ${inviteData.companyName}`
+                      : 'Invitation Notice'}
+                  </div>
+                  <div style={{ fontSize: '12px', color: inviteData.valid ? '#94A3B8' : '#FECACA', marginTop: '2px', lineHeight: 1.4 }}>
+                    {inviteData.valid ? (
+                      <>
+                        You are registering via official company invite for <strong style={{ color: '#38BDF8' }}>{inviteData.designation || (selectedRole === 'HR' ? 'HR Recruiter' : 'Candidate')}</strong>.
+                        {inviteData.autoVerifyBadge && (
+                          <span style={{ display: 'block', color: '#10B981', fontWeight: 700, marginTop: '2px' }}>
+                            ✓ Verified Badge will be auto-awarded upon account creation.
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      inviteData.message || 'The invitation link is invalid or expired.'
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {regError && (
               <div className="login-error-alert">

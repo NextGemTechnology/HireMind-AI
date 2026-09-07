@@ -218,6 +218,16 @@ Client (Login Request) ---> AuthController (/v1/auth/login)
 | `/v1/admin/developer/metrics` | `GET` | Retrieve system telemetry metrics | `ROLE_APP_DEVELOPER` |
 | `/v1/admin/service-team/verifications`| `GET` | List company verification requests | `ROLE_SERVICE_TEAM` |
 | `/v1/admin/super-admin/audit-logs` | `GET` | Search forensic audit logs | `ROLE_SUPER_ADMIN` |
+| `/v1/employees` | `POST` | Onboard candidate as employee (PENDING) | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
+| `/v1/employees` | `GET` | List company employees (status filter) | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
+| `/v1/employees/{id}/verify` | `PUT` | Executive approval for employee onboarding | `ROLE_COMPANY_ADMIN`, `ROLE_SUPER_ADMIN` |
+| `/v1/employees/{id}/terminate` | `POST` | Initiate separation/notice (ON_NOTICE) | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
+| `/v1/employees/{id}/terminate/decision`| `PUT`| Executive decision on employee termination | `ROLE_COMPANY_ADMIN`, `ROLE_SUPER_ADMIN` |
+| `/v1/employees/me` | `GET` | Candidate view own verified employments | `ROLE_CANDIDATE` |
+| `/v1/salary` | `POST` | Create salary disbursement draft | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
+| `/v1/salary/{id}/submit` | `PUT` | Submit salary for leadership approval | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
+| `/v1/salary/{id}/approve` | `PUT` | Executive approve & trigger payment gateway | `ROLE_COMPANY_ADMIN`, `ROLE_SUPER_ADMIN` |
+| `/v1/salary/me` | `GET` | Candidate view own salary disbursements | `ROLE_CANDIDATE` |
 | `/v1/public/stats` | `GET` | Get public platform statistics | Public |
 
 ---
@@ -404,3 +414,11 @@ Distributed under the **MIT License**.
 
 ### 👨‍💻 Developed & Maintained by
 **Abhay Gupta** — [GitHub Profile](https://github.com/AbhayGupta002)
+
+---
+
+## 🚀 Recent Updates
+- **Enhanced Administrative Security**: Consolidated and hardened authentication for 4 distinct Admin roles (`ROLE_APP_DEVELOPER`, `ROLE_SERVICE_TEAM`, `ROLE_COMPANY_ADMIN`, and `ROLE_SUPER_ADMIN`) with isolated credentials, cross-table fallbacks, and 2FA OTP integration.
+- **CompanyManagerSaaS Workflow**: Extended Company Manager portal for managing employees, performance reviews, and salary disbursement approvals.
+- **Database Migrations**: Refined MySQL 8 compatibility in Flyway migrations (e.g., V21-V23).
+- **Frontend Enhancements**: Improved error visibility during authentication and refined UI for HR and Company Manager dashboards.

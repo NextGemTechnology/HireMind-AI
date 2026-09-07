@@ -16,7 +16,8 @@ public interface CompanyCandidateVerificationRepository extends JpaRepository<Co
 
     @Query("SELECT v FROM CompanyCandidateVerification v " +
             "JOIN FETCH v.company c " +
-            "JOIN FETCH v.hrUser h " +
+            "LEFT JOIN FETCH v.hrUser h " +
+            "LEFT JOIN FETCH v.hrProfile hp " +
             "JOIN FETCH v.candidateUser u " +
             "WHERE v.company.id = :companyId AND (:status IS NULL OR v.status = :status)")
     Page<CompanyCandidateVerification> findByCompanyIdAndStatus(
@@ -32,4 +33,6 @@ public interface CompanyCandidateVerificationRepository extends JpaRepository<Co
     Optional<CompanyCandidateVerification> findByBadgeCertificateId(String badgeCertificateId);
 
     boolean existsByCompanyIdAndCandidateUserIdAndStatus(Long companyId, Long candidateUserId, String status);
+
+    long countByCompanyIdAndStatus(Long companyId, String status);
 }

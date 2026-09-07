@@ -93,11 +93,17 @@ public class CompanyServiceImpl implements CompanyService {
 
     @Override
     public CompanyDto.Response updateCompany(Long companyId, CompanyDto.UpdateRequest request) {
-        String currentUserEmail = SecurityContextHolder.getContext().getAuthentication().getName();
-        HrProfile hrProfile = hrProfileRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new ForbiddenException("Only HR profiles can update companies"));
-        if (!hrProfile.getCompany().getId().equals(companyId)) {
-            throw new ForbiddenException("You do not have permission to update this company's profile");
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isPlatformAdmin = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_SUPER_ADMIN".equals(a.getAuthority()) || "ROLE_PLATFORM_ADMIN".equals(a.getAuthority()));
+
+        if (!isPlatformAdmin) {
+            String currentUserEmail = auth != null ? auth.getName() : "";
+            HrProfile hrProfile = hrProfileRepository.findByEmail(currentUserEmail)
+                    .orElseThrow(() -> new ForbiddenException("Only HR profiles or Administrators can update companies"));
+            if (!hrProfile.getCompany().getId().equals(companyId)) {
+                throw new ForbiddenException("You do not have permission to update this company's profile");
+            }
         }
 
         Company company = companyRepository.findById(companyId)

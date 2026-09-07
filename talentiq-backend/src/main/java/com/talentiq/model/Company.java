@@ -31,6 +31,9 @@ public class Company extends AuditEntity {
     @Column(nullable = false, unique = true, length = 200)
     private String slug;
 
+    @Column(length = 255)
+    private String tagline;
+
     @Column(length = 500)
     private String website;
 
@@ -78,4 +81,11 @@ public class Company extends AuditEntity {
     @Column(name = "is_blacklisted", nullable = false)
     @Builder.Default
     private boolean blacklisted = false;
+
+    @Column(name = "subscription_status", length = 30)
+    @Builder.Default
+    private String subscriptionStatus = "ACTIVE";
+
+    @Column(name = "registered_by_user_id")
+    private Long registeredByUserId;
 }

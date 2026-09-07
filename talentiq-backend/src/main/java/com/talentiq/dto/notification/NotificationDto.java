@@ -1,14 +1,19 @@
 package com.talentiq.dto.notification;
 
 import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 
 public class NotificationDto {
 
     @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class SendRequest {
         @NotBlank(message = "Title is required")
         private String title;
