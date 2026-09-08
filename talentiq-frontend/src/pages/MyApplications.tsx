@@ -49,7 +49,11 @@ interface ApplicationItem {
   notes?: string;
 }
 
-export const MyApplications: React.FC = () => {
+interface MyApplicationsProps {
+  embedded?: boolean;
+}
+
+export const MyApplications: React.FC<MyApplicationsProps> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { theme } = useTheme();
 
@@ -139,31 +143,45 @@ export const MyApplications: React.FC = () => {
   const inReviewCount = applications.filter(a => a.status === 'SCREENED' || a.status === 'APPLIED').length;
 
   return (
-    <div className="lunar-page-wrapper">
-      <InteractiveGalaxyBackground theme={theme} />
+    <div className={`lunar-page-wrapper ${embedded ? 'is-embedded' : ''} theme-${theme}`}>
+      {!embedded && <InteractiveGalaxyBackground theme={theme} />}
 
       {/* ── MAIN CONTENT CONTAINER (Z-INDEX 10) ── */}
       <div className="lunar-apps-container">
-        {/* ── HERO HEADER DIV (Placed Cleanly Just Below Navigation Header) ── */}
+        {/* ── HERO HEADER DIV (Professional Pipeline Header) ── */}
         <div className="lunar-hero-panel">
           <div className="lunar-hero-content">
-            <h1 className="lunar-hero-title">
-              My <span className="lunar-gradient-text">Application Constellation</span>
-            </h1>
+            <div className="lunar-hero-top-bar">
+              <div>
+                <h1 className="lunar-hero-title">
+                  My <span className="lunar-gradient-text">Application Pipeline</span>
+                </h1>
+                <p className="lunar-hero-subtitle">
+                  Track recruitment stages, interview invitations, status updates, and formal offers in real time.
+                </p>
+              </div>
 
-            {/* Metric Chips inside the Hero Panel */}
+              <button onClick={fetchApplications} className="lunar-refresh-btn" title="Refresh Pipeline">
+                <RefreshCw size={14} className={loading ? 'spin-icon' : ''} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {/* 4 Thematic Alternating Metric Cards */}
             <div className="lunar-metrics-grid">
               <div
-                className={`lunar-metric-card ${selectedFilter === 'ALL' ? 'active-metric' : ''}`}
+                className={`lunar-metric-card total ${selectedFilter === 'ALL' ? 'active-metric' : ''}`}
                 onClick={() => setSelectedFilter('ALL')}
+                title="View All Applications"
               >
                 <div className="lunar-metric-number">{totalCount}</div>
-                <div className="lunar-metric-label">Total Applications</div>
+                <div className="lunar-metric-label">All Applications</div>
               </div>
 
               <div
                 className={`lunar-metric-card interview ${selectedFilter === 'INTERVIEWING' ? 'active-metric' : ''}`}
                 onClick={() => setSelectedFilter('INTERVIEWING')}
+                title="Filter by Scheduled Interviews"
               >
                 <div className="lunar-metric-number">{interviewingCount}</div>
                 <div className="lunar-metric-label">📅 Interviewing</div>
@@ -172,6 +190,7 @@ export const MyApplications: React.FC = () => {
               <div
                 className={`lunar-metric-card offer ${selectedFilter === 'OFFERED' ? 'active-metric' : ''}`}
                 onClick={() => setSelectedFilter('OFFERED')}
+                title="Filter by Job Offers"
               >
                 <div className="lunar-metric-number">{offeredCount}</div>
                 <div className="lunar-metric-label">🎉 Offers Received</div>
@@ -180,19 +199,13 @@ export const MyApplications: React.FC = () => {
               <div
                 className={`lunar-metric-card review ${selectedFilter === 'SCREENED' ? 'active-metric' : ''}`}
                 onClick={() => setSelectedFilter('SCREENED')}
+                title="Filter by Screened / In Review"
               >
                 <div className="lunar-metric-number">{inReviewCount}</div>
-                <div className="lunar-metric-label">⚡ In Review / Screened</div>
+                <div className="lunar-metric-label">⚡ In Review</div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* ── Filter Horizon Pills ── */}
-        <div className="lunar-filters-row">
-          <button onClick={fetchApplications} className="lunar-refresh-btn" title="Refresh Pipeline">
-            <RefreshCw size={15} /> Refresh
-          </button>
         </div>
 
         {/* ── Motion Application Cards Feed ── */}
@@ -268,7 +281,7 @@ export const MyApplications: React.FC = () => {
                     {/* Lunar Score Ring */}
                     {app.aiMatchScore && (
                       <div className="lunar-score-ring">
-                        <div className="lunar-score-val">{app.aiMatchScore}%</div>
+                        <div className="lunar-score-val">{app.aiMatchScore}</div>
                         <div className="lunar-score-lbl">AI FIT</div>
                       </div>
                     )}

@@ -461,7 +461,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
         </div>
 
         <button
-          onClick={() => { logout(); navigate('/'); }}
+          onClick={() => { logout('/hr-login'); }}
           style={{
             display: 'flex',
             alignItems: 'center',

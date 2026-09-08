@@ -128,27 +128,44 @@ Audit Telemetry / Moderate Verification / Manage Subscriptions & Security
 
 ## 🌟 Core Features & Modules
 
-### 1. Real-Time Chat & Messaging System
+### 1. WhatsApp-Style Real-Time Messaging System
 - **Full-Duplex Communication**: Built using STOMP over SockJS (`/ws-chat`).
 - **Database Retention**: All direct and group messages are permanently stored in MySQL.
-- **Responsive Layout**: Mobile-first single-panel switching with a "← Back" button for seamless chat on mobile screens.
+- **Mobile WhatsApp Navigation**: Optimized mobile UX ($\le 768\text{px}$) with single-panel view toggling and a WhatsApp-style `← Back` arrow button to return to the contact directory.
+- **Polished Visuals**: Bubble tails, timestamps, double blue ticks (`✓✓`), clean `💬` header badge, and global dark/light theme integration.
 
-### 2. High-Concurrency Redis OTP & Rate Limiting Engine
+### 2. Profile Picture System (Instagram-Style Public Viewing & Client Compression)
+- **Image Upload & Storage**: Candidates can upload profile avatars up to 5 MB with instantaneous preview and DB persistence (`profile_picture_url`).
+- **Smart Image Compression**: Client-side canvas compression (`imageCompressor.ts`) automatically compresses images below 1 MB without losing visual sharpness.
+- **Public Profile Access**: Candidate avatars (`candidate-avatar-circle`) display across recruiter search drawers, applicant cards, and public portfolio pages.
+
+### 3. Developer Workspace & Daily Progress Tracker
+- **Developer Command Center**: Dedicated workspace (`/admin/developer`) for platform developers (`ROLE_APP_DEVELOPER`).
+- **Daily Progress Logging**: Allows developers to record daily updates, task status, and technical notes backed by Flyway SQL schema V24.
+- **System Metrics & Diagnostics**: Telemetry dashboard for tracking JVM memory, thread pool activity, and Redis presence.
+
+### 4. Candidate Dashboard & Interactive Portfolio Builder
+- **Unified Navigation**: Candidate hub (`/dashboard`) combining AI Matches, Jobs Explorer, My Applications, Recruiter Chat, and Portfolio Builder.
+- **Searchable Skill & Tech Stack Matrix**: Replaced flat lists with searchable drop-down select inputs for quick skill addition and tag management.
+- **Application Tracking & Status Filters**: Visual status badges for candidate applications (Applied, Shortlisted, Interview Scheduled, Rejected, Hired).
+
+### 5. High-Concurrency Redis OTP & Rate Limiting Engine
 - **$O(1)$ Performance**: Cryptographic 4-digit OTP codes cached in Redis with an automated 10-minute TTL.
 - **Sliding-Window Rate Limiting**: Throttles OTP requests per email and per IP to prevent spam and abuse.
-- **Brute-Force Protection**: Locks accounts temporarily after 5 invalid verification attempts.
+- **Role Lock Defense**: Secures registration by locking `selectedRole` upon OTP generation to eliminate role escalation risks.
 
-### 3. AI Candidate Matching & Career Agent
+### 6. AI Candidate Matching & Career Agent
 - **AI Recommendation Engine**: Calculates candidate-to-job compatibility scores based on skills, experience, and profile attributes.
 - **Prompt Safety Firewall**: Sanitizes natural language queries and defends against prompt injection.
 
-### 4. Enterprise Company Verification & Badges
+### 7. Enterprise Company Verification & Badges
 - **Verification Pipeline**: Service Team reviews submitted corporate documents.
 - **Verified Badges**: Approved companies and recruiters display official gold verification seals.
 
-### 5. Automated Notification Center
-- **In-App Notifications**: Real-time bell counter and unread message notifications.
-- **Transactional Emails**: Automated SMTP email dispatch for OTP verification, welcome messages, and password resets.
+### 8. Security Hardening & IDOR Defenses
+- **IDOR Protections**: Enforced user identity checks on company updates (`PUT /v1/companies/{id}`) and candidate data deletions.
+- **XSS Prevention**: HTML string escaping in Leaflet popup renderers (`JobMap.tsx`).
+- **Strict CORS & Input Validation**: Validated WebSocket origin patterns and added `@Valid` annotations on core DTO payloads.
 
 ---
 
@@ -207,6 +224,8 @@ Client (Login Request) ---> AuthController (/v1/auth/login)
 | `/v1/auth/send-otp` | `POST` | Dispatch 4-digit OTP code | Public |
 | `/v1/auth/verify-otp` | `POST` | Verify OTP code & activate account | Public |
 | `/v1/auth/logout` | `POST` | Revoke JWT token in Redis | Authenticated |
+| `/v1/candidate/profile-picture` | `POST` | Upload & compress candidate profile image | `ROLE_CANDIDATE` |
+| `/v1/developer/updates` | `GET`, `POST` | Developer daily updates & progress logs | `ROLE_APP_DEVELOPER` |
 | `/v1/jobs` | `GET` | List & filter active job postings | Public |
 | `/v1/jobs` | `POST` | Create a new job listing | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
 | `/v1/applications` | `POST` | Submit job application | `ROLE_CANDIDATE` |
@@ -218,16 +237,6 @@ Client (Login Request) ---> AuthController (/v1/auth/login)
 | `/v1/admin/developer/metrics` | `GET` | Retrieve system telemetry metrics | `ROLE_APP_DEVELOPER` |
 | `/v1/admin/service-team/verifications`| `GET` | List company verification requests | `ROLE_SERVICE_TEAM` |
 | `/v1/admin/super-admin/audit-logs` | `GET` | Search forensic audit logs | `ROLE_SUPER_ADMIN` |
-| `/v1/employees` | `POST` | Onboard candidate as employee (PENDING) | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
-| `/v1/employees` | `GET` | List company employees (status filter) | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
-| `/v1/employees/{id}/verify` | `PUT` | Executive approval for employee onboarding | `ROLE_COMPANY_ADMIN`, `ROLE_SUPER_ADMIN` |
-| `/v1/employees/{id}/terminate` | `POST` | Initiate separation/notice (ON_NOTICE) | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
-| `/v1/employees/{id}/terminate/decision`| `PUT`| Executive decision on employee termination | `ROLE_COMPANY_ADMIN`, `ROLE_SUPER_ADMIN` |
-| `/v1/employees/me` | `GET` | Candidate view own verified employments | `ROLE_CANDIDATE` |
-| `/v1/salary` | `POST` | Create salary disbursement draft | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
-| `/v1/salary/{id}/submit` | `PUT` | Submit salary for leadership approval | `ROLE_HR`, `ROLE_COMPANY_ADMIN` |
-| `/v1/salary/{id}/approve` | `PUT` | Executive approve & trigger payment gateway | `ROLE_COMPANY_ADMIN`, `ROLE_SUPER_ADMIN` |
-| `/v1/salary/me` | `GET` | Candidate view own salary disbursements | `ROLE_CANDIDATE` |
 | `/v1/public/stats` | `GET` | Get public platform statistics | Public |
 
 ---
@@ -254,14 +263,14 @@ HireMind-AI/
 │       ├── main/java/com/talentiq/
 │       │   ├── ai/                 # AI Copilot, Agents, & Usage Logging
 │       │   ├── config/             # Spring Security, Redis, WebSocket configs
-│       │   ├── controller/         # REST API Controllers
+│       │   ├── controller/         # REST API Controllers (Auth, Chat, User, Developer...)
 │       │   ├── dto/                # Request/Response Data Objects
-│       │   ├── model/              # JPA Entities (User, Job, Chat, Candidate...)
+│       │   ├── model/              # JPA Entities (User, Job, Chat, DeveloperDailyUpdate...)
 │       │   ├── repository/         # Spring Data Repositories
 │       │   └── service/            # Business Logic Layer
 │       └── main/resources/
 │           ├── application.yml     # Application configuration
-│           └── db/migration/       # Flyway SQL migrations (V1 - V13)
+│           └── db/migration/       # Flyway SQL migrations (V1 - V24)
 ├── talentiq-frontend/              # React 18 SPA Frontend Application
 │   ├── Dockerfile                  # Nginx production build
 │   ├── package.json                # Dependencies & scripts
@@ -269,9 +278,9 @@ HireMind-AI/
 │       ├── api/                    # Axios HTTP client & WebSocket setup
 │       ├── components/             # Reusable UI components & Navigation
 │       ├── context/                # AuthContext & ThemeContext
-│       ├── css/                    # Modular Vanilla CSS styles
-│       ├── pages/                  # Application views (Candidate, HR, Admin)
-│       └── index.css               # Global responsive design system
+│       ├── css/                    # Modular Vanilla CSS styles (hr-messages, candidate-dashboard...)
+│       ├── pages/                  # Application views (Candidate, HR, Developer, Admin)
+│       └── utils/                  # Utility functions (imageCompressor, roleRoutes)
 └── scripts/
     └── test_all_apis.py            # Automated API testing script
 ```
@@ -418,7 +427,9 @@ Distributed under the **MIT License**.
 ---
 
 ## 🚀 Recent Updates
-- **Enhanced Administrative Security**: Consolidated and hardened authentication for 4 distinct Admin roles (`ROLE_APP_DEVELOPER`, `ROLE_SERVICE_TEAM`, `ROLE_COMPANY_ADMIN`, and `ROLE_SUPER_ADMIN`) with isolated credentials, cross-table fallbacks, and 2FA OTP integration.
-- **CompanyManagerSaaS Workflow**: Extended Company Manager portal for managing employees, performance reviews, and salary disbursement approvals.
-- **Database Migrations**: Refined MySQL 8 compatibility in Flyway migrations (e.g., V21-V23).
-- **Frontend Enhancements**: Improved error visibility during authentication and refined UI for HR and Company Manager dashboards.
+- **WhatsApp-Style Messaging & Mobile Chat**: Single-panel mobile view switching, WhatsApp `← Back` arrow navigation, double blue ticks (`✓✓`), and bubble tails.
+- **Instagram-Style Profile Picture System**: Candidate profile avatar upload with client-side compression under 1 MB and DB storage.
+- **Developer Workspace & Daily Updates**: Added `/admin/developer` interactive daily updates system and V24 Flyway database migration.
+- **Interactive Candidate Dashboard & Searchable Skill Matrix**: Candidate portal with dropdown search for skills and tech stacks.
+- **Security Hardening**: Fixed IDOR vulnerabilities, patched Leaflet map XSS, enforced OTP role locking, and secured WebSocket CORS.
+

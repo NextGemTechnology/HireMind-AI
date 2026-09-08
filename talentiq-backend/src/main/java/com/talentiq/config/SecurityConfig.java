@@ -67,7 +67,9 @@ public class SecurityConfig {
             // Public candidate verification certificate endpoints
             "/v1/company/verifications/candidate/**",
             "/v1/company/verifications/certificate/**",
-            "/v1/company/invitations/validate/**"
+            "/v1/company/invitations/validate/**",
+            // Public user avatar endpoints (Instagram style)
+            "/v1/users/avatar/**"
     };
 
     @Bean

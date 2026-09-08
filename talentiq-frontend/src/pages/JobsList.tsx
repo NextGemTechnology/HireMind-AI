@@ -65,7 +65,11 @@ const StarCanvas: React.FC = () => {
   );
 };
 
-export const JobsList: React.FC = () => {
+interface JobsListProps {
+  embedded?: boolean;
+}
+
+export const JobsList: React.FC<JobsListProps> = ({ embedded = false }) => {
   const { isHr, isAdmin } = useAuth();
   const navigate = useNavigate();
 
@@ -301,9 +305,9 @@ export const JobsList: React.FC = () => {
   });
 
   const jobsContent = (
-    <div className="jobs-page-wrapper" style={isHr ? { flex: 1, height: '100vh', overflowY: 'auto' } : undefined}>
+    <div className={`jobs-page-wrapper ${embedded ? 'is-embedded' : ''}`} style={isHr ? { flex: 1, height: '100vh', overflowY: 'auto' } : undefined}>
       {/* Star Canvas */}
-      <StarCanvas />
+      {!embedded && <StarCanvas />}
 
       {/* Cosmic Background Orbs */}
       <div className="jobs-orb-top-right" />

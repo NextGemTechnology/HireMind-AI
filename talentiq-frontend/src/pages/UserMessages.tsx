@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import {
   Send, Search, MessageSquare, Briefcase, FileText,
   FolderGit2, Sparkles, LogOut, Check, CheckCheck,
-  Sun, Moon, Paperclip, X, Clock,
-  ChevronDown, CheckCircle2, Trash2, Copy, Building2, User, ArrowLeft
+  Paperclip, X, Clock,
+  Trash2, Copy, Building2, User, ArrowLeft
 } from 'lucide-react';
 import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/hr-messages.css';
 
 /* ─── Types ─── */
-type ChatTheme = 'galaxy' | 'moon' | 'light' | 'obsidian';
-
 interface Contact {
   userId: number;
   name: string;
@@ -43,8 +42,13 @@ interface Message {
   status?: 'SENDING' | 'SENT' | 'DELIVERED' | 'READ';
 }
 
-export const UserMessages: React.FC = () => {
+interface UserMessagesProps {
+  embedded?: boolean;
+}
+
+export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { isLight } = useTheme();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -54,28 +58,6 @@ export const UserMessages: React.FC = () => {
       navigate('/user-login');
     }
   }, [isAuthenticated, navigate]);
-
-  // ── 4-Theme Engine ──
-  const [theme, setTheme] = useState<ChatTheme>(() => {
-    const saved = localStorage.getItem('candidate_chat_theme') as ChatTheme;
-    if (saved && ['galaxy', 'moon', 'light', 'obsidian'].includes(saved)) {
-      return saved;
-    }
-    return 'galaxy';
-  });
-
-  const [showThemeMenu, setShowThemeMenu] = useState(false);
-
-  const handleSelectTheme = (newTheme: ChatTheme) => {
-    setTheme(newTheme);
-    localStorage.setItem('candidate_chat_theme', newTheme);
-    setShowThemeMenu(false);
-  };
-
-  const toggleLightDark = () => {
-    const nextTheme: ChatTheme = theme === 'light' ? 'galaxy' : 'light';
-    handleSelectTheme(nextTheme);
-  };
 
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -139,6 +121,8 @@ export const UserMessages: React.FC = () => {
 
       const savedContactId = sessionStorage.getItem('active_chat_contact_id');
 
+      const isMobile = window.innerWidth <= 768;
+
       // If direct recruiter param passed from job details, ensure contact exists in list
       if (contactIdParam) {
         const targetId = parseInt(contactIdParam);
@@ -162,18 +146,30 @@ export const UserMessages: React.FC = () => {
           setSelectedContact(newRecruiterContact);
           sessionStorage.setItem('active_chat_contact_id', String(targetId));
         }
-      } else if (savedContactId) {
-        const targetId = parseInt(savedContactId);
-        const found = list.find(c => c.userId === targetId);
-        if (found) {
-          setSelectedContact(found);
+      } else if (!isMobile) {
+        // Desktop / wide screen split pane: auto-select saved or first contact
+        if (savedContactId) {
+          const targetId = parseInt(savedContactId);
+          const found = list.find(c => c.userId === targetId);
+          if (found) {
+            setSelectedContact(found);
+          } else if (list.length > 0) {
+            setSelectedContact(list[0]);
+            sessionStorage.setItem('active_chat_contact_id', String(list[0].userId));
+          }
         } else if (list.length > 0) {
           setSelectedContact(list[0]);
           sessionStorage.setItem('active_chat_contact_id', String(list[0].userId));
         }
-      } else if (list.length > 0) {
-        setSelectedContact(list[0]);
-        sessionStorage.setItem('active_chat_contact_id', String(list[0].userId));
+      } else {
+        // Mobile screen: keep on contacts list view unless user previously selected a chat in this session
+        if (savedContactId) {
+          const targetId = parseInt(savedContactId);
+          const found = list.find(c => c.userId === targetId);
+          if (found) {
+            setSelectedContact(found);
+          }
+        }
       }
 
       setContacts(list);
@@ -183,7 +179,7 @@ export const UserMessages: React.FC = () => {
     } finally {
       setContactsLoading(false);
     }
-  }, [contactIdParam, recruiterNameParam, jobTitleParam, companyParam]);
+  }, [contactIdParam, recruiterNameParam, jobTitleParam, companyParam, currentUserId, user]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -529,118 +525,66 @@ export const UserMessages: React.FC = () => {
   };
 
   return (
-    <div className={`messages-page-wrapper theme-${theme} ${selectedContact ? 'has-active-chat' : 'no-active-chat'}`}>
-      {/* ── Left Navigation Sidebar ── */}
-      <aside className="msg-sidebar">
-        <div className="msg-sidebar-brand" onClick={() => navigate('/')}>
-          <HireMindLogo variant="navbar" size="sm" />
-        </div>
+    <div className={`messages-page-wrapper ${isLight ? 'theme-light' : 'theme-universe'} ${selectedContact ? 'has-active-chat' : 'no-active-chat'} ${embedded ? 'is-embedded' : ''}`}>
+      {/* ── Left Navigation Sidebar (Only when standalone) ── */}
+      {!embedded && (
+        <aside className="msg-sidebar">
+          <div className="msg-sidebar-brand" onClick={() => navigate('/')}>
+            <HireMindLogo variant="navbar" size="sm" />
+          </div>
 
-        <nav className="msg-nav-list">
-          <button onClick={() => navigate('/jobs')} className="msg-nav-item">
-            <Briefcase size={17} /> Jobs Explorer
-          </button>
-          <button onClick={() => navigate('/recommendations')} className="msg-nav-item">
-            <Sparkles size={17} /> AI Matches
-          </button>
-          <button onClick={() => {}} className="msg-nav-item active">
-            <MessageSquare size={17} /> Recruiter Chat
-          </button>
-          <button onClick={() => navigate('/my-applications')} className="msg-nav-item">
-            <FileText size={17} /> Applications
-          </button>
-          <button onClick={() => navigate('/portfolio')} className="msg-nav-item">
-            <FolderGit2 size={17} /> Portfolio
-          </button>
-          <div className="msg-nav-divider" />
-          <button onClick={() => { logout(); navigate('/'); }} className="msg-nav-item sign-out">
-            <LogOut size={17} /> Sign Out
-          </button>
-        </nav>
+          <nav className="msg-nav-list">
+            <button onClick={() => navigate('/jobs')} className="msg-nav-item">
+              <Briefcase size={17} /> Jobs Explorer
+            </button>
+            <button onClick={() => navigate('/recommendations')} className="msg-nav-item">
+              <Sparkles size={17} /> AI Matches
+            </button>
+            <button onClick={() => {}} className="msg-nav-item active">
+              <MessageSquare size={17} /> Recruiter Chat
+            </button>
+            <button onClick={() => navigate('/my-applications')} className="msg-nav-item">
+              <FileText size={17} /> Applications
+            </button>
+            <button onClick={() => navigate('/portfolio')} className="msg-nav-item">
+              <FolderGit2 size={17} /> Portfolio
+            </button>
+            <div className="msg-nav-divider" />
+            <button onClick={() => { logout('/user-login'); }} className="msg-nav-item sign-out">
+              <LogOut size={17} /> Sign Out
+            </button>
+          </nav>
 
-        <div className="msg-user-badge">
-          <div className="msg-user-name">{user ? `${user.firstName} ${user.lastName}` : 'Candidate'}</div>
-          <div className="msg-user-email">{user?.email || 'candidate@gmail.com'}</div>
-        </div>
-      </aside>
+          <div className="msg-user-badge">
+            <div className="msg-user-name">{user ? `${user.firstName} ${user.lastName}` : 'Candidate'}</div>
+            <div className="msg-user-email">{user?.email || 'candidate@gmail.com'}</div>
+          </div>
+        </aside>
+      )}
 
-      {/* ── Fixed Left Contacts Directory ── */}
+      {/* ── Fixed Left Contacts Directory (WhatsApp style chat list) ── */}
       <div className="msg-contacts-panel">
         <div className="msg-contacts-header">
           <div className="msg-contacts-title-row">
             <div className="msg-contacts-title-wrap">
-              <h2 className="msg-contacts-title">Conversations 💬</h2>
-              <span className="msg-contacts-badge">{contacts.length}</span>
-            </div>
-
-            {/* Quick Light/Dark Toggle & Theme Dropdown */}
-            <div className="msg-theme-tools">
-              <button
-                onClick={toggleLightDark}
-                className="msg-theme-quick-btn"
-                title={theme === 'light' ? 'Switch to Cosmic Dark' : 'Switch to Solar Light'}
-              >
-                {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
-              </button>
-
-              <div className="msg-theme-dropdown-wrap">
-                <button
-                  onClick={() => setShowThemeMenu(!showThemeMenu)}
-                  className="msg-theme-select-btn"
-                  title="Choose Chat Theme"
-                >
-                  <Sparkles size={13} />
-                  <span className="msg-theme-name-label">{theme.toUpperCase()}</span>
-                  <ChevronDown size={13} />
-                </button>
-
-                {showThemeMenu && (
-                  <div className="msg-theme-menu">
-                    <button
-                      onClick={() => handleSelectTheme('galaxy')}
-                      className={`msg-theme-opt ${theme === 'galaxy' ? 'active' : ''}`}
-                    >
-                      <span>🌌 Cosmic Galaxy</span>
-                      {theme === 'galaxy' && <CheckCircle2 size={13} color="#A78BFA" />}
-                    </button>
-                    <button
-                      onClick={() => handleSelectTheme('moon')}
-                      className={`msg-theme-opt ${theme === 'moon' ? 'active' : ''}`}
-                    >
-                      <span>🌙 Lunar Moon</span>
-                      {theme === 'moon' && <CheckCircle2 size={13} color="#93C5FD" />}
-                    </button>
-                    <button
-                      onClick={() => handleSelectTheme('light')}
-                      className={`msg-theme-opt ${theme === 'light' ? 'active' : ''}`}
-                    >
-                      <span>☀️ Solar Daylight</span>
-                      {theme === 'light' && <CheckCircle2 size={13} color="#F59E0B" />}
-                    </button>
-                    <button
-                      onClick={() => handleSelectTheme('obsidian')}
-                      className={`msg-theme-opt ${theme === 'obsidian' ? 'active' : ''}`}
-                    >
-                      <span>🪐 Cyber Obsidian</span>
-                      {theme === 'obsidian' && <CheckCircle2 size={13} color="#34D399" />}
-                    </button>
-                  </div>
-                )}
-              </div>
+              <span className="msg-contacts-title-emoji">💬</span>
+              {contacts.length > 0 && (
+                <span className="msg-contacts-badge">{contacts.length}</span>
+              )}
             </div>
           </div>
 
           <div className="msg-search-box">
-            <Search size={14} className="msg-search-icon" />
+            <Search size={15} className="msg-search-icon" />
             <input
               type="text"
-              placeholder="Search recruiters, roles, companies..."
+              placeholder="Search chats or recruiters..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="msg-search-input"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="msg-search-clear">
+              <button onClick={() => setSearchQuery('')} className="msg-search-clear" title="Clear">
                 <X size={13} />
               </button>
             )}
@@ -650,7 +594,7 @@ export const UserMessages: React.FC = () => {
         {/* Scrollable Contacts List */}
         <div className="msg-contacts-list">
           {contactsLoading ? (
-            <div className="msg-loading-text">Loading chat directory...</div>
+            <div className="msg-loading-text">Loading chats...</div>
           ) : filteredContacts.length === 0 ? (
             <div className="msg-empty-contacts">
               No conversations found matching "{searchQuery}".
@@ -661,7 +605,10 @@ export const UserMessages: React.FC = () => {
               return (
                 <div
                   key={c.userId}
-                  onClick={() => setSelectedContact(c)}
+                  onClick={() => {
+                    setSelectedContact(c);
+                    sessionStorage.setItem('active_chat_contact_id', String(c.userId));
+                  }}
                   className={`msg-contact-item ${isSelected ? 'selected' : ''} ${c.flagged ? 'is-flagged-contact' : ''}`}
                 >
                   <div className="msg-avatar-contact">
@@ -676,7 +623,7 @@ export const UserMessages: React.FC = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                         <span className="msg-contact-name">{c.name}</span>
                         {c.flagged && (
-                          <span className="msg-flag-icon-badge" title="Flagged / Shortlisted by this Recruiter">
+                          <span className="msg-flag-icon-badge" title="Shortlisted by this Recruiter">
                             🚩 Shortlisted
                           </span>
                         )}
@@ -693,7 +640,7 @@ export const UserMessages: React.FC = () => {
                       </div>
                     )}
                     <div className="msg-contact-snippet-row">
-                      <span className="msg-contact-snippet">{c.lastMessage || 'Click to start conversation...'}</span>
+                      <span className="msg-contact-snippet">{c.lastMessage || 'Tap to chat...'}</span>
                       {c.unreadCount > 0 && (
                         <span className="msg-unread-badge">{c.unreadCount}</span>
                       )}
@@ -710,28 +657,19 @@ export const UserMessages: React.FC = () => {
       <div className="msg-chat-panel">
         {selectedContact ? (
           <>
-            {/* Top Chat Header */}
+            {/* Top Chat Header (WhatsApp style) */}
             <div className="msg-chat-header">
               <div className="msg-chat-header-user">
                 <button
-                  onClick={() => setSelectedContact(null)}
-                  className="msg-mobile-back-btn"
-                  style={{
-                    background: 'rgba(255,255,255,0.08)',
-                    border: '1px solid rgba(255,255,255,0.15)',
-                    borderRadius: '8px',
-                    color: 'inherit',
-                    padding: '6px 8px',
-                    cursor: 'pointer',
-                    display: 'none',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '12px',
-                    marginRight: '6px',
+                  type="button"
+                  onClick={() => {
+                    setSelectedContact(null);
+                    sessionStorage.removeItem('active_chat_contact_id');
                   }}
-                  title="Back to Conversations"
+                  className="msg-mobile-back-btn"
+                  title="Back to Chats"
                 >
-                  <ArrowLeft size={16} />
+                  <ArrowLeft size={18} />
                 </button>
                 <div className="msg-avatar-contact active-avatar">
                   {selectedContact.avatarUrl ? (
@@ -744,19 +682,16 @@ export const UserMessages: React.FC = () => {
                   <div className="msg-chat-header-name">
                     <span className="msg-chat-candidate-title">{selectedContact.name}</span>
                     {selectedContact.flagged && (
-                      <span className="msg-flagged-pill candidate-side" title="You have been shortlisted and flagged by this HR Recruiter!">
-                        🚩 Shortlisted by Recruiter
+                      <span className="msg-flagged-pill candidate-side" title="Shortlisted by Recruiter">
+                        🚩 Shortlisted
                       </span>
                     )}
                   </div>
                   <div className="msg-chat-status-line">
                     <span className="msg-status-dot" />
-                    <span>{otherTyping ? 'Typing...' : 'HR Recruiter Online'}</span>
+                    <span>{otherTyping ? 'typing...' : 'online'}</span>
                     {selectedContact.companyName && (
                       <span className="msg-company-tag">• {selectedContact.companyName}</span>
-                    )}
-                    {selectedContact.jobTitle && (
-                      <span className="msg-job-tag">• {selectedContact.jobTitle}</span>
                     )}
                   </div>
                 </div>
@@ -764,17 +699,12 @@ export const UserMessages: React.FC = () => {
 
               <div className="msg-chat-header-actions">
                 <button
+                  type="button"
                   onClick={() => setShowClearModal(true)}
                   className="msg-header-btn msg-btn-danger"
-                  title="Clear / Delete Conversation"
+                  title="Clear Chat History"
                 >
-                  <Trash2 size={14} /> Clear Chat
-                </button>
-                <button onClick={() => navigate('/recommendations')} className="msg-header-btn" title="View AI Job Recommendations">
-                  <Sparkles size={14} /> AI Matches
-                </button>
-                <button onClick={() => navigate('/jobs')} className="msg-header-btn" title="View Jobs Catalog">
-                  <Briefcase size={14} /> Jobs Catalog
+                  <Trash2 size={15} /> <span>Clear</span>
                 </button>
               </div>
             </div>

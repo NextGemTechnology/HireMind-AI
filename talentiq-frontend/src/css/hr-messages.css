@@ -20,6 +20,51 @@
   z-index: 100;
 }
 
+.messages-page-wrapper.is-embedded {
+  position: relative !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  height: calc(100vh - 120px) !important;
+  max-height: calc(100vh - 120px) !important;
+  border-radius: 16px;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  z-index: 1;
+}
+
+.theme-light .messages-page-wrapper.is-embedded {
+  border-color: #E2E8F0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.msg-mobile-back-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  margin-right: 6px;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.msg-mobile-back-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.theme-light .msg-mobile-back-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.msg-mobile-back-btn:active {
+  transform: scale(0.92);
+}
+
 /* ════════════════════════════════════════════════════════════════
    THEME 1: COSMIC GALAXY (Default Dark Nebula)
    ════════════════════════════════════════════════════════════════ */

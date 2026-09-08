@@ -1,6 +1,6 @@
 /* ============================================================
    TalentIQ — AI Recommendation Engine 2.0 Unified Styles
-   3-Div Cohesive Architecture: Topbar, Content & Modal
+   Single-Page Seamless Architecture & Full Light/Dark Theme
    ============================================================ */
 
 .recs-page-wrapper {
@@ -10,10 +10,29 @@
   background: #090D1A;
   color: #F8FAFC;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ── Seamless Transparent Embedding in Candidate Dashboard ── */
+.recs-page-wrapper.is-embedded {
+  background: transparent !important;
+  min-height: auto;
+  padding: 0;
+  color: var(--cand-text-main, #0F172A);
+}
+
+.recs-page-wrapper.is-embedded .recs-unified-dashboard {
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0 40px;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  gap: 16px;
 }
 
 /* ════════════════════════════════════════════════════════════
-   1 SINGLE UNIFIED DASHBOARD CONTAINER (1 hi div me sab kuch)
+   1 SINGLE UNIFIED DASHBOARD CONTAINER (Single Seamless Page)
    ════════════════════════════════════════════════════════════ */
 .recs-unified-dashboard {
   max-width: 1320px;
@@ -1008,8 +1027,8 @@
 }
 
 .recs-chat-timeline {
-  padding: 20px;
-  max-height: 480px;
+  padding: 18px 20px;
+  max-height: 380px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1434,3 +1453,557 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   LIGHT THEME ADAPTATION (Full Dashboard & Embedded Sync)
+   ══════════════════════════════════════════════════════════════ */
+
+.candidate-dashboard-layout.theme-light .recs-page-wrapper,
+.candidate-dashboard-layout.theme-light-75 .recs-page-wrapper,
+.candidate-dashboard-layout.theme-light-25 .recs-page-wrapper,
+.theme-light .recs-page-wrapper,
+.recs-page-wrapper.theme-light {
+  color: var(--cand-text-main, #0F172A);
+}
+
+.theme-light .recs-page-wrapper:not(.is-embedded),
+.recs-page-wrapper.theme-light:not(.is-embedded) {
+  background: #F8FAFC;
+}
+
+/* Topbar in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-unified-topbar,
+.candidate-dashboard-layout.theme-light-75 .recs-unified-topbar,
+.candidate-dashboard-layout.theme-light-25 .recs-unified-topbar,
+.theme-light .recs-unified-topbar,
+.recs-page-wrapper.theme-light .recs-unified-topbar {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.candidate-dashboard-layout.theme-light .recs-topbar-title,
+.candidate-dashboard-layout.theme-light-75 .recs-topbar-title,
+.candidate-dashboard-layout.theme-light-25 .recs-topbar-title,
+.theme-light .recs-topbar-title,
+.recs-page-wrapper.theme-light .recs-topbar-title {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-topbar-sub,
+.candidate-dashboard-layout.theme-light-75 .recs-topbar-sub,
+.candidate-dashboard-layout.theme-light-25 .recs-topbar-sub,
+.theme-light .recs-topbar-sub,
+.recs-page-wrapper.theme-light .recs-topbar-sub {
+  color: var(--cand-text-muted, #64748B) !important;
+}
+
+/* Search & Inputs in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-search-input,
+.candidate-dashboard-layout.theme-light-75 .recs-search-input,
+.candidate-dashboard-layout.theme-light-25 .recs-search-input,
+.theme-light .recs-search-input,
+.recs-page-wrapper.theme-light .recs-search-input {
+  background: var(--cand-bg, #F8FAFC);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-main, #0F172A);
+}
+
+.candidate-dashboard-layout.theme-light .recs-search-input:focus,
+.candidate-dashboard-layout.theme-light-75 .recs-search-input:focus,
+.candidate-dashboard-layout.theme-light-25 .recs-search-input:focus,
+.theme-light .recs-search-input:focus,
+.recs-page-wrapper.theme-light .recs-search-input:focus {
+  background: #FFFFFF;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.candidate-dashboard-layout.theme-light .recs-search-icon,
+.theme-light .recs-search-icon,
+.recs-page-wrapper.theme-light .recs-search-icon {
+  color: var(--cand-text-muted, #64748B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-search-clear-btn,
+.theme-light .recs-search-clear-btn,
+.recs-page-wrapper.theme-light .recs-search-clear-btn {
+  color: var(--cand-text-muted, #64748B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-search-clear-btn:hover,
+.theme-light .recs-search-clear-btn:hover,
+.recs-page-wrapper.theme-light .recs-search-clear-btn:hover {
+  color: var(--cand-text-main, #0F172A);
+}
+
+/* Select Dropdowns in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-native-select,
+.candidate-dashboard-layout.theme-light-75 .recs-native-select,
+.candidate-dashboard-layout.theme-light-25 .recs-native-select,
+.theme-light .recs-native-select,
+.recs-page-wrapper.theme-light .recs-native-select {
+  background: var(--cand-bg, #F8FAFC);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-main, #0F172A);
+}
+
+.candidate-dashboard-layout.theme-light .recs-native-select:hover,
+.candidate-dashboard-layout.theme-light .recs-native-select:focus,
+.theme-light .recs-native-select:hover,
+.theme-light .recs-native-select:focus,
+.recs-page-wrapper.theme-light .recs-native-select:hover,
+.recs-page-wrapper.theme-light .recs-native-select:focus {
+  border-color: #3B82F6;
+  background: #FFFFFF;
+}
+
+.candidate-dashboard-layout.theme-light .recs-native-select option,
+.theme-light .recs-native-select option,
+.recs-page-wrapper.theme-light .recs-native-select option {
+  background: #FFFFFF;
+  color: #0F172A;
+}
+
+.candidate-dashboard-layout.theme-light .recs-select-arrow,
+.theme-light .recs-select-arrow,
+.recs-page-wrapper.theme-light .recs-select-arrow {
+  color: var(--cand-text-muted, #64748B);
+}
+
+/* View Mode Pills in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-view-toggle-group,
+.candidate-dashboard-layout.theme-light-75 .recs-view-toggle-group,
+.candidate-dashboard-layout.theme-light-25 .recs-view-toggle-group,
+.theme-light .recs-view-toggle-group,
+.recs-page-wrapper.theme-light .recs-view-toggle-group {
+  background: var(--cand-border-subtle, #F1F5F9);
+  border: 1px solid var(--cand-border, #CBD5E1);
+}
+
+.candidate-dashboard-layout.theme-light .recs-view-pill-btn,
+.theme-light .recs-view-pill-btn,
+.recs-page-wrapper.theme-light .recs-view-pill-btn {
+  color: var(--cand-text-muted, #64748B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-view-pill-btn:hover,
+.theme-light .recs-view-pill-btn:hover,
+.recs-page-wrapper.theme-light .recs-view-pill-btn:hover {
+  color: var(--cand-text-main, #0F172A);
+}
+
+.candidate-dashboard-layout.theme-light .recs-view-pill-btn.active,
+.theme-light .recs-view-pill-btn.active,
+.recs-page-wrapper.theme-light .recs-view-pill-btn.active {
+  background: var(--cand-primary, #2563EB);
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* AI Career Agent Workspace in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-chat-workspace,
+.candidate-dashboard-layout.theme-light-75 .recs-chat-workspace,
+.candidate-dashboard-layout.theme-light-25 .recs-chat-workspace,
+.theme-light .recs-chat-workspace,
+.recs-page-wrapper.theme-light .recs-chat-workspace {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-top-header,
+.candidate-dashboard-layout.theme-light-75 .recs-chat-top-header,
+.candidate-dashboard-layout.theme-light-25 .recs-chat-top-header,
+.theme-light .recs-chat-top-header,
+.recs-page-wrapper.theme-light .recs-chat-top-header {
+  background: var(--cand-bg, #F8FAFC);
+  border-bottom: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-bot-title,
+.theme-light .recs-chat-bot-title,
+.recs-page-wrapper.theme-light .recs-chat-bot-title {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-bot-sub,
+.theme-light .recs-chat-bot-sub,
+.recs-page-wrapper.theme-light .recs-chat-bot-sub {
+  color: var(--cand-text-muted, #64748B) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-header-btn,
+.theme-light .recs-chat-header-btn,
+.recs-page-wrapper.theme-light .recs-chat-header-btn {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-main, #334155);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-header-btn:hover,
+.theme-light .recs-chat-header-btn:hover,
+.recs-page-wrapper.theme-light .recs-chat-header-btn:hover {
+  background: #EFF6FF;
+  border-color: #3B82F6;
+  color: #1D4ED8;
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-reset-btn,
+.theme-light .recs-chat-reset-btn,
+.recs-page-wrapper.theme-light .recs-chat-reset-btn {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-muted, #64748B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-reset-btn:hover,
+.theme-light .recs-chat-reset-btn:hover,
+.recs-page-wrapper.theme-light .recs-chat-reset-btn:hover {
+  background: #FEF2F2;
+  border-color: #F87171;
+  color: #DC2626;
+}
+
+/* Quick Prompts Bar in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-chat-prompts-bar,
+.candidate-dashboard-layout.theme-light-75 .recs-chat-prompts-bar,
+.candidate-dashboard-layout.theme-light-25 .recs-chat-prompts-bar,
+.theme-light .recs-chat-prompts-bar,
+.recs-page-wrapper.theme-light .recs-chat-prompts-bar {
+  background: var(--cand-border-subtle, #F1F5F9);
+  border-bottom: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-prompts-label,
+.theme-light .recs-prompts-label,
+.recs-page-wrapper.theme-light .recs-prompts-label {
+  color: #4F46E5;
+}
+
+.candidate-dashboard-layout.theme-light .recs-prompt-chip,
+.theme-light .recs-prompt-chip,
+.recs-page-wrapper.theme-light .recs-prompt-chip {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-main, #334155);
+}
+
+.candidate-dashboard-layout.theme-light .recs-prompt-chip:hover,
+.theme-light .recs-prompt-chip:hover,
+.recs-page-wrapper.theme-light .recs-prompt-chip:hover {
+  background: #EEF2FF;
+  border-color: #6366F1;
+  color: #4338CA;
+}
+
+/* Chat Messages in Light Mode */
+.candidate-dashboard-layout.theme-light .agent-msg,
+.candidate-dashboard-layout.theme-light-75 .agent-msg,
+.candidate-dashboard-layout.theme-light-25 .agent-msg,
+.theme-light .agent-msg,
+.recs-page-wrapper.theme-light .agent-msg {
+  background: var(--cand-bg, #F8FAFC);
+  border: 1px solid var(--cand-border, #E2E8F0);
+  color: var(--cand-text-main, #1E293B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-timestamp,
+.theme-light .recs-chat-timestamp,
+.recs-page-wrapper.theme-light .recs-chat-timestamp {
+  color: var(--cand-text-sub, #94A3B8);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-embedded-job-card,
+.theme-light .recs-chat-embedded-job-card,
+.recs-page-wrapper.theme-light .recs-chat-embedded-job-card {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-embed-job-title,
+.theme-light .recs-embed-job-title,
+.recs-page-wrapper.theme-light .recs-embed-job-title {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-embed-job-company,
+.theme-light .recs-embed-job-company,
+.recs-page-wrapper.theme-light .recs-embed-job-company {
+  color: var(--cand-text-muted, #64748B) !important;
+}
+
+/* Chat Input in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-chat-bottom-input,
+.candidate-dashboard-layout.theme-light-75 .recs-chat-bottom-input,
+.candidate-dashboard-layout.theme-light-25 .recs-chat-bottom-input,
+.theme-light .recs-chat-bottom-input,
+.recs-page-wrapper.theme-light .recs-chat-bottom-input {
+  background: var(--cand-card-bg, #FFFFFF);
+  border-top: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-text-input,
+.theme-light .recs-chat-text-input,
+.recs-page-wrapper.theme-light .recs-chat-text-input {
+  background: var(--cand-bg, #F8FAFC);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-main, #0F172A);
+}
+
+.candidate-dashboard-layout.theme-light .recs-chat-text-input:focus,
+.theme-light .recs-chat-text-input:focus,
+.recs-page-wrapper.theme-light .recs-chat-text-input:focus {
+  background: #FFFFFF;
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* Job Cards in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-job-unified-card,
+.candidate-dashboard-layout.theme-light-75 .recs-job-unified-card,
+.candidate-dashboard-layout.theme-light-25 .recs-job-unified-card,
+.theme-light .recs-job-unified-card,
+.recs-page-wrapper.theme-light .recs-job-unified-card {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.candidate-dashboard-layout.theme-light .recs-job-unified-card:hover,
+.theme-light .recs-job-unified-card:hover,
+.recs-page-wrapper.theme-light .recs-job-unified-card:hover {
+  transform: translateY(-2px);
+  border-color: #93C5FD;
+  box-shadow: 0 8px 24px -4px rgba(37, 99, 235, 0.1);
+}
+
+.candidate-dashboard-layout.theme-light .recs-card-job-title,
+.theme-light .recs-card-job-title,
+.recs-page-wrapper.theme-light .recs-card-job-title {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-card-meta-line,
+.theme-light .recs-card-meta-line,
+.recs-page-wrapper.theme-light .recs-card-meta-line {
+  color: var(--cand-text-muted, #64748B) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-meta-company,
+.theme-light .recs-meta-company,
+.recs-page-wrapper.theme-light .recs-meta-company {
+  color: var(--cand-text-main, #1E293B) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-skills-lead-label,
+.theme-light .recs-skills-lead-label,
+.recs-page-wrapper.theme-light .recs-skills-lead-label {
+  color: var(--cand-text-muted, #64748B) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-circular-gauge,
+.theme-light .recs-circular-gauge,
+.recs-page-wrapper.theme-light .recs-circular-gauge {
+  background: var(--cand-bg, #F8FAFC);
+  border: 2px solid var(--cand-border, #E2E8F0);
+  box-shadow: none;
+}
+
+.candidate-dashboard-layout.theme-light .recs-gauge-val,
+.theme-light .recs-gauge-val,
+.recs-page-wrapper.theme-light .recs-gauge-val {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-gauge-sub,
+.theme-light .recs-gauge-sub,
+.recs-page-wrapper.theme-light .recs-gauge-sub {
+  color: #4F46E5 !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-skill-chip-more,
+.theme-light .recs-skill-chip-more,
+.recs-page-wrapper.theme-light .recs-skill-chip-more {
+  background: var(--cand-border-subtle, #F1F5F9);
+  color: var(--cand-text-muted, #64748B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-accordion-btn,
+.theme-light .recs-accordion-btn,
+.recs-page-wrapper.theme-light .recs-accordion-btn {
+  background: var(--cand-border-subtle, #F1F5F9);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: #4338CA;
+}
+
+.candidate-dashboard-layout.theme-light .recs-accordion-btn:hover,
+.theme-light .recs-accordion-btn:hover,
+.recs-page-wrapper.theme-light .recs-accordion-btn:hover {
+  background: #EEF2FF;
+  border-color: #6366F1;
+  color: #3730A3;
+}
+
+.candidate-dashboard-layout.theme-light .recs-expanded-analysis-box,
+.theme-light .recs-expanded-analysis-box,
+.recs-page-wrapper.theme-light .recs-expanded-analysis-box {
+  background: var(--cand-bg, #F8FAFC);
+  border: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-meter-card,
+.theme-light .recs-meter-card,
+.recs-page-wrapper.theme-light .recs-meter-card {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-meter-top,
+.theme-light .recs-meter-top,
+.recs-page-wrapper.theme-light .recs-meter-top {
+  color: var(--cand-text-muted, #64748B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-meter-top strong,
+.theme-light .recs-meter-top strong,
+.recs-page-wrapper.theme-light .recs-meter-top strong {
+  color: var(--cand-text-main, #0F172A);
+}
+
+.candidate-dashboard-layout.theme-light .recs-progress-track,
+.theme-light .recs-progress-track,
+.recs-page-wrapper.theme-light .recs-progress-track {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.candidate-dashboard-layout.theme-light .recs-insights-column,
+.theme-light .recs-insights-column,
+.recs-page-wrapper.theme-light .recs-insights-column {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-column-header,
+.theme-light .recs-column-header,
+.recs-page-wrapper.theme-light .recs-column-header {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-column-list li,
+.theme-light .recs-column-list li,
+.recs-page-wrapper.theme-light .recs-column-list li {
+  color: var(--cand-text-muted, #475569) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-card-actions-bar,
+.theme-light .recs-card-actions-bar,
+.recs-page-wrapper.theme-light .recs-card-actions-bar {
+  border-top: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-card-btn,
+.theme-light .recs-card-btn,
+.recs-page-wrapper.theme-light .recs-card-btn {
+  background: var(--cand-border-subtle, #F1F5F9);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-main, #334155);
+}
+
+.candidate-dashboard-layout.theme-light .recs-loading-card,
+.theme-light .recs-loading-card,
+.recs-page-wrapper.theme-light .recs-loading-card {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-loading-headline,
+.theme-light .recs-loading-headline,
+.recs-page-wrapper.theme-light .recs-loading-headline {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-loading-subtext,
+.theme-light .recs-loading-subtext,
+.recs-page-wrapper.theme-light .recs-loading-subtext {
+  color: var(--cand-text-muted, #64748B) !important;
+}
+
+/* Modal in Light Mode */
+.candidate-dashboard-layout.theme-light .recs-modal-card,
+.theme-light .recs-modal-card,
+.recs-page-wrapper.theme-light .recs-modal-card {
+  background: var(--cand-card-bg, #FFFFFF);
+  border: 1px solid var(--cand-border, #E2E8F0);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+.candidate-dashboard-layout.theme-light .recs-modal-title,
+.theme-light .recs-modal-title,
+.recs-page-wrapper.theme-light .recs-modal-title {
+  color: var(--cand-text-main, #0F172A) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-modal-sub,
+.theme-light .recs-modal-sub,
+.recs-page-wrapper.theme-light .recs-modal-sub {
+  color: var(--cand-text-muted, #64748B) !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-modal-close,
+.theme-light .recs-modal-close,
+.recs-page-wrapper.theme-light .recs-modal-close {
+  background: var(--cand-border-subtle, #F1F5F9);
+  border: 1px solid var(--cand-border, #CBD5E1);
+  color: var(--cand-text-muted, #64748B);
+}
+
+.candidate-dashboard-layout.theme-light .recs-modal-header,
+.theme-light .recs-modal-header,
+.recs-page-wrapper.theme-light .recs-modal-header {
+  border-bottom: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-modal-footer,
+.theme-light .recs-modal-footer,
+.recs-page-wrapper.theme-light .recs-modal-footer {
+  border-top: 1px solid var(--cand-border, #E2E8F0);
+}
+
+.candidate-dashboard-layout.theme-light .recs-modal-section-title,
+.theme-light .recs-modal-section-title,
+.recs-page-wrapper.theme-light .recs-modal-section-title {
+  color: #4F46E5 !important;
+}
+
+.candidate-dashboard-layout.theme-light .recs-modal-text,
+.theme-light .recs-modal-text,
+.recs-page-wrapper.theme-light .recs-modal-text {
+  color: var(--cand-text-main, #334155) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DARK THEME OVERRIDES FOR EMBEDDED MODE
+   ══════════════════════════════════════════════════════════════ */
+.candidate-dashboard-layout.theme-dark .recs-unified-topbar,
+.candidate-dashboard-layout.theme-dark-80 .recs-unified-topbar {
+  background: rgba(21, 30, 46, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.candidate-dashboard-layout.theme-dark .recs-chat-workspace,
+.candidate-dashboard-layout.theme-dark-80 .recs-chat-workspace {
+  background: rgba(21, 30, 46, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.candidate-dashboard-layout.theme-dark .recs-job-unified-card,
+.candidate-dashboard-layout.theme-dark-80 .recs-job-unified-card {
+  background: rgba(21, 30, 46, 0.92);
+  border: 1.5px solid rgba(148, 163, 184, 0.15);
+}
+

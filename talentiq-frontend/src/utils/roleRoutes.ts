@@ -57,7 +57,7 @@ export const getPostLoginRoute = (roles: string[] = []): string => {
     return '/hr-analytics';
   }
   if (roles.includes('ROLE_CANDIDATE') || roles.includes('CANDIDATE')) {
-    return '/jobs';
+    return '/dashboard';
   }
   return '/';
 };

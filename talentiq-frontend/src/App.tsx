@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -17,10 +18,8 @@ import Privacy from './pages/Privacy';
 import { CandidateProfile } from './pages/CandidateProfile';
 
 // Candidate Protected Pages
-import { Recommendations } from './pages/Recommendations';
-import { MyApplications } from './pages/MyApplications';
-import { PortfolioBuilder } from './pages/PortfolioBuilder';
-import { UserMessages } from './pages/UserMessages';
+import { CandidateDashboard } from './pages/CandidateDashboard';
+import { DeveloperWorkspace } from './pages/DeveloperWorkspace';
 import { GroupCollaborationChat } from './pages/GroupCollaborationChat';
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -56,13 +55,39 @@ const BlockedRoute = () => (
   </div>
 );
 
+const CandidateMessagesRoute: React.FC = () => {
+  const location = useLocation();
+  const { isHr } = useAuth();
+  if (isHr) {
+    return <Navigate to={`/hr-messages${location.search}`} replace />;
+  }
+  const search = location.search;
+  const target = search
+    ? `/dashboard${search.includes('tab=') ? search : `${search}&tab=messages`}`
+    : '/dashboard?tab=messages';
+  return <Navigate to={target} replace />;
+};
+
 function AppLayout() {
   const location = useLocation();
   const { isHr } = useAuth();
 
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      // If page was loaded from bfcache (Back/Forward navigation) without valid token
+      const token = localStorage.getItem('accessToken');
+      if (event.persisted && !token) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener('pageshow', handlePageShow);
+    return () => window.removeEventListener('pageshow', handlePageShow);
+  }, []);
+
   const HIDE_NAV_ROUTES = [
     '/hr-analytics', '/hr-messages', '/messages', '/hr-calendar', '/hr-applications',
-    '/hr-copilot', '/copilot', '/team-chat', '/admin'
+    '/hr-copilot', '/copilot', '/team-chat', '/admin', '/dashboard', '/candidate',
+    '/developer-workspace'
   ];
   const isHome = location.pathname === '/';
   const hideNavbar = isHome || (location.pathname === '/jobs' && isHr) || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
@@ -86,25 +111,41 @@ function AppLayout() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/candidate-profile/:id" element={<CandidateProfile />} />
 
-          {/* Candidate Protected Routes */}
+          {/* ── Single Unified Candidate / User Dashboard ── */}
+          <Route path="/dashboard" element={
+            <ProtectedRoute roles={['ROLE_CANDIDATE']}>
+              <CandidateDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/candidate/dashboard" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/candidate" element={<Navigate to="/dashboard" replace />} />
+
+          {/* ── Protected Developer Workspace for Verified Candidates ── */}
+          <Route path="/developer-workspace" element={
+            <ProtectedRoute roles={['ROLE_CANDIDATE']}>
+              <DeveloperWorkspace />
+            </ProtectedRoute>
+          } />
+
+          {/* Candidate Legacy Sub-Routes (Consolidated & Seamlessly Redirected) */}
           <Route path="/recommendations" element={
             <ProtectedRoute roles={['ROLE_CANDIDATE']}>
-              <Recommendations />
+              <Navigate to="/dashboard?tab=ai-matches" replace />
             </ProtectedRoute>
           } />
           <Route path="/my-applications" element={
             <ProtectedRoute roles={['ROLE_CANDIDATE']}>
-              <MyApplications />
+              <Navigate to="/dashboard?tab=applications" replace />
             </ProtectedRoute>
           } />
           <Route path="/portfolio" element={
             <ProtectedRoute roles={['ROLE_CANDIDATE']}>
-              <PortfolioBuilder />
+              <Navigate to="/dashboard?tab=portfolio" replace />
             </ProtectedRoute>
           } />
           <Route path="/messages" element={
             <ProtectedRoute roles={['ROLE_CANDIDATE', 'ROLE_HR']}>
-              <UserMessages />
+              <CandidateMessagesRoute />
             </ProtectedRoute>
           } />
           <Route path="/team-chat" element={

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { MilkyWay3DCanvas } from '../components/MilkyWay3DCanvas';
 import {
   Plus,
@@ -91,6 +92,7 @@ interface CandidateProfile {
   firstName?: string;
   lastName?: string;
   email?: string;
+  avatarUrl?: string;
   headline?: string;
   bio?: string;
   location?: string;
@@ -106,27 +108,62 @@ interface CandidateProfile {
   educations?: CandidateEducation[];
 }
 
-// ── Preset Tech Stacks for Quick Selection ───────────────────
-const PRESET_LANGUAGES = [
-  'JavaScript', 'TypeScript', 'Python', 'Java', 'Go', 'Rust', 'C++', 'C#',
-  'PHP', 'Swift', 'Kotlin', 'Ruby', 'SQL', 'HTML5/CSS3', 'Shell/Bash'
-];
+// ── Categorized Skills Matrix for Quick Selection & Dropdown Search ───
+interface SkillCategoryGroup {
+  category: string;
+  skills: string[];
+}
 
-const PRESET_FRAMEWORKS = [
-  'React', 'Next.js', 'Vue.js', 'Angular', 'Node.js', 'Express',
-  'Spring Boot', 'Django', 'FastAPI', 'Flask', 'Laravel', 'ASP.NET Core',
-  'Flutter', 'React Native', 'TensorFlow', 'PyTorch', 'LangChain', 'GraphQL'
-];
-
-const PRESET_DEVOPS_DB = [
-  'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Docker', 'Kubernetes',
-  'AWS', 'Google Cloud (GCP)', 'Microsoft Azure', 'Apache Kafka', 'Elasticsearch', 'CI/CD Pipelines'
+const CATEGORIZED_SKILLS: SkillCategoryGroup[] = [
+  {
+    category: 'Core Programming Languages',
+    skills: [
+      'JavaScript', 'TypeScript', 'Python', 'Java', 'Go', 'Rust', 'C++', 'C#',
+      'PHP', 'Swift', 'Kotlin', 'Ruby', 'SQL', 'HTML5/CSS3', 'Shell/Bash', 'Scala', 'Dart', 'R'
+    ]
+  },
+  {
+    category: 'Frameworks & Web Engineering',
+    skills: [
+      'React', 'Next.js', 'Vue.js', 'Angular', 'Node.js', 'Express',
+      'Spring Boot', 'Django', 'FastAPI', 'Flask', 'Laravel', 'ASP.NET Core',
+      'Flutter', 'React Native', 'Tailwind CSS', 'Redux Toolkit', 'GraphQL', 'NestJS', 'Svelte'
+    ]
+  },
+  {
+    category: 'Databases & Distributed Storage',
+    skills: [
+      'PostgreSQL', 'MySQL', 'MongoDB', 'Redis', 'Elasticsearch', 'Cassandra',
+      'DynamoDB', 'Supabase', 'Firebase', 'Oracle DB', 'MSSQL', 'Neo4j', 'Prisma ORM'
+    ]
+  },
+  {
+    category: 'Cloud, DevOps & Microservices',
+    skills: [
+      'Docker', 'Kubernetes', 'AWS', 'Google Cloud (GCP)', 'Microsoft Azure',
+      'Apache Kafka', 'CI/CD Pipelines', 'Terraform', 'Linux', 'Microservices',
+      'RESTful APIs', 'Nginx', 'RabbitMQ', 'Git / GitHub Actions'
+    ]
+  },
+  {
+    category: 'AI / ML & Data Engineering',
+    skills: [
+      'Generative AI / LLMs', 'LangChain', 'OpenAI API', 'TensorFlow', 'PyTorch',
+      'Prompt Engineering', 'Pandas & NumPy', 'Scikit-Learn', 'Vector DBs (Pinecone)',
+      'Hugging Face', 'Data Pipelines & ETL'
+    ]
+  }
 ];
 
 type TabType = 'projects' | 'skills' | 'experience' | 'qualifications' | 'resume';
 
-export const PortfolioBuilder: React.FC = () => {
+interface PortfolioBuilderProps {
+  embedded?: boolean;
+}
+
+export const PortfolioBuilder: React.FC<PortfolioBuilderProps> = ({ embedded = false }) => {
   const { user } = useAuth();
+  const { isLight } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('projects');
 
   // Candidate Data State
@@ -140,6 +177,15 @@ export const PortfolioBuilder: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // ── Skills Matrix Search & Category Dropdown State ──
+  const [skillCategoryFilter, setSkillCategoryFilter] = useState('ALL');
+  const [skillSearchQuery, setSkillSearchQuery] = useState('');
+  const [dropdownSelectedSkill, setDropdownSelectedSkill] = useState('');
+  const [quickProficiency, setQuickProficiency] = useState<'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT'>('ADVANCED');
+  const [quickYears, setQuickYears] = useState<number>(2);
+  const [showSkillSearchDropdown, setShowSkillSearchDropdown] = useState(false);
+  const skillSearchRef = useRef<HTMLDivElement | null>(null);
 
   // ── Project Modal State ──
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -210,6 +256,17 @@ export const PortfolioBuilder: React.FC = () => {
   useEffect(() => {
     fetchAllData();
   }, [user]);
+
+  // Click outside listener for skills search autocomplete
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (skillSearchRef.current && !skillSearchRef.current.contains(event.target as Node)) {
+        setShowSkillSearchDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ── Fetch All Candidate Portfolio & Profile Data ──────────
   const fetchAllData = async () => {
@@ -433,16 +490,22 @@ export const PortfolioBuilder: React.FC = () => {
     }
   };
 
-  const handleQuickAddSkill = async (skillName: string) => {
-    if (skills.some((s) => s.skillName.toLowerCase() === skillName.toLowerCase())) {
-      showToast(`Skill "${skillName}" is already in your stack!`);
+  const handleQuickAddSkill = async (
+    skillName: string,
+    proficiency: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT' = 'ADVANCED',
+    years: number = 2
+  ) => {
+    const trimmed = skillName.trim();
+    if (!trimmed) return;
+    if (skills.some((s) => s.skillName.toLowerCase() === trimmed.toLowerCase())) {
+      showToast(`Skill "${trimmed}" is already in your stack!`);
       return;
     }
     try {
       const payload = {
-        skillName,
-        proficiency: 'ADVANCED',
-        years: 2,
+        skillName: trimmed,
+        proficiency,
+        years,
         primary: false,
       };
       const res = await apiClient.post('/candidates/me/skills', payload);
@@ -450,12 +513,19 @@ export const PortfolioBuilder: React.FC = () => {
       if (updatedCandidate?.skills) {
         setSkills(updatedCandidate.skills);
       } else {
-        setSkills((prev) => [...prev, { id: Date.now(), skillName, proficiency: 'ADVANCED', years: 2 }]);
+        setSkills((prev) => [...prev, { id: Date.now(), skillName: trimmed, proficiency, years }]);
       }
-      showToast(`⚡ Added "${skillName}" to your skills!`);
-    } catch (err) {
-      setSkills((prev) => [...prev, { id: Date.now(), skillName, proficiency: 'ADVANCED', years: 2 }]);
-      showToast(`⚡ Added "${skillName}" to your skills!`);
+      showToast(`⚡ Added "${trimmed}" (${proficiency}) to your stack!`);
+      setSkillSearchQuery('');
+      setDropdownSelectedSkill('');
+      setShowSkillSearchDropdown(false);
+    } catch (err: any) {
+      console.error('Error adding skill:', err);
+      setSkills((prev) => [...prev, { id: Date.now(), skillName: trimmed, proficiency, years }]);
+      showToast(`⚡ Added "${trimmed}" (${proficiency}) to your stack!`);
+      setSkillSearchQuery('');
+      setDropdownSelectedSkill('');
+      setShowSkillSearchDropdown(false);
     }
   };
 
@@ -763,9 +833,9 @@ export const PortfolioBuilder: React.FC = () => {
     : user?.email?.split('@')[0] || 'Candidate';
 
   return (
-    <div className="portfolio-page-wrapper">
+    <div className={`portfolio-page-wrapper ${embedded ? 'is-embedded' : ''} ${isLight ? 'theme-light' : 'theme-universe'}`}>
       {/* 3D Interactive Milky Way Galaxy Canvas */}
-      <MilkyWay3DCanvas interactive={true} showOrbits={true} />
+      {!embedded && <MilkyWay3DCanvas interactive={true} showOrbits={true} />}
 
       <div className="portfolio-container">
         {/* Toast / Feedback Banner */}
@@ -784,8 +854,16 @@ export const PortfolioBuilder: React.FC = () => {
         {/* ── 3D Hero Profile Header Card ── */}
         <div className="portfolio-hero-card">
           <div className="portfolio-hero-info">
-            <div className="portfolio-avatar-glow">
-              {displayName.charAt(0).toUpperCase()}
+            <div className="portfolio-avatar-glow" style={{ overflow: 'hidden' }}>
+              {(profile?.avatarUrl || user?.avatarUrl) ? (
+                <img
+                  src={profile?.avatarUrl || user?.avatarUrl}
+                  alt={displayName}
+                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }}
+                />
+              ) : (
+                displayName.charAt(0).toUpperCase()
+              )}
             </div>
 
             <div className="portfolio-hero-meta">
@@ -984,78 +1062,240 @@ export const PortfolioBuilder: React.FC = () => {
 
         {/* ── TAB 2: SKILLS & TECH STACK MATRIX ── */}
         {activeTab === 'skills' && (
-          <div>
+          <div className="portfolio-skills-section">
             <div className="portfolio-section-header">
               <div>
                 <h2 className="portfolio-section-title">
                   <Cpu size={22} color="#A855F7" />
-                  Verified Skills & Tech Stack Matrix
+                  Verified Skills &amp; Tech Stack Matrix
                 </h2>
                 <p className="portfolio-section-subtitle">
-                  Languages, frameworks, databases, and infrastructure tools with proficiency scoring
+                  Search, filter, and add programming languages, frameworks, cloud tools, and databases with proficiency scoring
                 </p>
               </div>
 
               <button onClick={() => setShowSkillModal(true)} className="portfolio-primary-add-btn">
-                <Plus size={16} /> Add Custom Skill
+                <Plus size={16} /> Custom Skill Dialog
               </button>
             </div>
 
-            {/* Quick-Add Tech Stack Suggestion Pills */}
-            <div className="portfolio-preset-section">
-              <h4 className="portfolio-preset-title">⚡ Quick-Add Core Languages:</h4>
-              <div className="portfolio-preset-chips">
-                {PRESET_LANGUAGES.map((lang) => (
-                  <button
-                    key={lang}
-                    onClick={() => handleQuickAddSkill(lang)}
-                    className={`portfolio-preset-chip ${skills.some((s) => s.skillName.toLowerCase() === lang.toLowerCase()) ? 'added' : ''}`}
+            {/* Interactive Search & Categorized Dropdown Selector Box */}
+            <div className="portfolio-skill-search-box">
+              <div className="portfolio-skill-search-grid">
+                {/* 1. Category Filter Dropdown */}
+                <div className="portfolio-form-group">
+                  <label className="portfolio-field-label">📁 Category Filter</label>
+                  <select
+                    className="portfolio-select"
+                    value={skillCategoryFilter}
+                    onChange={(e) => {
+                      setSkillCategoryFilter(e.target.value);
+                      setDropdownSelectedSkill('');
+                    }}
                   >
-                    + {lang}
-                  </button>
-                ))}
+                    <option value="ALL">🌟 All Categories (Search Everywhere)</option>
+                    {CATEGORIZED_SKILLS.map((cat) => (
+                      <option key={cat.category} value={cat.category}>
+                        {cat.category} ({cat.skills.length})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Category Skills Dropdown List */}
+                <div className="portfolio-form-group">
+                  <label className="portfolio-field-label">📋 Select from Dropdown List</label>
+                  <select
+                    className="portfolio-select"
+                    value={dropdownSelectedSkill}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDropdownSelectedSkill(val);
+                      if (val) {
+                        setSkillSearchQuery(val);
+                      }
+                    }}
+                  >
+                    <option value="">-- Choose a skill to add --</option>
+                    {(skillCategoryFilter === 'ALL'
+                      ? CATEGORIZED_SKILLS.flatMap((c) => c.skills)
+                      : CATEGORIZED_SKILLS.find((c) => c.category === skillCategoryFilter)?.skills || []
+                    ).map((s) => {
+                      const isAdded = skills.some((userSkill) => userSkill.skillName.toLowerCase() === s.toLowerCase());
+                      return (
+                        <option key={s} value={s} disabled={isAdded}>
+                          {s} {isAdded ? '✓ (Already in stack)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* 3. Search or Type Custom Skill with Autocomplete */}
+                <div className="portfolio-form-group" ref={skillSearchRef} style={{ position: 'relative' }}>
+                  <label className="portfolio-field-label">🔍 Live Search or Custom Name</label>
+                  <div className="portfolio-skill-search-input-wrapper">
+                    <input
+                      type="text"
+                      className="portfolio-input"
+                      placeholder="Type e.g. React, Docker, Python..."
+                      value={skillSearchQuery}
+                      onChange={(e) => {
+                        setSkillSearchQuery(e.target.value);
+                        setShowSkillSearchDropdown(true);
+                        setDropdownSelectedSkill('');
+                      }}
+                      onFocus={() => setShowSkillSearchDropdown(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (skillSearchQuery.trim()) {
+                            handleQuickAddSkill(skillSearchQuery, quickProficiency, quickYears);
+                          }
+                        }
+                      }}
+                    />
+                    {skillSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSkillSearchQuery('');
+                          setDropdownSelectedSkill('');
+                        }}
+                        className="portfolio-search-clear-btn"
+                        title="Clear"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Autocomplete Dropdown */}
+                  {showSkillSearchDropdown && skillSearchQuery.trim().length > 0 && (
+                    <div className="portfolio-skill-autocomplete-dropdown">
+                      {/* Filter matching skills */}
+                      {(() => {
+                        const q = skillSearchQuery.toLowerCase().trim();
+                        const allAvailable = CATEGORIZED_SKILLS.flatMap((c) =>
+                          c.skills.map((s) => ({ skill: s, category: c.category }))
+                        );
+                        const matches = allAvailable.filter((item) =>
+                          item.skill.toLowerCase().includes(q)
+                        );
+
+                        return (
+                          <>
+                            {matches.slice(0, 8).map((item, idx) => {
+                              const isAdded = skills.some(
+                                (s) => s.skillName.toLowerCase() === item.skill.toLowerCase()
+                              );
+                              return (
+                                <div
+                                  key={idx}
+                                  className={`portfolio-skill-autocomplete-item ${isAdded ? 'disabled' : ''}`}
+                                  onClick={() => {
+                                    if (!isAdded) {
+                                      handleQuickAddSkill(item.skill, quickProficiency, quickYears);
+                                    }
+                                  }}
+                                >
+                                  <div className="portfolio-skill-match-name">
+                                    <Sparkles size={14} color="#A855F7" />
+                                    <span>{item.skill}</span>
+                                    <span className="portfolio-skill-match-cat">{item.category}</span>
+                                  </div>
+                                  <span className={`portfolio-skill-match-action ${isAdded ? 'added' : ''}`}>
+                                    {isAdded ? 'Added ✓' : '+ Add'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+
+                            {/* Option to add as custom skill */}
+                            {!matches.some((m) => m.skill.toLowerCase() === q) && (
+                              <div
+                                className="portfolio-skill-autocomplete-item custom"
+                                onClick={() => handleQuickAddSkill(skillSearchQuery, quickProficiency, quickYears)}
+                              >
+                                <div className="portfolio-skill-match-name">
+                                  <Plus size={14} color="#38BDF8" />
+                                  <span>Add "<strong>{skillSearchQuery.trim()}</strong>" as custom skill</span>
+                                </div>
+                                <span className="portfolio-skill-match-action custom">+ Add Custom</span>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <h4 className="portfolio-preset-title" style={{ marginTop: 16 }}>⚡ Quick-Add Frameworks & Libraries:</h4>
-              <div className="portfolio-preset-chips">
-                {PRESET_FRAMEWORKS.map((fw) => (
-                  <button
-                    key={fw}
-                    onClick={() => handleQuickAddSkill(fw)}
-                    className={`portfolio-preset-chip ${skills.some((s) => s.skillName.toLowerCase() === fw.toLowerCase()) ? 'added' : ''}`}
-                  >
-                    + {fw}
-                  </button>
-                ))}
-              </div>
+              {/* Proficiency Level and Add Button Bar */}
+              <div className="portfolio-skill-add-bar">
+                <div className="portfolio-skill-proficiency-selector">
+                  <span className="portfolio-skill-prof-label">Proficiency:</span>
+                  <div className="portfolio-prof-pills">
+                    {(['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'] as const).map((lvl) => (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => setQuickProficiency(lvl)}
+                        className={`portfolio-prof-pill ${lvl.toLowerCase()} ${quickProficiency === lvl ? 'active' : ''}`}
+                      >
+                        {lvl.charAt(0) + lvl.slice(1).toLowerCase()}
+                      </button>
+                    ))}
+                  </div>
 
-              <h4 className="portfolio-preset-title" style={{ marginTop: 16 }}>⚡ Quick-Add Databases & Cloud Infra:</h4>
-              <div className="portfolio-preset-chips">
-                {PRESET_DEVOPS_DB.map((db) => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                    <span className="portfolio-skill-prof-label">Years:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      value={quickYears}
+                      onChange={(e) => setQuickYears(Math.max(1, Number(e.target.value)))}
+                      className="portfolio-input"
+                      style={{ width: 56, padding: '5px 8px', fontSize: 13, height: 32 }}
+                    />
+                  </div>
+                </div>
+
+                <div className="portfolio-skill-add-btn-group">
                   <button
-                    key={db}
-                    onClick={() => handleQuickAddSkill(db)}
-                    className={`portfolio-preset-chip ${skills.some((s) => s.skillName.toLowerCase() === db.toLowerCase()) ? 'added' : ''}`}
+                    type="button"
+                    disabled={!skillSearchQuery.trim()}
+                    onClick={() => handleQuickAddSkill(skillSearchQuery, quickProficiency, quickYears)}
+                    className="portfolio-skill-submit-btn"
                   >
-                    + {db}
+                    <Plus size={15} /> Add to Tech Stack
                   </button>
-                ))}
+                </div>
               </div>
             </div>
 
             {/* Current Active Skills Matrix */}
-            <h3 style={{ fontSize: 16, fontWeight: 700, color: '#F8FAFC', marginBottom: 14 }}>
-              Current Technical Stack ({skills.length} skills)
-            </h3>
+            <div className="portfolio-current-skills-header">
+              <h3 className="portfolio-skills-count-title">
+                Current Technical Stack ({skills.length} skills)
+              </h3>
+              {skills.length > 0 && (
+                <span className="portfolio-skills-tip">
+                  Click the ✕ on any skill card to remove it from your stack
+                </span>
+              )}
+            </div>
 
             {skills.length === 0 ? (
               <div className="portfolio-empty-state">
                 <div className="portfolio-empty-icon" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#C084FC' }}>
                   <Cpu size={36} />
                 </div>
-                <h3 className="portfolio-empty-title">No Skills Added Yet</h3>
+                <h3 className="portfolio-empty-title">No Skills in Your Stack Yet</h3>
                 <p className="portfolio-empty-desc">
-                  Click on the quick-add buttons above or use the "Add Custom Skill" button to showcase your technical stack.
+                  Use the categorized dropdown or search box above to add your languages, frameworks, and infrastructure tools.
                 </p>
               </div>
             ) : (
@@ -1064,9 +1304,16 @@ export const PortfolioBuilder: React.FC = () => {
                   <div key={skill.id} className="portfolio-skill-card">
                     <div className="portfolio-skill-info">
                       <span className="portfolio-skill-name">{skill.skillName}</span>
-                      <span className={`portfolio-skill-badge ${skill.proficiency?.toLowerCase() || 'intermediate'}`}>
-                        {skill.proficiency || 'INTERMEDIATE'}
-                      </span>
+                      <div className="portfolio-skill-meta-row">
+                        <span className={`portfolio-skill-badge ${skill.proficiency?.toLowerCase() || 'intermediate'}`}>
+                          {skill.proficiency || 'INTERMEDIATE'}
+                        </span>
+                        {skill.years && skill.years > 0 && (
+                          <span className="portfolio-skill-years-tag">
+                            {skill.years} {skill.years === 1 ? 'yr' : 'yrs'}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <button
@@ -1074,7 +1321,7 @@ export const PortfolioBuilder: React.FC = () => {
                       className="portfolio-skill-delete-btn"
                       title="Remove Skill"
                     >
-                      <X size={13} />
+                      <X size={14} />
                     </button>
                   </div>
                 ))}

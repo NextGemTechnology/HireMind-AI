@@ -30,6 +30,11 @@ public interface CompanyCandidateVerificationRepository extends JpaRepository<Co
             "WHERE v.candidateUser.id = :candidateUserId AND v.status = 'APPROVED'")
     List<CompanyCandidateVerification> findApprovedByCandidateUserId(@Param("candidateUserId") Long candidateUserId);
 
+    @Query("SELECT v FROM CompanyCandidateVerification v " +
+            "JOIN FETCH v.company c " +
+            "WHERE v.candidateUser.id = :candidateUserId ORDER BY v.createdAt DESC")
+    List<CompanyCandidateVerification> findByCandidateUserId(@Param("candidateUserId") Long candidateUserId);
+
     Optional<CompanyCandidateVerification> findByBadgeCertificateId(String badgeCertificateId);
 
     boolean existsByCompanyIdAndCandidateUserIdAndStatus(Long companyId, Long candidateUserId, String status);

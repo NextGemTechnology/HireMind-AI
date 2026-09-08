@@ -155,6 +155,15 @@ public class CompanyVerificationServiceImpl implements CompanyVerificationServic
 
     @Override
     @Transactional(readOnly = true)
+    public List<CompanyVerificationDto.Response> getCandidateBadges(Long candidateUserId) {
+        return verificationRepository.findByCandidateUserId(candidateUserId)
+                .stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public CompanyVerificationDto.Response getVerificationByCertificate(String certificateId) {
         CompanyCandidateVerification verification = verificationRepository.findByBadgeCertificateId(certificateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Verification Certificate", "id", certificateId));

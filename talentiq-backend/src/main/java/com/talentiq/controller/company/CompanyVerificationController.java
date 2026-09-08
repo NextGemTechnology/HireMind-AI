@@ -69,6 +69,15 @@ public class CompanyVerificationController {
         return ResponseEntity.ok(ApiResponse.success(badges));
     }
 
+    @GetMapping("/my-badges")
+    @PreAuthorize("hasRole('CANDIDATE')")
+    @Operation(summary = "Logged-in candidate views their company verification badges (pending and approved)")
+    public ResponseEntity<ApiResponse<List<CompanyVerificationDto.Response>>> getMyBadges(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        List<CompanyVerificationDto.Response> badges = verificationService.getCandidateBadges(principal.getId());
+        return ResponseEntity.ok(ApiResponse.success(badges));
+    }
+
     @GetMapping("/certificate/{certificateId}")
     @Operation(summary = "Verify authenticity of a company credential certificate ID")
     public ResponseEntity<ApiResponse<CompanyVerificationDto.Response>> getCertificate(

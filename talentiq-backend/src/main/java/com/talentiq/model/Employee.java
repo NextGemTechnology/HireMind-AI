@@ -112,4 +112,8 @@ public class Employee extends AuditEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "verification_id")
     private CompanyCandidateVerification verification;
+
+    @Column(name = "workspace_access", nullable = false)
+    @Builder.Default
+    private boolean workspaceAccess = true;
 }

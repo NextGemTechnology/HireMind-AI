@@ -23,7 +23,7 @@ import {
 import MilkyWay3DCanvas from '../components/MilkyWay3DCanvas';
 // import { GoogleAuthButton } from '../components/GoogleAuthButton'; // Disabled for security hardening
 import { HireMindLogo } from '../components/HireMindLogo';
-import { getAdminDashboardRoute } from '../utils/roleRoutes';
+import { getAdminDashboardRoute, getPostLoginRoute } from '../utils/roleRoutes';
 import '../css/login.css';
 
 type LoginRoleMode = 'CANDIDATE' | 'HR' | 'ADMIN';
@@ -75,9 +75,17 @@ interface LoginProps {
 }
 
 export const Login: React.FC<LoginProps> = ({ initialRole }) => {
-  const { login, register, logout, verify2Fa } = useAuth();
+  const { user, isAuthenticated, login, register, logout, verify2Fa } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const token = localStorage.getItem('accessToken');
+    if (isAuthenticated && token && user) {
+      const target = getPostLoginRoute(user.roles || []);
+      navigate(target, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const getRoleFromPath = (): LoginRoleMode => {
     if (location.pathname === '/hr-login') return 'HR';
@@ -374,7 +382,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
         : (JSON.parse(localStorage.getItem('user') || '{}').roles || []);
 
       const targetPath = getAdminDashboardRoute(authenticatedRoles);
-      navigate(targetPath);
+      navigate(targetPath, { replace: true });
     } catch (err: any) {
       setTwoFactorError(err.response?.data?.message || 'Invalid or expired 2FA code. Please try again.');
     } finally {
@@ -449,26 +457,26 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
           setError('Unauthorized: Your account does not have HR Recruiter permissions.');
           return;
         }
-        navigate('/hr-analytics');
+        navigate('/hr-analytics', { replace: true });
       } else if (selectedRole === 'ADMIN') {
         const adminPath = getAdminDashboardRoute(authenticatedRoles);
         if (adminPath === '/admin-login') {
-          logout();
+          logout('/admin-login');
           setError('Unauthorized: Your account does not have Enterprise Admin permissions.');
           return;
         }
-        navigate(adminPath);
+        navigate(adminPath, { replace: true });
       } else {
         const userIsCandidate = authenticatedRoles.includes('ROLE_CANDIDATE') || authenticatedRoles.includes('CANDIDATE');
         const userIsAdmin = authenticatedRoles.some(r =>
           ['ROLE_SUPER_ADMIN', 'ROLE_PLATFORM_ADMIN', 'ROLE_APP_DEVELOPER', 'ROLE_SERVICE_TEAM', 'ROLE_COMPANY_ADMIN', 'SUPER_ADMIN'].includes(r)
         );
         if (!userIsCandidate && !userIsAdmin) {
-          logout();
+          logout('/user-login');
           setError('Invalid email or password');
           return;
         }
-        navigate('/jobs');
+        navigate('/dashboard', { replace: true });
       }
     } catch (err: any) {
       const serverMsg = err.response?.data?.message || err.response?.data?.error || err.message;
@@ -653,7 +661,7 @@ export const Login: React.FC<LoginProps> = ({ initialRole }) => {
           yearsExperience: 2,
           otp: otpCode
         });
-        navigate('/jobs');
+        navigate('/dashboard');
       }
     } catch (err: any) {
       setRegError(err?.response?.data?.message || err?.message || 'Registration failed. Please check OTP code and retry.');

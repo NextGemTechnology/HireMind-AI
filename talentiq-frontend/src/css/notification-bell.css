@@ -403,3 +403,103 @@
     right: -40px;
   }
 }
+
+/* ── Candidate Dashboard Theme Support for Notification Bell ── */
+.candidate-dashboard-layout .notif-bell-btn {
+  background: var(--cand-card-bg);
+  border: 1px solid var(--cand-border);
+  color: var(--cand-text-muted);
+}
+
+.candidate-dashboard-layout .notif-bell-btn:hover {
+  background: var(--cand-border-subtle);
+  color: var(--cand-text-main);
+  border-color: var(--cand-primary);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+.candidate-dashboard-layout.theme-light .notif-hover-preview,
+.candidate-dashboard-layout.theme-light-75 .notif-hover-preview,
+.candidate-dashboard-layout.theme-light-25 .notif-hover-preview {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+.candidate-dashboard-layout.theme-light .notif-preview-title,
+.candidate-dashboard-layout.theme-light-75 .notif-preview-title,
+.candidate-dashboard-layout.theme-light-25 .notif-preview-title {
+  color: #0F172A;
+}
+
+.candidate-dashboard-layout.theme-light .notif-preview-snippet,
+.candidate-dashboard-layout.theme-light-75 .notif-preview-snippet,
+.candidate-dashboard-layout.theme-light-25 .notif-preview-snippet {
+  color: #475569;
+}
+
+.candidate-dashboard-layout.theme-light .notif-preview-hint,
+.candidate-dashboard-layout.theme-light-75 .notif-preview-hint,
+.candidate-dashboard-layout.theme-light-25 .notif-preview-hint {
+  border-top: 1px solid #F1F5F9;
+}
+
+.candidate-dashboard-layout.theme-light .notif-dropdown-panel,
+.candidate-dashboard-layout.theme-light-75 .notif-dropdown-panel,
+.candidate-dashboard-layout.theme-light-25 .notif-dropdown-panel {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+}
+
+.candidate-dashboard-layout.theme-light .notif-dropdown-header h4,
+.candidate-dashboard-layout.theme-light-75 .notif-dropdown-header h4,
+.candidate-dashboard-layout.theme-light-25 .notif-dropdown-header h4 {
+  color: #0F172A;
+}
+
+.candidate-dashboard-layout.theme-light .notif-card-item,
+.candidate-dashboard-layout.theme-light-75 .notif-card-item,
+.candidate-dashboard-layout.theme-light-25 .notif-card-item {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+}
+
+.candidate-dashboard-layout.theme-light .notif-card-item:hover,
+.candidate-dashboard-layout.theme-light-75 .notif-card-item:hover,
+.candidate-dashboard-layout.theme-light-25 .notif-card-item:hover {
+  background: #EFF6FF;
+  border-color: #93C5FD;
+}
+
+.candidate-dashboard-layout.theme-light .notif-card-item.unread,
+.candidate-dashboard-layout.theme-light-75 .notif-card-item.unread,
+.candidate-dashboard-layout.theme-light-25 .notif-card-item.unread {
+  background: #F5F3FF;
+  border-color: #DDD6FE;
+}
+
+.candidate-dashboard-layout.theme-light .notif-card-item.unread.is-chat,
+.candidate-dashboard-layout.theme-light-75 .notif-card-item.unread.is-chat,
+.candidate-dashboard-layout.theme-light-25 .notif-card-item.unread.is-chat {
+  background: #F0F9FF;
+  border-color: #BAE6FD;
+}
+
+.candidate-dashboard-layout.theme-light .notif-item-title,
+.candidate-dashboard-layout.theme-light-75 .notif-item-title,
+.candidate-dashboard-layout.theme-light-25 .notif-item-title {
+  color: #0F172A;
+}
+
+.candidate-dashboard-layout.theme-light .notif-item-msg,
+.candidate-dashboard-layout.theme-light-75 .notif-item-msg,
+.candidate-dashboard-layout.theme-light-25 .notif-item-msg {
+  color: #475569;
+}
+
+.candidate-dashboard-layout.theme-light .notif-empty-state p,
+.candidate-dashboard-layout.theme-light-75 .notif-empty-state p,
+.candidate-dashboard-layout.theme-light-25 .notif-empty-state p {
+  color: #0F172A;
+}

@@ -16,6 +16,8 @@ public interface CompanyVerificationService {
 
     List<CompanyVerificationDto.Response> getCandidateApprovedBadges(Long candidateUserId);
 
+    List<CompanyVerificationDto.Response> getCandidateBadges(Long candidateUserId);
+
     CompanyVerificationDto.Response getVerificationByCertificate(String certificateId);
 
     List<CompanyVerificationDto.HrMemberResponse> getCompanyHrTeam(Long companyAdminUserId);

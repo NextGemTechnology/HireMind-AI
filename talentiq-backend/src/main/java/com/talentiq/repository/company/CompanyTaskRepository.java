@@ -17,6 +17,8 @@ public interface CompanyTaskRepository extends JpaRepository<CompanyTask, Long> 
 
     List<CompanyTask> findByCompanyIdAndAssignedToUserIdOrderByCreatedAtDesc(Long companyId, Long assignedToUserId);
 
+    List<CompanyTask> findByAssignedToUserIdOrderByCreatedAtDesc(Long assignedToUserId);
+
     @Query("SELECT COUNT(t) FROM CompanyTask t WHERE t.company.id = :companyId AND t.status = 'COMPLETED'")
     long countCompletedByCompanyId(@Param("companyId") Long companyId);
 

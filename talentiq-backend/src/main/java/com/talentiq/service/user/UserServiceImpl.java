@@ -35,6 +35,7 @@ public class UserServiceImpl implements UserService {
     private final CompanyCredentialRepository companyCredentialRepository;
     private final AppDevCredentialRepository appDevCredentialRepository;
     private final ServiceTeamCredentialRepository serviceTeamCredentialRepository;
+    private final com.talentiq.infrastructure.storage.FileStorageService fileStorageService;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -286,6 +287,47 @@ public class UserServiceImpl implements UserService {
         }
 
         userCredentialRepository.updatePassword(cred.getId(), passwordEncoder.encode(request.getNewPassword()));
+    }
+
+    @Override
+    public UserDto.Response uploadAvatar(UserPrincipal principal, org.springframework.web.multipart.MultipartFile file) {
+        if (principal == null) {
+            throw new BadRequestException("Unauthenticated user session");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BadRequestException("No image file provided");
+        }
+        if (file.getSize() > 5 * 1024 * 1024L) {
+            throw new BadRequestException("Profile picture size must be less than 5MB");
+        }
+        String contentType = file.getContentType();
+        if (contentType != null && !contentType.startsWith("image/")) {
+            throw new BadRequestException("Uploaded file must be a valid image");
+        }
+
+        String storedPath = fileStorageService.storeFile(file, "avatars", principal.getId());
+        String avatarUrl = "/api/v1/users/avatar/" + storedPath;
+
+        // 1. Update User entity
+        User user = userRepository.findById(principal.getId()).orElse(null);
+        if (user == null && principal.getEmail() != null) {
+            user = userRepository.findByEmail(principal.getEmail()).orElse(null);
+        }
+        if (user != null) {
+            user.setAvatarUrl(avatarUrl);
+            userRepository.save(user);
+        }
+
+        // 2. If HR, also update HrProfile
+        if (principal.hasRole(Role.ROLE_HR)) {
+            hrProfileRepository.findByEmail(principal.getEmail()).ifPresent(hr -> {
+                hr.setAvatarUrl(avatarUrl);
+                hrProfileRepository.save(hr);
+            });
+        }
+
+        log.info("Profile picture updated for user {} ({}) -> {}", principal.getId(), principal.getEmail(), avatarUrl);
+        return getUserProfile(principal);
     }
 
     private User findUserById(Long userId) {

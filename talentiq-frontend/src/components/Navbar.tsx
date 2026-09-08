@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { 
-  Sparkles, 
   Briefcase, 
   BarChart3, 
   ShieldCheck, 
@@ -17,8 +16,11 @@ import {
   User,
   Menu,
   X,
-  ChevronDown
+  ChevronDown,
+  LayoutDashboard,
+  Code2
 } from 'lucide-react';
+import { apiClient } from '../api/client';
 import { HireMindLogo } from './HireMindLogo';
 import { AiLogo } from './AiLogo';
 import { NotificationBell } from './NotificationBell';
@@ -28,11 +30,27 @@ import '../css/navbar.css';
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, isCandidate, isHr, isAdmin, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
   const location = useLocation();
 
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
+  const [devWorkspaceEligible, setDevWorkspaceEligible] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (isAuthenticated && isCandidate) {
+      apiClient.get('/developer-workspace/eligibility')
+        .then(res => {
+          if (isMounted) setDevWorkspaceEligible(!!res.data?.data?.eligible);
+        })
+        .catch(() => {
+          if (isMounted) setDevWorkspaceEligible(false);
+        });
+    } else {
+      setDevWorkspaceEligible(false);
+    }
+    return () => { isMounted = false; };
+  }, [isAuthenticated, isCandidate]);
 
   const profileRef = useRef<HTMLDivElement | null>(null);
 
@@ -54,8 +72,7 @@ export const Navbar: React.FC = () => {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    logout();
-    navigate('/');
+    logout('/');
   };
 
   const adminHomePath = getAdminDashboardRoute(user?.roles || []);
@@ -65,7 +82,7 @@ export const Navbar: React.FC = () => {
   return (
     <nav className="global-navbar">
       {/* Brand Logo */}
-      <Link to={isHr ? '/hr-analytics' : isAdmin ? adminHomePath : '/'} className="nav-brand-link">
+      <Link to={isHr ? '/hr-analytics' : isAdmin ? adminHomePath : isCandidate ? '/dashboard' : '/'} className="nav-brand-link">
         <HireMindLogo variant="navbar" size="md" />
       </Link>
 
@@ -92,21 +109,24 @@ export const Navbar: React.FC = () => {
             </>
           ) : isCandidate ? (
             <>
-              <Link to="/jobs" className={`btn btn-secondary nav-link-btn ${location.pathname === '/jobs' ? 'active-link' : ''}`}>
-                <Briefcase size={15} /> Jobs
+              <Link to="/dashboard" className={`btn btn-secondary nav-link-btn ${location.pathname.startsWith('/dashboard') || location.pathname.startsWith('/candidate') ? 'active-link' : ''}`}>
+                <LayoutDashboard size={15} color="var(--primary-cyan)" /> Dashboard
               </Link>
-              <Link to="/recommendations" className={`btn btn-secondary nav-link-btn ${location.pathname === '/recommendations' ? 'active-link' : ''}`}>
-                <Sparkles size={15} color="var(--primary-cyan)" /> AI Matches
-              </Link>
-              <Link to="/messages" className={`btn btn-secondary nav-link-btn ${location.pathname === '/messages' ? 'active-link' : ''}`}>
-                <MessageSquare size={15} color="var(--primary-cyan)" /> Messages
-              </Link>
-              <Link to="/my-applications" className={`btn btn-secondary nav-link-btn ${location.pathname === '/my-applications' ? 'active-link' : ''}`}>
-                <FileText size={15} /> Applications
-              </Link>
-              <Link to="/portfolio" className={`btn btn-secondary nav-link-btn ${location.pathname === '/portfolio' ? 'active-link' : ''}`}>
-                <FolderGit2 size={15} /> Portfolio
-              </Link>
+              {devWorkspaceEligible && (
+                <Link
+                  to="/developer-workspace"
+                  className="btn btn-secondary nav-link-btn"
+                  style={{
+                    background: 'rgba(37, 99, 235, 0.15)',
+                    border: '1px solid rgba(37, 99, 235, 0.4)',
+                    color: '#38BDF8',
+                    fontWeight: 700
+                  }}
+                  title="Switch to Developer Workspace"
+                >
+                  <Code2 size={15} color="#38BDF8" /> Dev Workspace
+                </Link>
+              )}
             </>
           ) : (
             <Link to="/jobs" className={`btn btn-secondary nav-link-btn ${location.pathname === '/jobs' ? 'active-link' : ''}`}>
@@ -178,21 +198,47 @@ export const Navbar: React.FC = () => {
                   <div className="nav-profile-dropdown-divider" />
 
                   <div className="nav-profile-dropdown-menu">
-                    <Link 
-                      to="/profile" 
-                      onClick={() => setShowProfileMenu(false)} 
-                      className="nav-profile-menu-item"
-                    >
-                      <User size={15} /> My Profile Center
-                    </Link>
-
-                    {isCandidate && (
+                    {isCandidate ? (
+                      <>
+                        <Link 
+                          to="/dashboard?tab=overview" 
+                          onClick={() => setShowProfileMenu(false)} 
+                          className="nav-profile-menu-item"
+                        >
+                          <LayoutDashboard size={15} /> Dashboard
+                        </Link>
+                        {devWorkspaceEligible && (
+                          <Link 
+                            to="/developer-workspace" 
+                            onClick={() => setShowProfileMenu(false)} 
+                            className="nav-profile-menu-item"
+                            style={{ color: '#38BDF8', fontWeight: 600 }}
+                          >
+                            <Code2 size={15} color="#38BDF8" /> Switch to Dev Workspace
+                          </Link>
+                        )}
+                        <Link 
+                          to="/dashboard?tab=portfolio" 
+                          onClick={() => setShowProfileMenu(false)} 
+                          className="nav-profile-menu-item"
+                        >
+                          <FolderGit2 size={15} /> Portfolio & Resumes
+                        </Link>
+                        <Link 
+                          to="/dashboard?tab=applications" 
+                          onClick={() => setShowProfileMenu(false)} 
+                          className="nav-profile-menu-item"
+                        >
+                          <FileText size={15} /> My Applications
+                        </Link>
+                      </>
+                    ) : (
                       <Link 
-                        to="/portfolio" 
+                        to="/profile" 
                         onClick={() => setShowProfileMenu(false)} 
                         className="nav-profile-menu-item"
                       >
-                        <FolderGit2 size={15} /> Portfolio & Resumes
+                        <User size={15} /> My Profile Center
                       </Link>
                     )}
 

@@ -26,7 +26,9 @@ interface AuthContextType {
   verify2Fa: (data: { email: string; twoFactorToken: string; otp: string }) => Promise<any>;
   register: (data: any) => Promise<void>;
   googleLogin: (data: any) => Promise<void>;
-  logout: () => void;
+  logout: (redirectPath?: string) => void;
+  updateUser: (data: Partial<UserProfile>) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,6 +44,8 @@ const parseUserFromAuthData = (data: any): UserProfile => {
     firstName: data.firstName,
     lastName: data.lastName,
     roles: rolesArray,
+    avatarUrl: data.avatarUrl,
+    phone: data.phone,
     status: data.status || 'ACTIVE',
     emailVerified: data.emailVerified ?? true,
     companySlug: data.companySlug,
@@ -52,8 +56,15 @@ const parseUserFromAuthData = (data: any): UserProfile => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
     try {
+      const token = localStorage.getItem('accessToken');
       const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : null;
+      if (!token || !saved) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('user');
+        return null;
+      }
+      return JSON.parse(saved);
     } catch {
       return null;
     }
@@ -172,17 +183,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(authUser);
   };
 
-  const logout = async () => {
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'accessToken' && !e.newValue) {
+        setUser(null);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const logout = (redirectPath?: string) => {
+    const token = localStorage.getItem('accessToken');
+
+    // 1. Instantly destroy local session & storage
     try {
-      await apiClient.post('/auth/logout');
-    } catch (err) {
-      console.debug('Logout API call finished / token revoked');
-    } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       sessionStorage.clear();
-      setUser(null);
+    } catch (err) {
+      console.warn('Storage purge error:', err);
+    }
+    setUser(null);
+
+    // 2. Blacklist token on server asynchronously
+    if (token) {
+      apiClient.post('/auth/logout', null, {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => {
+        // Ignored, local session is already destroyed
+      });
+    }
+
+    // 3. Force browser history replacement and reload to eliminate cached DOM/bfcache
+    const target = redirectPath || '/';
+    window.location.replace(target);
+  };
+
+  const updateUser = (updatedData: Partial<UserProfile>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const merged = { ...prev, ...updatedData };
+      localStorage.setItem('user', JSON.stringify(merged));
+      return merged;
+    });
+  };
+
+  const refreshUser = async () => {
+    try {
+      const res = await apiClient.get('/users/me');
+      if (res.data && res.data.data) {
+        const userData = parseUserFromAuthData(res.data.data);
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+      }
+    } catch (err) {
+      console.warn('Failed to refresh user profile:', err);
     }
   };
 
@@ -196,10 +253,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   roles.includes('ROLE_COMPANY_ADMIN') ||
                   roles.includes('SUPER_ADMIN');
 
+  const isAuthenticated = !!user && !!localStorage.getItem('accessToken');
+
   return (
     <AuthContext.Provider value={{
       user,
-      isAuthenticated: !!user,
+      isAuthenticated,
       isLoading,
       isCandidate,
       isHr,
@@ -208,7 +267,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       verify2Fa,
       register,
       googleLogin,
-      logout
+      logout,
+      updateUser,
+      refreshUser
     }}>
       {children}
     </AuthContext.Provider>

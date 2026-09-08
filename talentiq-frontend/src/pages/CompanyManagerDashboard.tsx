@@ -833,7 +833,7 @@ export const CompanyManagerDashboard: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={logout}
+            onClick={() => logout('/admin-login')}
             style={{
               display: 'flex',
               alignItems: 'center',

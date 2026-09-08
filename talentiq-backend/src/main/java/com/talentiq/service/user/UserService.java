@@ -16,4 +16,6 @@ public interface UserService {
     void changePassword(UserPrincipal principal, UserDto.ChangePasswordRequest request);
 
     void changePassword(Long userId, UserDto.ChangePasswordRequest request);
+
+    UserDto.Response uploadAvatar(UserPrincipal principal, org.springframework.web.multipart.MultipartFile file);
 }

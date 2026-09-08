@@ -26,8 +26,6 @@ import {
   ListFilter,
   Globe,
   Check,
-  Maximize2,
-  Minimize2,
   ShieldCheck
 } from 'lucide-react';
 import { AiChatSettings } from '../components/AiChatSettings';
@@ -80,6 +78,9 @@ interface RecommendationItem {
   missingSkills: string[];
   strengths: string[];
   improvementSuggestions?: string[];
+  recommendationReason?: string;
+  growthOpportunities?: string[];
+  relevanceTag?: 'SUPER_MATCH' | 'STRONG_FIT' | 'SKILL_GROWTH' | 'CAREER_PIVOT';
 }
 
 interface RecommendationStatus {
@@ -88,28 +89,27 @@ interface RecommendationStatus {
   activeResumeName?: string;
   activeResumeId?: number;
   parseStatus?: string;
-  isParsed?: boolean;
-  profileSkillsCount: number;
-  candidateSkills: string[];
-  extractedSkills: string[];
-  profileCompletion: number;
-  totalMatchingJobs: number;
-  highMatchJobsCount: number;
+  profileSkillsCount?: number;
+  candidateSkills?: string[];
+  extractedSkills?: string[];
+  profileCompletion?: number;
+  totalMatchingJobs?: number;
+  highMatchJobsCount?: number;
 }
 
 interface ChatMessage {
   id: string;
   sender: 'user' | 'agent';
   text: string;
-  timestamp: string;
   suggestedJobs?: JobDto[];
+  requiresResume?: boolean;
+  timestamp: string;
   intent?: string;
   warningCount?: number;
   isBlocked?: boolean;
-  requiresResume?: boolean;
 }
 
-export const Recommendations: React.FC = () => {
+export const Recommendations: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const navigate = useNavigate();
   const { theme } = useTheme();
 
@@ -125,7 +125,7 @@ export const Recommendations: React.FC = () => {
   const [scoreFilter, setScoreFilter] = useState<'85_PLUS' | '90_PLUS' | '75_PLUS' | 'ALL'>('85_PLUS');
   const [locationFilter, setLocationFilter] = useState<'ALL' | 'REMOTE' | 'HYBRID' | 'ONSITE'>('ALL');
   const [sortBy, setSortBy] = useState<'SCORE_DESC' | 'RECENT' | 'SALARY_DESC'>('SCORE_DESC');
-  const [viewMode, setViewMode] = useState<'CARDS' | 'COMPACT' | 'CHAT'>('CARDS');
+  const [cardLayout, setCardLayout] = useState<'CARDS' | 'COMPACT'>('CARDS');
 
   // Accordion Expand State for Job Details Breakdown
   const [expandedCardIds, setExpandedCardIds] = useState<Set<number>>(new Set());
@@ -147,10 +147,9 @@ export const Recommendations: React.FC = () => {
   const [applyingJobId, setApplyingJobId] = useState<number | null>(null);
   const [selectedModalJob, setSelectedModalJob] = useState<JobDto | null>(null);
 
-  // ── AI Career Copilot Chat State ──
+  // ── AI Career Copilot Chat State (Permanently Expanded) ──
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
-  const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   const [securityBlocked, setSecurityBlocked] = useState(false);
   const [securityWarningCount, setSecurityWarningCount] = useState(0);
   const [isPrivacySettingsOpen, setIsPrivacySettingsOpen] = useState(false);
@@ -429,12 +428,12 @@ export const Recommendations: React.FC = () => {
   });
 
   return (
-    <div className="recs-page-wrapper">
+    <div className={`recs-page-wrapper ${embedded ? 'is-embedded' : ''} theme-${theme}`}>
       {/* ── Interactive Cosmic Galaxy Background ── */}
-      <InteractiveGalaxyBackground theme={theme} />
+      {!embedded && <InteractiveGalaxyBackground theme={theme} />}
 
       {/* ═══════════════════════════════════════════════════════════
-          1 SINGLE UNIFIED DASHBOARD CONTAINER (1 hi div me sab kuch)
+          1 SINGLE UNIFIED DASHBOARD CONTAINER (Single Seamless Page)
          ═══════════════════════════════════════════════════════════ */}
       <div className="recs-unified-dashboard">
 
@@ -532,28 +531,20 @@ export const Recommendations: React.FC = () => {
             {/* View Mode Switcher */}
             <div className="recs-view-toggle-group">
               <button
-                onClick={() => setViewMode('CARDS')}
-                className={`recs-view-pill-btn ${viewMode === 'CARDS' ? 'active' : ''}`}
+                onClick={() => setCardLayout('CARDS')}
+                className={`recs-view-pill-btn ${cardLayout === 'CARDS' ? 'active' : ''}`}
                 title="Cards View"
               >
                 <LayoutGrid size={14} />
                 <span>Cards</span>
               </button>
               <button
-                onClick={() => setViewMode('COMPACT')}
-                className={`recs-view-pill-btn ${viewMode === 'COMPACT' ? 'active' : ''}`}
-                title="Compact View"
+                onClick={() => setCardLayout('COMPACT')}
+                className={`recs-view-pill-btn ${cardLayout === 'COMPACT' ? 'active' : ''}`}
+                title="Compact List View"
               >
                 <ListFilter size={14} />
                 <span>List</span>
-              </button>
-              <button
-                onClick={() => setViewMode('CHAT')}
-                className={`recs-view-pill-btn ${viewMode === 'CHAT' ? 'active' : ''}`}
-                title="AI Chat"
-              >
-                <AiLogo size={14} />
-                <span>AI Chat</span>
               </button>
             </div>
 
@@ -612,455 +603,427 @@ export const Recommendations: React.FC = () => {
           </div>
         )}
 
-        {/* ── DIV 2: Unified Main Content & AI Workspace ── */}
+        {/* ── DIV 2: Unified Main Content & AI Workspace (Permanently Expanded) ── */}
         <div className="recs-unified-content">
-          {viewMode === 'CHAT' ? (
-            /* A. DYNAMIC EXPANDABLE AI CAREER AGENT WORKSPACE */
-            <div className={`recs-chat-workspace ${isChatFullscreen ? 'fullscreen' : ''}`}>
-              <div className="recs-chat-top-header">
-                <div className="recs-chat-bot-info">
-                  <div className="recs-chat-bot-avatar">
-                    <AiLogo size={18} animated />
-                  </div>
-                  <div>
-                    <span className="recs-chat-bot-title">HireMind AI Career Agent</span>
-                    <span className="recs-chat-bot-sub">Neural Match Assistant & Career Advisor</span>
-                  </div>
+          {/* A. PERMANENTLY EXPANDED AI CAREER AGENT WORKSPACE */}
+          <div className="recs-chat-workspace">
+            <div className="recs-chat-top-header">
+              <div className="recs-chat-bot-info">
+                <div className="recs-chat-bot-avatar">
+                  <AiLogo size={18} animated />
                 </div>
-
-                <div className="recs-chat-header-actions-group">
-                  <button
-                    onClick={() => setIsChatFullscreen(!isChatFullscreen)}
-                    className="recs-chat-header-btn"
-                    title={isChatFullscreen ? 'Exit Fullscreen' : 'Expand Agent to Fullscreen'}
-                  >
-                    {isChatFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-                    <span>{isChatFullscreen ? 'Collapse' : 'Expand'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setIsChatFullscreen(false);
-                      setViewMode('CARDS');
-                    }}
-                    className="recs-chat-header-btn"
-                    title="Minimize Agent to Floating Badge"
-                  >
-                    <ChevronDown size={14} />
-                    <span>Minimize</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsPrivacySettingsOpen(true)}
-                    className="recs-chat-header-btn"
-                    title="AI Privacy, Retention and Storage Settings"
-                  >
-                    <ShieldCheck size={13} />
-                    <span>Privacy</span>
-                  </button>
-
-                  <button
-                    onClick={() => setChatMessages([
-                      {
-                        id: 'reset-msg',
-                        sender: 'agent',
-                        text: 'Chat history cleared. What kind of roles or companies can I find for you?',
-                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      }
-                    ])}
-                    className="recs-chat-reset-btn"
-                    title="Clear conversation"
-                  >
-                    <Trash2 size={13} /> Clear
-                  </button>
+                <div>
+                  <span className="recs-chat-bot-title">HireMind AI Career Agent</span>
+                  <span className="recs-chat-bot-sub">Neural Match Assistant & Career Advisor</span>
                 </div>
               </div>
 
-              {/* Quick Prompts */}
-              <div className="recs-chat-prompts-bar">
-                <span className="recs-prompts-label">⚡ Quick Queries:</span>
-                <button onClick={() => handleSendMessage('Suggest me Java developer jobs')} className="recs-prompt-chip">
-                  💡 Java roles
-                </button>
-                <button onClick={() => handleSendMessage('Based on my resume suggest me jobs')} className="recs-prompt-chip">
-                  📄 Resume Match
-                </button>
-                <button onClick={() => handleSendMessage('Show recent Remote React developer roles')} className="recs-prompt-chip">
-                  🚀 Remote React
-                </button>
-                <button onClick={() => handleSendMessage('Find Cloud & DevOps engineer openings')} className="recs-prompt-chip">
-                  ☁️ DevOps & Cloud
-                </button>
-              </div>
-
-              {/* Messages Timeline */}
-              <div className="recs-chat-timeline">
-                {chatMessages.map(msg => (
-                  <div key={msg.id} className={`recs-chat-row ${msg.sender === 'user' ? 'user-row' : 'agent-row'}`}>
-                    <div className="recs-chat-avatar-bubble">
-                      {msg.sender === 'user' ? <User size={14} /> : <AiLogo size={15} />}
-                    </div>
-                    <div className="recs-chat-content-wrap">
-                      <div className={`recs-chat-bubble-text ${msg.sender === 'user' ? 'user-msg' : 'agent-msg'}`}>
-                        <div>{msg.text}</div>
-
-                        {/* Resume upload in chat */}
-                        {msg.requiresResume && (
-                          <div className="recs-chat-inline-upload">
-                            <input
-                              type="file"
-                              ref={chatResumeInputRef}
-                              style={{ display: 'none' }}
-                              accept=".pdf,.doc,.docx"
-                              onChange={handleInlineResumeUpload}
-                            />
-                            <button
-                              onClick={() => chatResumeInputRef.current?.click()}
-                              disabled={uploadingResume}
-                              className="cosmic-btn-primary recs-chat-btn"
-                            >
-                              <UploadCloud size={13} />
-                              {uploadingResume ? 'Uploading...' : 'Upload PDF Resume'}
-                            </button>
-                            <button
-                              onClick={() => navigate('/portfolio')}
-                              className="cosmic-btn-secondary recs-chat-btn"
-                            >
-                              <FileText size={13} /> Resume Center
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Suggested jobs */}
-                        {msg.suggestedJobs && msg.suggestedJobs.length > 0 && (
-                          <div className="recs-chat-embedded-jobs-grid">
-                            {msg.suggestedJobs.map(job => (
-                              <div key={job.id} className="recs-chat-embedded-job-card">
-                                <div className="recs-embed-job-header">
-                                  <div>
-                                    <h4 className="recs-embed-job-title">{job.title}</h4>
-                                    <div className="recs-embed-job-company">
-                                      <Building2 size={12} /> {job.company?.name} · {job.location || 'Remote'}
-                                    </div>
-                                  </div>
-                                  {job.remote && <span className="recs-pill-badge blue">🚀 Remote</span>}
-                                </div>
-
-                                <div className="recs-embed-actions-row">
-                                  <button
-                                    onClick={() => setSelectedModalJob(job)}
-                                    className="cosmic-btn-secondary recs-embed-btn"
-                                  >
-                                    Details
-                                  </button>
-                                  <button
-                                    onClick={() => handleChatWithRecruiter(job)}
-                                    className="cosmic-btn-secondary recs-embed-btn"
-                                  >
-                                    <MessageSquare size={12} /> Message HR
-                                  </button>
-                                  {appliedJobIds.includes(job.id) ? (
-                                    <span className="recs-applied-pill-tag mini">
-                                      <CheckCircle2 size={12} /> Applied
-                                    </span>
-                                  ) : (
-                                    <button
-                                      onClick={() => handleApply(job.id)}
-                                      disabled={applyingJobId === job.id}
-                                      className="cosmic-btn-primary recs-embed-btn"
-                                    >
-                                      Apply 🚀
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <span className="recs-chat-timestamp">{msg.timestamp}</span>
-                    </div>
-                  </div>
-                ))}
-
-                {chatLoading && (
-                  <div className="recs-chat-row agent-row">
-                    <div className="recs-chat-avatar-bubble"><AiLogo size={15} /></div>
-                    <div className="recs-chat-bubble-text agent-msg loading-msg">
-                      <span className="recs-pulse-dot" />
-                      <span style={{ fontSize: 13, color: '#A78BFA' }}>Analyzing candidate match profile...</span>
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-
-              {/* Chat Input */}
-              <div className="recs-chat-bottom-input">
-                <input
-                  type="text"
-                  placeholder="Ask AI Career Copilot (e.g. 'Suggest remote roles with 85%+ match' or 'Find React jobs')..."
-                  value={chatInput}
-                  disabled={chatLoading || securityBlocked}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  className="recs-chat-text-input"
-                />
+              <div className="recs-chat-header-actions-group">
                 <button
-                  onClick={() => handleSendMessage()}
-                  disabled={!chatInput.trim() || chatLoading || securityBlocked}
-                  className="cosmic-btn-primary recs-chat-send-action-btn"
+                  onClick={() => setIsPrivacySettingsOpen(true)}
+                  className="recs-chat-header-btn"
+                  title="AI Privacy, Retention and Storage Settings"
                 >
-                  <Send size={15} />
+                  <ShieldCheck size={13} />
+                  <span>Privacy</span>
+                </button>
+
+                <button
+                  onClick={() => setChatMessages([
+                    {
+                      id: 'reset-msg',
+                      sender: 'agent',
+                      text: 'Chat history cleared. What kind of roles or companies can I find for you?',
+                      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    }
+                  ])}
+                  className="recs-chat-reset-btn"
+                  title="Clear conversation"
+                >
+                  <Trash2 size={13} /> Clear
                 </button>
               </div>
             </div>
-          ) : loading ? (
-            /* B. LOADING STATE */
-            <div className="recs-loading-card">
-              <div className="recs-loading-spinner" />
-              <h3 className="recs-loading-headline">Computing 85%+ Match Vector Matrix...</h3>
-              <p className="recs-loading-subtext">Evaluating skills alignment, experience depth, and semantic proximity</p>
-            </div>
-          ) : filteredAndSortedRecommendations.length === 0 ? (
-            /* C. NO MATCHES NOTICE (No extra div box) */
-            <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8', fontSize: '13px' }}>
-              No roles matched your current search or filter criteria.{' '}
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setScoreFilter('ALL');
-                  setLocationFilter('ALL');
-                }}
-                style={{ background: 'none', border: 'none', color: '#A78BFA', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}
-              >
-                Reset Filters
+
+            {/* Quick Prompts */}
+            <div className="recs-chat-prompts-bar">
+              <span className="recs-prompts-label">⚡ Quick Queries:</span>
+              <button onClick={() => handleSendMessage('Suggest me Java developer jobs')} className="recs-prompt-chip">
+                💡 Java roles
+              </button>
+              <button onClick={() => handleSendMessage('Based on my resume suggest me jobs')} className="recs-prompt-chip">
+                📄 Resume Match
+              </button>
+              <button onClick={() => handleSendMessage('Show recent Remote React developer roles')} className="recs-prompt-chip">
+                🚀 Remote React
+              </button>
+              <button onClick={() => handleSendMessage('Find Cloud & DevOps engineer openings')} className="recs-prompt-chip">
+                ☁️ DevOps & Cloud
               </button>
             </div>
-          ) : (
-            /* D. JOB RECOMMENDATION CARDS */
-            <div className={viewMode === 'COMPACT' ? 'recs-compact-list' : 'recs-cards-grid'}>
-              {filteredAndSortedRecommendations.map(rec => {
-                const isApplied = appliedJobIds.includes(rec.job.id);
-                const isSuperMatch = rec.overallScore >= 85;
-                const isExpanded = expandedCardIds.has(rec.id);
 
-                return (
-                  <article
-                    key={rec.id}
-                    className={`recs-job-unified-card ${isSuperMatch ? 'super-match-border' : ''} ${viewMode === 'COMPACT' ? 'compact-layout' : ''}`}
-                  >
-                    {/* Header Row */}
-                    <div className="recs-card-header-row">
-                      <div className="recs-card-left-info">
-                        <div className="recs-company-avatar">
-                          {rec.job.company.name.charAt(0).toUpperCase()}
+            {/* Messages Timeline */}
+            <div className="recs-chat-timeline">
+              {chatMessages.map(msg => (
+                <div key={msg.id} className={`recs-chat-row ${msg.sender === 'user' ? 'user-row' : 'agent-row'}`}>
+                  <div className="recs-chat-avatar-bubble">
+                    {msg.sender === 'user' ? <User size={14} /> : <AiLogo size={15} />}
+                  </div>
+                  <div className="recs-chat-content-wrap">
+                    <div className={`recs-chat-bubble-text ${msg.sender === 'user' ? 'user-msg' : 'agent-msg'}`}>
+                      <div>{msg.text}</div>
+
+                      {/* Resume upload in chat */}
+                      {msg.requiresResume && (
+                        <div className="recs-chat-inline-upload">
+                          <input
+                            type="file"
+                            ref={chatResumeInputRef}
+                            style={{ display: 'none' }}
+                            accept=".pdf,.doc,.docx"
+                            onChange={handleInlineResumeUpload}
+                          />
+                          <button
+                            onClick={() => chatResumeInputRef.current?.click()}
+                            disabled={uploadingResume}
+                            className="cosmic-btn-primary recs-chat-btn"
+                          >
+                            <UploadCloud size={13} />
+                            {uploadingResume ? 'Uploading...' : 'Upload PDF Resume'}
+                          </button>
+                          <button
+                            onClick={() => navigate('/portfolio')}
+                            className="cosmic-btn-secondary recs-chat-btn"
+                          >
+                            <FileText size={13} /> Resume Center
+                          </button>
                         </div>
-                        <div className="recs-job-headings">
-                          <div className="recs-badge-strip">
-                            {isSuperMatch && (
-                              <span className="recs-pill-badge flame">
-                                <Flame size={11} /> 85%+ MATCH
-                              </span>
-                            )}
-                            {rec.job.remote && (
-                              <span className="recs-pill-badge blue">🚀 Remote</span>
-                            )}
-                            {rec.job.hybrid && (
-                              <span className="recs-pill-badge purple">🪐 Hybrid</span>
-                            )}
-                            {rec.job.experienceLevel && (
-                              <span className="recs-pill-badge grey">{rec.job.experienceLevel}</span>
-                            )}
-                          </div>
-                          <h2 className="recs-card-job-title">{rec.job.title}</h2>
-                          <div className="recs-card-meta-line">
-                            <Building2 size={13} className="recs-meta-icon" />
-                            <span className="recs-meta-company">{rec.job.company.name}</span>
-                            <span className="recs-meta-separator">•</span>
-                            <MapPin size={13} className="recs-meta-icon" />
-                            <span>{rec.job.location || 'Remote'}</span>
-                            {(rec.job.salaryMin || rec.job.salaryMax) && (
-                              <>
-                                <span className="recs-meta-separator">•</span>
-                                <DollarSign size={13} className="recs-meta-icon green" />
-                                <span className="recs-salary-text">
-                                  {rec.job.salaryCurrency || '$'}{rec.job.salaryMin?.toLocaleString()} - {rec.job.salaryCurrency || '$'}{rec.job.salaryMax?.toLocaleString()}/{rec.job.salaryPeriod || 'yr'}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      )}
 
-                      {/* Match Score Gauge */}
-                      <div className={`recs-circular-gauge ${isSuperMatch ? 'super-gauge' : ''}`}>
-                        <div className="recs-gauge-val">{rec.overallScore.toFixed(0)}%</div>
-                        <div className="recs-gauge-sub">AI FIT</div>
-                      </div>
-                    </div>
+                      {/* Suggested jobs */}
+                      {msg.suggestedJobs && msg.suggestedJobs.length > 0 && (
+                        <div className="recs-chat-embedded-jobs-grid">
+                          {msg.suggestedJobs.map(job => (
+                            <div key={job.id} className="recs-chat-embedded-job-card">
+                              <div className="recs-embed-job-header">
+                                <div>
+                                  <h4 className="recs-embed-job-title">{job.title}</h4>
+                                  <div className="recs-embed-job-company">
+                                    <Building2 size={12} /> {job.company?.name} · {job.location || 'Remote'}
+                                  </div>
+                                </div>
+                                {job.remote && <span className="recs-pill-badge blue">🚀 Remote</span>}
+                              </div>
 
-                    {/* Matched Skills Chips */}
-                    {rec.matchingSkills && rec.matchingSkills.length > 0 && (
-                      <div className="recs-card-skills-row">
-                        <span className="recs-skills-lead-label">Matched Skills:</span>
-                        <div className="recs-skills-chips-list">
-                          {rec.matchingSkills.slice(0, 5).map((skill, idx) => (
-                            <span key={idx} className="recs-skill-chip-tag">
-                              <Check size={11} className="recs-check-icon" /> {skill}
-                            </span>
+                              <div className="recs-embed-actions-row">
+                                <button
+                                  onClick={() => setSelectedModalJob(job)}
+                                  className="cosmic-btn-secondary recs-embed-btn"
+                                >
+                                  Details
+                                </button>
+                                <button
+                                  onClick={() => handleChatWithRecruiter(job)}
+                                  className="cosmic-btn-secondary recs-embed-btn"
+                                >
+                                  <MessageSquare size={12} /> Message HR
+                                </button>
+                                {appliedJobIds.includes(job.id) ? (
+                                  <span className="recs-applied-pill-tag mini">
+                                    <CheckCircle2 size={12} /> Applied
+                                  </span>
+                                ) : (
+                                  <button
+                                    onClick={() => handleApply(job.id)}
+                                    disabled={applyingJobId === job.id}
+                                    className="cosmic-btn-primary recs-embed-btn"
+                                  >
+                                    Apply 🚀
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           ))}
-                          {rec.matchingSkills.length > 5 && (
-                            <span className="recs-skill-chip-more">+{rec.matchingSkills.length - 5} more</span>
-                          )}
+                        </div>
+                      )}
+                    </div>
+                    <span className="recs-chat-timestamp">{msg.timestamp}</span>
+                  </div>
+                </div>
+              ))}
+
+              {chatLoading && (
+                <div className="recs-chat-row agent-row">
+                  <div className="recs-chat-avatar-bubble"><AiLogo size={15} /></div>
+                  <div className="recs-chat-bubble-text agent-msg loading-msg">
+                    <span className="recs-pulse-dot" />
+                    <span style={{ fontSize: 13, color: '#A78BFA' }}>Analyzing candidate match profile...</span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Input */}
+            <div className="recs-chat-bottom-input">
+              <input
+                type="text"
+                placeholder="Ask AI Career Copilot (e.g. 'Suggest remote roles with 85%+ match' or 'Find React jobs')..."
+                value={chatInput}
+                disabled={chatLoading || securityBlocked}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                className="recs-chat-text-input"
+              />
+              <button
+                onClick={() => handleSendMessage()}
+                disabled={!chatInput.trim() || chatLoading || securityBlocked}
+                className="cosmic-btn-primary recs-chat-send-action-btn"
+              >
+                <Send size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* B. NEURAL MATCH RECOMMENDATIONS SECTION */}
+          <div className="recs-results-section" style={{ marginTop: '12px' }}>
+            {loading ? (
+              /* Loading State */
+              <div className="recs-loading-card">
+                <div className="recs-loading-spinner" />
+                <h3 className="recs-loading-headline">Computing 85%+ Match Vector Matrix...</h3>
+                <p className="recs-loading-subtext">Evaluating skills alignment, experience depth, and semantic proximity</p>
+              </div>
+            ) : filteredAndSortedRecommendations.length === 0 ? (
+              /* No Matches Notice */
+              <div style={{ textAlign: 'center', padding: '32px 16px', color: '#94A3B8', fontSize: '13px' }}>
+                No roles matched your current search or filter criteria.{' '}
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    setScoreFilter('ALL');
+                    setLocationFilter('ALL');
+                  }}
+                  style={{ background: 'none', border: 'none', color: '#A78BFA', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}
+                >
+                  Reset Filters
+                </button>
+              </div>
+            ) : (
+              /* Job Recommendation Cards Grid / Compact List */
+              <div className={cardLayout === 'COMPACT' ? 'recs-compact-list' : 'recs-cards-grid'}>
+                {filteredAndSortedRecommendations.map(rec => {
+                  const isApplied = appliedJobIds.includes(rec.job.id);
+                  const isSuperMatch = rec.overallScore >= 85;
+                  const isExpanded = expandedCardIds.has(rec.id);
+
+                  return (
+                    <article
+                      key={rec.id}
+                      className={`recs-job-unified-card ${isSuperMatch ? 'super-match-border' : ''} ${cardLayout === 'COMPACT' ? 'compact-layout' : ''}`}
+                    >
+                      {/* Header Row */}
+                      <div className="recs-card-header-row">
+                        <div className="recs-card-left-info">
+                          <div className="recs-company-avatar">
+                            {rec.job.company.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="recs-job-headings">
+                            <div className="recs-badge-strip">
+                              {isSuperMatch && (
+                                <span className="recs-pill-badge flame">
+                                  <Flame size={11} /> 85%+ MATCH
+                                </span>
+                              )}
+                              {rec.job.remote && (
+                                <span className="recs-pill-badge blue">🚀 Remote</span>
+                              )}
+                              {rec.job.hybrid && (
+                                <span className="recs-pill-badge purple">🏢 Hybrid</span>
+                              )}
+                              {rec.relevanceTag && (
+                                <span className="recs-pill-badge green">
+                                  ✨ {rec.relevanceTag.replace('_', ' ')}
+                                </span>
+                              )}
+                            </div>
+
+                            <h3 className="recs-card-job-title">{rec.job.title}</h3>
+                            <div className="recs-card-meta-line">
+                              <span className="recs-meta-item"><Building2 size={13} color="#A78BFA" /> {rec.job.company.name}</span>
+                              <span className="recs-meta-divider">•</span>
+                              <span className="recs-meta-item"><MapPin size={13} color="#94A3B8" /> {rec.job.location || 'Remote'}</span>
+                              {(rec.job.salaryMin || rec.job.salaryMax) && (
+                                <>
+                                  <span className="recs-meta-divider">•</span>
+                                  <span className="recs-meta-item salary">
+                                    <DollarSign size={13} />
+                                    {rec.job.salaryCurrency || '$'}{rec.job.salaryMin ? rec.job.salaryMin.toLocaleString() : '80k'} - {rec.job.salaryMax ? rec.job.salaryMax.toLocaleString() : '130k'}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Circular Score Badge */}
+                        <div className={`recs-card-score-badge ${isSuperMatch ? 'super' : 'standard'}`}>
+                          <div className="recs-score-number">{rec.overallScore}%</div>
+                          <div className="recs-score-caption">FIT SCORE</div>
                         </div>
                       </div>
-                    )}
 
-                    {/* Expandable Dropdown Accordion Button */}
-                    <div className="recs-accordion-toggle-wrap">
-                      <button
-                        onClick={() => toggleCardExpansion(rec.id)}
-                        className={`recs-accordion-btn ${isExpanded ? 'expanded' : ''}`}
-                      >
-                        <span>
-                          {isExpanded ? '▲ Hide AI Match Analysis & Insights' : '▼ View AI Match Analysis & Insights'}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Collapsible Analysis Breakdown (1-div) */}
-                    {isExpanded && (
-                      <div className="recs-expanded-analysis-box">
-                        <div className="recs-fit-meters-grid">
-                          <div className="recs-meter-card">
-                            <div className="recs-meter-top">
-                              <span>⚡ Skills Alignment</span>
-                              <strong>{rec.skillScore}%</strong>
-                            </div>
-                            <div className="recs-progress-track">
-                              <div className="recs-progress-fill skills" style={{ width: `${Math.min(100, rec.skillScore)}%` }} />
-                            </div>
+                      {/* Match Breakdown Bars */}
+                      <div className="recs-scores-breakdown-row">
+                        <div className="recs-score-sub-pill">
+                          <span className="recs-sub-pill-label">Skills Match</span>
+                          <div className="recs-mini-bar-track">
+                            <div className="recs-mini-bar-fill green" style={{ width: `${rec.skillScore}%` }} />
                           </div>
-
-                          <div className="recs-meter-card">
-                            <div className="recs-meter-top">
-                              <span>💼 Experience Depth</span>
-                              <strong>{rec.experienceScore}%</strong>
-                            </div>
-                            <div className="recs-progress-track">
-                              <div className="recs-progress-fill experience" style={{ width: `${Math.min(100, rec.experienceScore)}%` }} />
-                            </div>
-                          </div>
-
-                          <div className="recs-meter-card">
-                            <div className="recs-meter-top">
-                              <span>📍 Location / Work Fit</span>
-                              <strong>{rec.locationScore}%</strong>
-                            </div>
-                            <div className="recs-progress-track">
-                              <div className="recs-progress-fill location" style={{ width: `${Math.min(100, rec.locationScore)}%` }} />
-                            </div>
-                          </div>
+                          <span className="recs-sub-pill-val">{rec.skillScore}%</span>
                         </div>
 
-                        {rec.missingSkills && rec.missingSkills.length > 0 && (
-                          <div className="recs-missing-skills-box">
-                            <span className="recs-missing-label">+ Recommended Skill Additions:</span>
-                            <div className="recs-missing-chips">
-                              {rec.missingSkills.slice(0, 4).map((s, idx) => (
-                                <span key={idx} className="recs-chip-addition">+{s}</span>
+                        <div className="recs-score-sub-pill">
+                          <span className="recs-sub-pill-label">Experience Depth</span>
+                          <div className="recs-mini-bar-track">
+                            <div className="recs-mini-bar-fill blue" style={{ width: `${rec.experienceScore}%` }} />
+                          </div>
+                          <span className="recs-sub-pill-val">{rec.experienceScore}%</span>
+                        </div>
+
+                        <div className="recs-score-sub-pill">
+                          <span className="recs-sub-pill-label">Semantic Proximity</span>
+                          <div className="recs-mini-bar-track">
+                            <div className="recs-mini-bar-fill purple" style={{ width: `${rec.semanticScore}%` }} />
+                          </div>
+                          <span className="recs-sub-pill-val">{rec.semanticScore}%</span>
+                        </div>
+                      </div>
+
+                      {/* AI Fit Explanation */}
+                      {rec.recommendationReason && (
+                        <div className="recs-ai-reason-quote">
+                          <Sparkles size={14} color="#A78BFA" style={{ flexShrink: 0, marginTop: 2 }} />
+                          <p className="recs-reason-text">{rec.recommendationReason}</p>
+                        </div>
+                      )}
+
+                      {/* Matched & Missing Skills Matrix */}
+                      <div className="recs-skills-matrix-row">
+                        {rec.matchingSkills && rec.matchingSkills.length > 0 && (
+                          <div className="recs-matched-skills-group">
+                            <span className="recs-skills-group-title matched">
+                              <Check size={12} /> Matched Skills ({rec.matchingSkills.length}):
+                            </span>
+                            <div className="recs-skill-chips-row">
+                              {rec.matchingSkills.map((sk: string, idx: number) => (
+                                <span key={idx} className="recs-skill-chip-pill matched">
+                                  {sk}
+                                </span>
                               ))}
                             </div>
                           </div>
                         )}
 
-                        <div className="recs-insights-columns">
-                          {rec.strengths && rec.strengths.length > 0 && (
-                            <div className="recs-insights-column strengths">
-                              <div className="recs-column-header">
-                                <CheckCircle2 size={14} color="#10B981" />
-                                <span>Key Matching Strengths</span>
-                              </div>
-                              <ul className="recs-column-list">
-                                {rec.strengths.map((str, idx) => (
-                                  <li key={idx}>• {str}</li>
-                                ))}
-                              </ul>
+                        {rec.missingSkills && rec.missingSkills.length > 0 && (
+                          <div className="recs-missing-skills-group">
+                            <span className="recs-skills-group-title missing">
+                              ⚡ Growth Skills ({rec.missingSkills.length}):
+                            </span>
+                            <div className="recs-skill-chips-row">
+                              {rec.missingSkills.map((sk: string, idx: number) => (
+                                <span key={idx} className="recs-skill-chip-pill missing">
+                                  +{sk}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Expanded Accordion Job Details */}
+                      {isExpanded && (
+                        <div className="recs-card-expanded-body">
+                          {rec.job.description && (
+                            <div className="recs-expand-block">
+                              <h5 className="recs-expand-title">Role Overview</h5>
+                              <p className="recs-expand-desc">{rec.job.description}</p>
                             </div>
                           )}
 
-                          {rec.improvementSuggestions && rec.improvementSuggestions.length > 0 && (
-                            <div className="recs-insights-column growth">
-                              <div className="recs-column-header">
-                                <Flame size={14} color="#F59E0B" />
-                                <span>AI Growth Suggestions</span>
-                              </div>
-                              <ul className="recs-column-list">
-                                {rec.improvementSuggestions.map((imp, idx) => (
-                                  <li key={idx}>• {imp}</li>
+                          {rec.growthOpportunities && rec.growthOpportunities.length > 0 && (
+                            <div className="recs-expand-block">
+                              <h5 className="recs-expand-title">Career Growth & Impact Potential</h5>
+                              <ul className="recs-growth-list">
+                                {rec.growthOpportunities.map((opp: string, idx: number) => (
+                                  <li key={idx}>✨ {opp}</li>
                                 ))}
                               </ul>
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Actions Row */}
-                    <div className="recs-card-actions-bar">
-                      <button
-                        onClick={() => setSelectedModalJob(rec.job)}
-                        className="cosmic-btn-secondary recs-card-btn"
-                      >
-                        Show Details
-                      </button>
-
-                      <button
-                        onClick={() => handleChatWithRecruiter(rec.job)}
-                        className="cosmic-btn-secondary recs-card-btn"
-                      >
-                        <MessageSquare size={13} /> Message Recruiter
-                      </button>
-
-                      {isApplied ? (
-                        <span className="recs-applied-pill-tag">
-                          <CheckCircle2 size={14} /> Applied
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => handleApply(rec.job.id)}
-                          disabled={applyingJobId === rec.job.id}
-                          className="cosmic-btn-primary recs-card-apply-btn"
-                        >
-                          {applyingJobId === rec.job.id ? 'Submitting...' : 'Apply Now 🚀'}
-                        </button>
                       )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )}
 
-          {/* Load More Button */}
-          {!loading && viewMode !== 'CHAT' && currentPage + 1 < totalPages && (
-            <div className="recs-load-more-center">
-              <button
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="cosmic-btn-primary recs-load-more-action"
-              >
-                <Sparkles size={15} />
-                <span>{loadingMore ? 'Fetching Next Batch...' : 'Load More Recommendations (12+)'}</span>
-              </button>
-            </div>
-          )}
+                      {/* Card Bottom Actions */}
+                      <div className="recs-card-bottom-actions">
+                        <div className="recs-left-actions-group">
+                          <button
+                            onClick={() => toggleCardExpansion(rec.id)}
+                            className="recs-btn-expand-details"
+                          >
+                            <span>{isExpanded ? 'Hide Details' : 'View Full Details'}</span>
+                            <ChevronDown size={14} className={`recs-expand-chevron ${isExpanded ? 'open' : ''}`} />
+                          </button>
+
+                          <button
+                            onClick={() => handleChatWithRecruiter(rec.job)}
+                            className="recs-btn-chat-recruiter"
+                            title="Direct Message Recruiter"
+                          >
+                            <MessageSquare size={14} />
+                            <span>Message HR</span>
+                          </button>
+                        </div>
+
+                        {isApplied ? (
+                          <span className="recs-applied-pill-tag">
+                            <CheckCircle2 size={14} /> Applied
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleApply(rec.job.id)}
+                            disabled={applyingJobId === rec.job.id}
+                            className="cosmic-btn-primary recs-card-apply-btn"
+                          >
+                            {applyingJobId === rec.job.id ? 'Submitting...' : 'Apply Now 🚀'}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Load More Button */}
+            {!loading && currentPage + 1 < totalPages && (
+              <div className="recs-load-more-center">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="cosmic-btn-primary recs-load-more-action"
+                >
+                  <Sparkles size={15} />
+                  <span>{loadingMore ? 'Fetching Next Batch...' : 'Load More Recommendations (12+)'}</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* ── DIV 3: Unified Job Details Modal ── */}
@@ -1145,22 +1108,6 @@ export const Recommendations: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
-
-        {/* Floating AI Agent Trigger Pill (Appears when minimized) */}
-        {viewMode !== 'CHAT' && (
-          <button
-            onClick={() => setViewMode('CHAT')}
-            className="recs-floating-ai-agent-btn"
-            title="Open AI Career Agent Chat"
-          >
-            <div className="recs-pulse-dot" />
-            <AiLogo size={28} animated title="HireMind AI Career Agent" />
-            <div className="recs-floating-agent-info">
-              <span className="recs-floating-agent-title">AI Career Agent</span>
-              <span className="recs-floating-agent-sub">Expand AI Assistant 🚀</span>
-            </div>
-          </button>
         )}
 
         {/* AI Privacy & Retention Settings Modal */}

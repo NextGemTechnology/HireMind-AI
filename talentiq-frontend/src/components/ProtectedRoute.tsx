@@ -53,7 +53,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  if (!isAuthenticated) {
+  const hasToken = !!localStorage.getItem('accessToken');
+  if (!isAuthenticated || !hasToken || !user) {
     // Determine appropriate login page based on requested roles
     const loginPath = redirectTo || determineLoginPath(roles);
     return <Navigate to={loginPath} replace />;
@@ -135,8 +136,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
               </a>
               <button
                 onClick={() => {
-                  logout();
-                  window.location.href = '/admin-login';
+                  logout(determineLoginPath(roles));
                 }}
                 style={{
                   padding: '10px 18px',
