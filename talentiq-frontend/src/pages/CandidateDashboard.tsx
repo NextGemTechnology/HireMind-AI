@@ -23,7 +23,11 @@ import {
   ArrowRight,
   Camera,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  Moon,
+  Sun,
+  X
 } from 'lucide-react';
 import { validateAndCompressProfileImage } from '../utils/imageCompressor';
 
@@ -85,6 +89,7 @@ export const CandidateDashboard: React.FC = () => {
   };
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -397,21 +402,6 @@ export const CandidateDashboard: React.FC = () => {
           </div>
 
           <div className="candidate-header-actions">
-            {/* Theme Toggle Emoji Button (☀️ / 🌙 Only) */}
-            <div className="candidate-theme-switcher" role="group" aria-label="Theme Switcher">
-              <button
-                type="button"
-                onClick={toggleCandTheme}
-                className="candidate-icon-btn candidate-theme-emoji-btn"
-                title={candTheme === 'dark' ? 'Switch to Light Mode ☀️' : 'Switch to Dark Mode 🌙'}
-                aria-label="Toggle Theme"
-              >
-                <span style={{ fontSize: '18px', lineHeight: 1 }}>
-                  {candTheme === 'dark' ? '☀️' : '🌙'}
-                </span>
-              </button>
-            </div>
-
             {/* Notification Bell (Real-time Count, Hover Preview & Rich Dropdown) */}
             <NotificationBell iconSize={18} />
 
@@ -593,6 +583,37 @@ export const CandidateDashboard: React.FC = () => {
 
                   <div className="candidate-dropdown-divider" />
 
+                  {/* Settings & Appearance */}
+                  <div className="candidate-dropdown-settings-row">
+                    <button
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setShowSettingsModal(true);
+                      }}
+                      className="candidate-dropdown-item candidate-dropdown-item-flex"
+                      title="Open Settings & Preferences"
+                    >
+                      <div className="candidate-dropdown-item-left">
+                        <Settings size={15} color="#6366F1" />
+                        <span>Settings</span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCandTheme();
+                      }}
+                      className="candidate-theme-quick-toggle"
+                      title={candTheme === 'dark' ? 'Switch to Light Mode ☀️' : 'Switch to Dark Mode 🌙'}
+                      aria-label="Toggle Theme"
+                    >
+                      {candTheme === 'dark' ? '🌙 Dark' : '☀️ Light'}
+                    </button>
+                  </div>
+
+                  <div className="candidate-dropdown-divider" />
+
                   {/* Sign Out */}
                   <button
                     onClick={() => {
@@ -611,6 +632,123 @@ export const CandidateDashboard: React.FC = () => {
             </div>
           </div>
         </header>
+
+        {/* ── Candidate Settings & Preferences Modal ── */}
+        {showSettingsModal && (
+          <div className="candidate-modal-backdrop" onClick={() => setShowSettingsModal(false)}>
+            <div className="candidate-modal-box" onClick={(e) => e.stopPropagation()}>
+              <div className="candidate-modal-header">
+                <div className="candidate-modal-title-wrap">
+                  <div className="candidate-modal-icon-badge">
+                    <Settings size={18} color="#6366F1" />
+                  </div>
+                  <div>
+                    <h3 className="candidate-modal-title">Settings & Preferences</h3>
+                    <p className="candidate-modal-subtitle">Manage appearance and candidate profile settings</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="candidate-modal-close-btn"
+                  onClick={() => setShowSettingsModal(false)}
+                  aria-label="Close Settings"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="candidate-modal-body">
+                {/* Appearance / Theme Section */}
+                <div className="candidate-settings-section">
+                  <h4 className="candidate-settings-section-title">Interface Theme</h4>
+                  <p className="candidate-settings-section-desc">Choose between dark mode or light mode for your dashboard.</p>
+                  <div className="candidate-settings-theme-cards">
+                    <button
+                      type="button"
+                      className={`candidate-settings-theme-card ${candTheme === 'dark' ? 'active' : ''}`}
+                      onClick={() => {
+                        if (candTheme !== 'dark') toggleCandTheme();
+                      }}
+                    >
+                      <div className="candidate-settings-theme-preview dark-preview">
+                        <div className="preview-nav" />
+                        <div className="preview-body">
+                          <div className="preview-line short" />
+                          <div className="preview-line long" />
+                        </div>
+                      </div>
+                      <div className="candidate-settings-theme-meta">
+                        <Moon size={16} color="#818CF8" />
+                        <span>Dark Mode</span>
+                        {candTheme === 'dark' && <CheckCircle2 size={15} color="#818CF8" className="check-icon" />}
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`candidate-settings-theme-card ${candTheme === 'light' ? 'active' : ''}`}
+                      onClick={() => {
+                        if (candTheme !== 'light') toggleCandTheme();
+                      }}
+                    >
+                      <div className="candidate-settings-theme-preview light-preview">
+                        <div className="preview-nav" />
+                        <div className="preview-body">
+                          <div className="preview-line short" />
+                          <div className="preview-line long" />
+                        </div>
+                      </div>
+                      <div className="candidate-settings-theme-meta">
+                        <Sun size={16} color="#F59E0B" />
+                        <span>Light Mode</span>
+                        {candTheme === 'light' && <CheckCircle2 size={15} color="#F59E0B" className="check-icon" />}
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Account Summary Section */}
+                <div className="candidate-settings-section">
+                  <h4 className="candidate-settings-section-title">Account Profile</h4>
+                  <div className="candidate-settings-account-card">
+                    <div className="candidate-avatar-circle" style={{ width: 48, height: 48, fontSize: 18 }}>
+                      {user?.avatarUrl ? (
+                        <img src={user.avatarUrl} alt={fullName} className="candidate-avatar-img" />
+                      ) : (
+                        userInitials
+                      )}
+                    </div>
+                    <div className="candidate-settings-account-info">
+                      <span className="candidate-settings-account-name">{fullName}</span>
+                      <span className="candidate-settings-account-email">{user?.email}</span>
+                      <span className="candidate-settings-account-role">Candidate Account</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        avatarInputRef.current?.click();
+                      }}
+                      className="candidate-settings-upload-btn"
+                    >
+                      <Camera size={14} />
+                      <span>Change Photo</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="candidate-modal-footer">
+                <button
+                  type="button"
+                  className="candidate-modal-done-btn"
+                  onClick={() => setShowSettingsModal(false)}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Avatar Upload Feedback Banner */}
         {avatarUploadMsg && (

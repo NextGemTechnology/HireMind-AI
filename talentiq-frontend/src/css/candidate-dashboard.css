@@ -579,6 +579,332 @@
   background: rgba(239, 68, 68, 0.15);
 }
 
+.candidate-dropdown-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.candidate-dropdown-item-flex {
+  flex: 1;
+}
+
+.candidate-theme-quick-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cand-border);
+  background: var(--cand-card-bg);
+  color: var(--cand-text-main);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.candidate-theme-quick-toggle:hover {
+  background: var(--cand-primary-soft);
+  border-color: var(--cand-primary);
+  transform: scale(1.02);
+}
+
+/* ── Settings & Preferences Modal ── */
+.candidate-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: candFadeIn 0.2s ease;
+}
+
+@keyframes candFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.candidate-modal-box {
+  width: 100%;
+  max-width: 520px;
+  background: var(--cand-card-bg);
+  border: 1px solid var(--cand-border);
+  border-radius: 18px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: candScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes candScaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.candidate-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--cand-border);
+}
+
+.candidate-modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.candidate-modal-icon-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--cand-primary-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.candidate-modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--cand-text-main);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.candidate-modal-subtitle {
+  font-size: 12.5px;
+  color: var(--cand-text-muted);
+  margin: 3px 0 0;
+}
+
+.candidate-modal-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--cand-border);
+  background: transparent;
+  color: var(--cand-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.candidate-modal-close-btn:hover {
+  background: var(--cand-border-subtle);
+  color: var(--cand-text-main);
+}
+
+.candidate-modal-body {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.candidate-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.candidate-settings-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cand-text-main);
+  margin: 0;
+}
+
+.candidate-settings-section-desc {
+  font-size: 12.5px;
+  color: var(--cand-text-muted);
+  margin: 0 0 10px;
+}
+
+.candidate-settings-theme-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.candidate-settings-theme-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px solid var(--cand-border);
+  background: var(--cand-bg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.candidate-settings-theme-card:hover {
+  border-color: var(--cand-primary);
+  transform: translateY(-1px);
+}
+
+.candidate-settings-theme-card.active {
+  border-color: var(--cand-primary);
+  background: var(--cand-primary-soft);
+  box-shadow: 0 0 0 1px var(--cand-primary);
+}
+
+.candidate-settings-theme-preview {
+  height: 70px;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--cand-border);
+}
+
+.dark-preview {
+  background: #0F172A;
+}
+
+.light-preview {
+  background: #F8FAFC;
+}
+
+.preview-nav {
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.25);
+  width: 100%;
+}
+
+.preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+}
+
+.preview-line {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.preview-line.short {
+  width: 45%;
+}
+
+.preview-line.long {
+  width: 80%;
+}
+
+.candidate-settings-theme-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cand-text-main);
+}
+
+.candidate-settings-theme-meta .check-icon {
+  margin-left: auto;
+}
+
+.candidate-settings-account-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--cand-bg);
+  border: 1px solid var(--cand-border);
+}
+
+.candidate-settings-account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.candidate-settings-account-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cand-text-main);
+}
+
+.candidate-settings-account-email {
+  font-size: 12px;
+  color: var(--cand-text-muted);
+}
+
+.candidate-settings-account-role {
+  font-size: 11px;
+  color: var(--cand-primary);
+  font-weight: 600;
+}
+
+.candidate-settings-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cand-border);
+  background: var(--cand-card-bg);
+  color: var(--cand-text-main);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.candidate-settings-upload-btn:hover {
+  border-color: var(--cand-primary);
+  color: var(--cand-primary);
+}
+
+.candidate-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--cand-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.candidate-modal-done-btn {
+  padding: 9px 22px;
+  border-radius: 8px;
+  background: var(--cand-primary);
+  color: #FFFFFF;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.candidate-modal-done-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
 /* ── Unified Overview Section ── */
 .candidate-overview-section,
 .candidate-overview-container {
