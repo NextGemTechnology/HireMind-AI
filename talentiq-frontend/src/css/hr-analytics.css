@@ -13,8 +13,8 @@
 /* ── Light Theme ─────────────────────────────────────────── */
 .analytics-page-wrapper.theme-light,
 .theme-light .analytics-page-wrapper {
-  background: var(--bg-dark) !important;
-  color: var(--text-main) !important;
+  background: #F8FAFC !important;
+  color: #1E293B !important;
 }
 
 .analytics-page-wrapper.theme-light h1,
@@ -23,7 +23,7 @@
 .analytics-page-wrapper.theme-light h4,
 .analytics-page-wrapper.theme-light h5,
 .analytics-page-wrapper.theme-light h6 {
-  color: var(--heading-color) !important;
+  color: #0F172A !important;
 }
 
 .analytics-page-wrapper.theme-light .an-sidebar {
@@ -600,12 +600,6 @@
 @media (max-width: 1200px) {
   .an-right-rail {
     display: none !important;
-  }
-}
-
-@media (max-width: 1024px) {
-  .analytics-page-wrapper {
-    flex-direction: column;
   }
 }
 
