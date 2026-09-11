@@ -46,7 +46,8 @@ HireMind AI optimizes the end-to-end recruitment lifecycle for candidates, HR re
 | Component | Technologies & Frameworks |
 |---|---|
 | **Backend Core** | Java 17, Spring Boot 3.3.4, Spring Security 6, Spring Data JPA, Hibernate |
-| **Database & ORM** | MySQL 8.4 (InnoDB, Composite Indexing, Flyway Database Migrations V1–V13) |
+| **Database & ORM** | MySQL 8.4 (InnoDB, Composite Indexing, Flyway Database Migrations V1–V25) |
+| **Payment Gateway** | Razorpay Java SDK 1.4.6 / Mock Gateway Provider, Webhook Verification, HMAC-SHA256 |
 | **Caching & In-Memory Storage** | Redis 7.4 (OTP Storage, Sliding-Window Rate Limiting, Token Revocation Blacklist) |
 | **Distributed Messaging & Streaming** | Apache Kafka 7.5, Zookeeper 7.5 |
 | **Real-Time WebSockets** | STOMP protocol, SockJS client, Spring Messaging (`/ws-chat`, `/topic/messages`) |
@@ -167,6 +168,16 @@ Audit Telemetry / Moderate Verification / Manage Subscriptions & Security
 - **XSS Prevention**: HTML string escaping in Leaflet popup renderers (`JobMap.tsx`).
 - **Strict CORS & Input Validation**: Validated WebSocket origin patterns and added `@Valid` annotations on core DTO payloads.
 
+### 9. Multi-Role Payment Gateway & Subscription Management System
+- **Role-Scoped Subscription Plans**:
+  - **Candidate Pro** (₹99/month): Priority job applications, AI resume optimization, direct recruiter messaging, featured profile badge, and application analytics.
+  - **HR Pro** (₹499/month): One-click resume shortlisting, bulk applicant filtering, candidate ranking score, and export tools.
+  - **HR Enterprise** (₹1,999/month): Full interview lifecycle management, note taking, stage ratings, pipeline analytics, and team collaboration.
+  - **Company Growth & Enterprise** (₹4,999/mo & ₹14,999/mo): Recruiter seat scaling, unlimited job postings, and SaaS license management.
+- **Razorpay Integration & Mock Mode**: Secure order creation, checkout modal integration, client-side signature generation, and server-side HMAC-SHA256 signature verification.
+- **Idempotency & Audit Trail**: Full transaction audit table (`payment_transactions`) with unique idempotency keys to prevent duplicate billing.
+- **Interactive UI Dashboards**: Dedicated subscription tabs across Candidate Portal (`CandidateSubscriptionTab.tsx`), HR Analytics (`HrSubscriptionTab.tsx`), and Company Management (`CompanyManagerDashboard.tsx`).
+
 ---
 
 ## 🔑 Authentication & Authorization Flow
@@ -238,6 +249,13 @@ Client (Login Request) ---> AuthController (/v1/auth/login)
 | `/v1/admin/service-team/verifications`| `GET` | List company verification requests | `ROLE_SERVICE_TEAM` |
 | `/v1/admin/super-admin/audit-logs` | `GET` | Search forensic audit logs | `ROLE_SUPER_ADMIN` |
 | `/v1/public/stats` | `GET` | Get public platform statistics | Public |
+| `/v1/subscriptions/plans` | `GET` | List active plans (filtered by role) | Public |
+| `/v1/subscriptions/my` | `GET` | Get authenticated user's active subscription | Authenticated |
+| `/v1/subscriptions/purchase` | `POST` | Initiate purchase order & create gateway receipt | Authenticated |
+| `/v1/subscriptions/verify` | `POST` | Verify gateway payment & activate subscription | Authenticated |
+| `/v1/subscriptions/cancel` | `POST` | Cancel active recurring subscription | Authenticated |
+| `/v1/subscriptions/transactions` | `GET` | View paginated payment transaction history | Authenticated |
+| `/v1/subscriptions/webhook/razorpay` | `POST` | Razorpay webhook event processor | Public (Signature Verified) |
 
 ---
 
@@ -391,6 +409,12 @@ MAIL_USERNAME=${MAIL_USERNAME}
 MAIL_PASSWORD=${MAIL_PASSWORD}
 MAIL_FROM=${MAIL_FROM}
 MAIL_FROM_NAME="HireMind AI Platform"
+
+# Payment Gateway Configuration (Razorpay / Mock)
+PAYMENT_GATEWAY=mock                   # 'razorpay' for production, 'mock' for local dev
+RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID}
+RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET}
+RAZORPAY_WEBHOOK_SECRET=${RAZORPAY_WEBHOOK_SECRET}
 ```
 
 ---
@@ -427,9 +451,10 @@ Distributed under the **MIT License**.
 ---
 
 ## 🚀 Recent Updates
+- **Multi-Role Payment Gateway & Subscriptions**: Integrated Razorpay + Mock gateway, created Flyway V25 schema (`subscription_plans`, `subscriptions`, `payment_transactions`, `webhook_events`), built candidate (₹99/mo) and HR (₹499/mo, ₹1,999/mo) subscription tiers with real-time UI dashboards and transaction history.
+- **Enterprise Home Page Redesign**: Complete overhaul of the landing page into a modern, dark SaaS theme with 2x2 mobile statistics grids, responsive navigation, and live candidate/job counters.
+- **Candidate Settings & Theme Customizer**: Added full Settings & Preferences modal to candidate portal with inline dark/light mode toggles and account controls.
 - **WhatsApp-Style Messaging & Mobile Chat**: Single-panel mobile view switching, WhatsApp `← Back` arrow navigation, double blue ticks (`✓✓`), and bubble tails.
 - **Instagram-Style Profile Picture System**: Candidate profile avatar upload with client-side compression under 1 MB and DB storage.
 - **Developer Workspace & Daily Updates**: Added `/admin/developer` interactive daily updates system and V24 Flyway database migration.
-- **Interactive Candidate Dashboard & Searchable Skill Matrix**: Candidate portal with dropdown search for skills and tech stacks.
-- **Security Hardening**: Fixed IDOR vulnerabilities, patched Leaflet map XSS, enforced OTP role locking, and secured WebSocket CORS.
 
