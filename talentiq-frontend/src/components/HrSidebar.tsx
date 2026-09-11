@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   LayoutDashboard, MessageSquare, Calendar, Briefcase,
   Users, Star, UserCircle2, BarChart2,
-  Settings, LogOut, Sparkles, CreditCard, X
+  Settings, LogOut, Sparkles, CreditCard
 } from 'lucide-react';
+import { AiLogo } from './AiLogo';
 import '../css/hr-sidebar.css';
 
 export type HrNavKey =
@@ -27,19 +29,16 @@ interface HrSidebarProps {
   activeNav: HrNavKey | string;
   onSelectNav?: (nav: HrNavKey) => void;
   unreadCount?: number;
-  mobileOpen?: boolean;
-  onCloseMobile?: () => void;
 }
 
 export const HrSidebar: React.FC<HrSidebarProps> = ({
   activeNav,
   onSelectNav,
   unreadCount = 0,
-  mobileOpen = false,
-  onCloseMobile,
 }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { isUniverse } = useTheme();
   const [hrProfile, setHrProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -59,225 +58,346 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
     if (directPath) {
       navigate(directPath);
     }
-    if (onCloseMobile) {
-      onCloseMobile();
-    }
   };
+
+  const navItemStyle = (isActive: boolean) => ({
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    padding: '9px 12px',
+    borderRadius: '10px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: isActive ? 700 : 500,
+    background: isActive
+      ? (isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#2563EB')
+      : 'transparent',
+    color: isActive ? '#FFFFFF' : (isUniverse ? '#CBD5E1' : '#475569'),
+    transition: 'all 0.18s ease',
+    textAlign: 'left' as const,
+    marginBottom: '3px',
+  });
 
   const hrName = user ? `${user.firstName || 'HR'} ${user.lastName || 'Recruiter'}`.trim() : 'HR Lead';
   const hrEmail = user?.email || 'hr.recruiter@hiremind.ai';
 
   return (
-    <>
-      {/* Mobile Drawer Backdrop */}
-      <div 
-        className={`hr-drawer-backdrop ${mobileOpen ? 'open' : ''}`} 
-        onClick={onCloseMobile}
-        aria-hidden="true"
-      />
-
-      <aside className={`hr-sidebar-aside ${mobileOpen ? 'drawer-open' : ''}`}>
-        {/* Brand Header */}
-        <div className="hr-sidebar-brand" onClick={() => handleNavClick('Dashboard', '/hr-analytics')}>
-          <div className="hr-sidebar-brand-icon">
-            H
-          </div>
-          <div className="hr-sidebar-brand-text" style={{ flex: 1 }}>
-            <div className="hr-sidebar-brand-title">HireMind AI</div>
-            <div className="hr-sidebar-brand-sub">HR PORTAL</div>
-          </div>
-          {mobileOpen && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onCloseMobile?.(); }}
-              style={{ background: 'none', border: 'none', color: '#64748B', cursor: 'pointer', padding: 4 }}
-              aria-label="Close navigation"
-            >
-              <X size={20} />
-            </button>
-          )}
+    <aside className="hr-sidebar-aside" style={{
+      background: isUniverse ? '#0F172A' : '#FFFFFF',
+      borderRight: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+    }}>
+      {/* ── Brand / Logo ── */}
+      <div
+        onClick={() => navigate('/hr-analytics')}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '4px 8px 18px',
+          cursor: 'pointer',
+          borderBottom: isUniverse ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9',
+          marginBottom: '12px'
+        }}
+      >
+        <div style={{
+          width: '36px',
+          height: '36px',
+          borderRadius: '10px',
+          background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: isUniverse ? '0 4px 14px rgba(99,102,241,0.4)' : '0 4px 12px rgba(37,99,235,0.3)'
+        }}>
+          <span style={{ fontSize: '17px' }}>🌌</span>
         </div>
-
-        {/* Navigation Sections */}
-        <div style={{ flex: 1, overflowY: 'auto', paddingRight: '2px' }}>
-          {/* Main Menu */}
-          <div style={{ marginBottom: '10px' }}>
-            <div className="hr-sidebar-nav-section-title">Main Menu</div>
-
-            <button
-              onClick={() => handleNavClick('Dashboard', '/hr-analytics')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Dashboard' ? 'active' : ''}`}
-              title="Dashboard"
-            >
-              <div className="hr-sidebar-nav-left">
-                <LayoutDashboard size={18} />
-                <span className="hr-sidebar-nav-label">Dashboard</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('Message', '/hr-messages')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Message' ? 'active' : ''}`}
-              title="Candidate Messages"
-            >
-              <div className="hr-sidebar-nav-left">
-                <MessageSquare size={18} />
-                <span className="hr-sidebar-nav-label">Candidate Messages</span>
-              </div>
-              {unreadCount > 0 && (
-                <span className="hr-sidebar-badge">{unreadCount}</span>
-              )}
-            </button>
-
-            <button
-              onClick={() => handleNavClick('Calendar', '/hr-calendar')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Calendar' ? 'active' : ''}`}
-              title="Interviews & Calendar"
-            >
-              <div className="hr-sidebar-nav-left">
-                <Calendar size={18} />
-                <span className="hr-sidebar-nav-label">Interviews & Calendar</span>
-              </div>
-            </button>
+        <div className="hr-sidebar-brand-text">
+          <div style={{ fontWeight: 800, fontSize: '15px', color: isUniverse ? '#F8FAFC' : '#1E293B', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+            HireMind AI
           </div>
-
-          {/* Recruitment & Talent */}
-          <div style={{ marginBottom: '10px' }}>
-            <div className="hr-sidebar-nav-section-title">Recruitment</div>
-
-            <button
-              onClick={() => handleNavClick('Jobs', '/jobs')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Jobs' ? 'active' : ''}`}
-              title="Job Postings"
-            >
-              <div className="hr-sidebar-nav-left">
-                <Briefcase size={18} />
-                <span className="hr-sidebar-nav-label">Job Postings</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('Candidates', '/hr-applications')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Candidates' ? 'active' : ''}`}
-              title="Applications & Pipeline"
-            >
-              <div className="hr-sidebar-nav-left">
-                <Users size={18} />
-                <span className="hr-sidebar-nav-label">Applications & Pipeline</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('Copilot', '/copilot')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Copilot' ? 'active' : ''}`}
-              title="AI Copilot"
-            >
-              <div className="hr-sidebar-nav-left">
-                <Sparkles size={18} />
-                <span className="hr-sidebar-nav-label">AI Copilot</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('TeamChat', '/team-chat')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'TeamChat' ? 'active' : ''}`}
-              title="Team Collaboration"
-            >
-              <div className="hr-sidebar-nav-left">
-                <Sparkles size={18} />
-                <span className="hr-sidebar-nav-label">Team Collaboration</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('Referrals', '/hr-analytics?tab=referrals')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Referrals' ? 'active' : ''}`}
-              title="My Referrals"
-            >
-              <div className="hr-sidebar-nav-left">
-                <Star size={18} />
-                <span className="hr-sidebar-nav-label">My Referrals</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Subscription & Plans */}
-          <div style={{ marginBottom: '10px' }}>
-            <div className="hr-sidebar-nav-section-title">Subscription</div>
-
-            <button
-              onClick={() => handleNavClick('Subscription', '/hr-analytics?tab=subscription')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Subscription' ? 'active' : ''}`}
-              title="Subscription & Plans"
-            >
-              <div className="hr-sidebar-nav-left">
-                <CreditCard size={18} />
-                <span className="hr-sidebar-nav-label">Subscription & Plans</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Organization */}
-          <div style={{ marginBottom: '6px' }}>
-            <div className="hr-sidebar-nav-section-title">Organization</div>
-
-            <button
-              onClick={() => handleNavClick('Employee', '/hr-analytics?tab=employee')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Employee' ? 'active' : ''}`}
-              title="Verified Employees"
-            >
-              <div className="hr-sidebar-nav-left">
-                <UserCircle2 size={18} />
-                <span className="hr-sidebar-nav-label">Verified Employees</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('Report', '/hr-analytics?tab=report')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Report' ? 'active' : ''}`}
-              title="Telemetry Reports"
-            >
-              <div className="hr-sidebar-nav-left">
-                <BarChart2 size={18} />
-                <span className="hr-sidebar-nav-label">Telemetry Reports</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => handleNavClick('Settings', '/hr-analytics?tab=settings')}
-              className={`hr-sidebar-nav-btn ${activeNav === 'Settings' ? 'active' : ''}`}
-              title="Settings"
-            >
-              <div className="hr-sidebar-nav-left">
-                <Settings size={18} />
-                <span className="hr-sidebar-nav-label">Settings</span>
-              </div>
-            </button>
+          <div style={{ fontSize: '10.5px', color: '#818CF8', fontWeight: 600, letterSpacing: '0.04em' }}>
+            HR EXECUTIVE PORTAL
           </div>
         </div>
+      </div>
 
-        {/* User Card & Sign Out */}
-        <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px solid #E2E8F0' }}>
-          <div className="hr-sidebar-user-card">
-            <div className="hr-sidebar-avatar">
-              {hrName.charAt(0).toUpperCase()}
-            </div>
-            <div className="hr-sidebar-user-details" style={{ flex: 1, minWidth: 0 }}>
-              <div className="hr-sidebar-user-name">{hrName}</div>
-              <div className="hr-sidebar-user-company">{hrProfile?.company?.name || hrEmail}</div>
-            </div>
-          </div>
+      {/* ── Scrollable Nav Menu List ── */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingRight: '2px' }}>
+        {/* MAIN MENU */}
+        <div style={{ marginBottom: '14px' }}>
+          <p style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            color: isUniverse ? '#64748B' : '#94A3B8',
+            letterSpacing: '0.08em',
+            padding: '0 12px',
+            margin: '0 0 6px 0',
+            textTransform: 'uppercase'
+          }}>
+            MAIN MENU
+          </p>
 
           <button
-            onClick={() => { logout('/hr-login'); }}
-            className="hr-sidebar-signout-btn"
-            title="Sign Out"
+            onClick={() => handleNavClick('Dashboard', '/hr-analytics')}
+            style={navItemStyle(activeNav === 'Dashboard')}
           >
-            <LogOut size={16} />
-            <span className="hr-sidebar-signout-text">Sign Out</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <LayoutDashboard size={16} />
+              <span>Dashboard</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Message', '/hr-messages')}
+            style={navItemStyle(activeNav === 'Message')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MessageSquare size={16} />
+              <span>Candidate Messages</span>
+            </div>
+            {unreadCount > 0 && (
+              <span style={{
+                background: '#EF4444',
+                color: '#FFF',
+                fontSize: '10px',
+                fontWeight: 700,
+                padding: '1px 6px',
+                borderRadius: '999px',
+                minWidth: '16px',
+                textAlign: 'center'
+              }}>
+                {unreadCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Calendar', '/hr-calendar')}
+            style={navItemStyle(activeNav === 'Calendar')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Calendar size={16} />
+              <span>Interviews & Calendar</span>
+            </div>
           </button>
         </div>
-      </aside>
-    </>
+
+        {/* RECRUITMENT & TALENT */}
+        <div style={{ marginBottom: '14px' }}>
+          <p style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            color: isUniverse ? '#64748B' : '#94A3B8',
+            letterSpacing: '0.08em',
+            padding: '0 12px',
+            margin: '0 0 6px 0',
+            textTransform: 'uppercase'
+          }}>
+            RECRUITMENT & TALENT
+          </p>
+
+          <button
+            onClick={() => handleNavClick('Jobs', '/jobs')}
+            style={navItemStyle(activeNav === 'Jobs')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Briefcase size={16} />
+              <span>Job Postings</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Candidates', '/hr-applications')}
+            style={navItemStyle(activeNav === 'Candidates')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Users size={16} />
+              <span>Applications & Pipeline</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Copilot', '/copilot')}
+            style={navItemStyle(activeNav === 'Copilot')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <AiLogo size={16} />
+              <span>AI Copilot</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('TeamChat', '/team-chat')}
+            style={navItemStyle(activeNav === 'TeamChat')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Sparkles size={16} />
+              <span>Team Collaboration</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Referrals', '/hr-analytics?tab=referrals')}
+            style={navItemStyle(activeNav === 'Referrals')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Star size={16} />
+              <span>My Referrals</span>
+            </div>
+          </button>
+        </div>
+
+        {/* SUBSCRIPTION & BILLING */}
+        <div style={{ marginBottom: '14px' }}>
+          <p style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            color: isUniverse ? '#64748B' : '#94A3B8',
+            letterSpacing: '0.08em',
+            padding: '0 12px',
+            margin: '0 0 6px 0',
+            textTransform: 'uppercase'
+          }}>
+            SUBSCRIPTION & PLANS
+          </p>
+
+          <button
+            onClick={() => handleNavClick('Subscription', '/hr-analytics?tab=subscription')}
+            style={navItemStyle(activeNav === 'Subscription')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <CreditCard size={16} />
+              <span>Subscription & Plans</span>
+            </div>
+          </button>
+        </div>
+
+        {/* ORGANIZATION */}
+        <div style={{ marginBottom: '8px' }}>
+          <p style={{
+            fontSize: '10px',
+            fontWeight: 700,
+            color: isUniverse ? '#64748B' : '#94A3B8',
+            letterSpacing: '0.08em',
+            padding: '0 12px',
+            margin: '0 0 6px 0',
+            textTransform: 'uppercase'
+          }}>
+            ORGANIZATION & GOVERNANCE
+          </p>
+
+          <button
+            onClick={() => handleNavClick('Employee', '/hr-analytics?tab=employee')}
+            style={navItemStyle(activeNav === 'Employee')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <UserCircle2 size={16} />
+              <span>Verified Employees</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Report', '/hr-analytics?tab=report')}
+            style={navItemStyle(activeNav === 'Report')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <BarChart2 size={16} />
+              <span>Telemetry Reports</span>
+            </div>
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Settings', '/hr-analytics?tab=settings')}
+            style={navItemStyle(activeNav === 'Settings')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Settings size={16} />
+              <span>Settings</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Bottom User Profile Card & Logout ── */}
+      <div style={{
+        marginTop: 'auto',
+        paddingTop: '12px',
+        borderTop: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
+      }}>
+        <div className="hr-sidebar-user-badge" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '8px 10px',
+          borderRadius: '10px',
+          background: isUniverse ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+          marginBottom: '8px',
+        }}>
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: 700,
+            color: '#FFFFFF',
+            flexShrink: 0
+          }}>
+            {hrName.charAt(0).toUpperCase()}
+          </div>
+          <div className="hr-sidebar-user-details" style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: '12px',
+              fontWeight: 700,
+              color: isUniverse ? '#F8FAFC' : '#1E293B',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {hrName}
+            </div>
+            <div style={{
+              fontSize: '10.5px',
+              color: isUniverse ? '#94A3B8' : '#64748B',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }}>
+              {hrProfile?.company?.name || hrEmail}
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={() => { logout('/hr-login'); }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            width: '100%',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            border: 'none',
+            background: 'transparent',
+            color: '#FB7185',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'background 0.2s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(251, 113, 133, 0.12)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+        >
+          <LogOut size={15} />
+          <span className="hr-sidebar-signout-text">Sign Out</span>
+        </button>
+      </div>
+    </aside>
   );
 };
 

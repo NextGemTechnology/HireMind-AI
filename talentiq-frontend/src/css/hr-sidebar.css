@@ -1,265 +1,50 @@
 /* ============================================================
-   TalentIQ / HireMind — Clean Enterprise HR Sidebar & Drawer
-   3-Color Palette: Primary Blue (#2563EB), White (#FFFFFF), Dark Slate (#0F172A)
+   TalentIQ / HireMind — HR Sidebar Responsive Styles
    ============================================================ */
 
 .hr-sidebar-aside {
-  width: 240px;
-  min-width: 240px;
+  width: 230px;
+  min-width: 230px;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
+  padding: 20px 12px 14px;
   flex-shrink: 0;
   position: sticky;
   top: 0;
   z-index: 40;
   box-sizing: border-box;
   user-select: none;
-  background: #FFFFFF;
-  border-right: 1px solid #E2E8F0;
-  transition: width 0.2s ease, transform 0.2s ease;
+  transition: width 0.25s ease, transform 0.25s ease;
 }
 
-.hr-sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 8px 16px;
-  cursor: pointer;
-  border-bottom: 1px solid #F1F5F9;
-  margin-bottom: 12px;
-}
-
-.hr-sidebar-brand-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: #2563EB;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFFFFF;
-  font-weight: 800;
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
-.hr-sidebar-brand-title {
-  font-weight: 800;
-  font-size: 15px;
-  color: #0F172A;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-}
-
-.hr-sidebar-brand-sub {
-  font-size: 10px;
-  color: #2563EB;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  margin-top: 2px;
-}
-
-.hr-sidebar-nav-section-title {
-  font-size: 10.5px;
-  font-weight: 700;
-  color: #64748B;
-  letter-spacing: 0.06em;
-  padding: 0 10px;
-  margin: 12px 0 6px 0;
-  text-transform: uppercase;
-}
-
-.hr-sidebar-nav-btn {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  font-size: 13.5px;
-  font-weight: 500;
-  background: transparent;
-  color: #334155;
-  transition: all 0.15s ease;
-  text-align: left;
-  margin-bottom: 2px;
-  box-sizing: border-box;
-}
-
-.hr-sidebar-nav-btn:hover {
-  background: #F1F5F9;
-  color: #0F172A;
-}
-
-.hr-sidebar-nav-btn.active {
-  background: #2563EB;
-  color: #FFFFFF;
-  font-weight: 700;
-}
-
-.hr-sidebar-nav-btn.active svg {
-  color: #FFFFFF !important;
-}
-
-.hr-sidebar-nav-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.hr-sidebar-badge {
-  background: #EF4444;
-  color: #FFFFFF;
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 9999px;
-  min-width: 18px;
-  text-align: center;
-}
-
-.hr-sidebar-user-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
-  margin-bottom: 8px;
-}
-
-.hr-sidebar-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: #2563EB;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  color: #FFFFFF;
-  flex-shrink: 0;
-}
-
-.hr-sidebar-user-name {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #0F172A;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hr-sidebar-user-company {
-  font-size: 11px;
-  color: #64748B;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.hr-sidebar-signout-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: #EF4444;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.hr-sidebar-signout-btn:hover {
-  background: #FEF2F2;
-  border-color: #FEE2E2;
-}
-
-/* Mobile Drawer Overlay */
-.hr-drawer-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  z-index: 100;
-  backdrop-filter: blur(2px);
-}
-
-.hr-drawer-backdrop.open {
-  display: block;
-}
-
-/* ── Responsive Tablet: 768px - 1023px ── */
-@media (min-width: 768px) and (max-width: 1023px) {
+@media (max-width: 1024px) {
   .hr-sidebar-aside {
-    width: 68px;
-    min-width: 68px;
-    padding: 14px 6px;
+    width: 72px;
+    min-width: 72px;
+    padding: 16px 8px 12px;
   }
 
   .hr-sidebar-brand-text,
   .hr-sidebar-nav-label,
-  .hr-sidebar-nav-section-title,
   .hr-sidebar-user-details,
   .hr-sidebar-signout-text {
     display: none !important;
   }
 
-  .hr-sidebar-brand {
-    justify-content: center;
-    padding-bottom: 12px;
+  .hr-sidebar-aside nav button {
+    justify-content: center !important;
+    padding: 10px 0 !important;
   }
 
-  .hr-sidebar-nav-btn {
-    justify-content: center;
-    padding: 10px 0;
-  }
-
-  .hr-sidebar-nav-left {
-    justify-content: center;
-  }
-
-  .hr-sidebar-user-card {
-    justify-content: center;
-    padding: 6px 0;
-    background: transparent;
-    border: none;
-  }
-
-  .hr-sidebar-signout-btn {
-    justify-content: center;
-    padding: 10px 0;
+  .hr-sidebar-user-badge {
+    justify-content: center !important;
+    padding: 8px 0 !important;
   }
 }
 
-/* ── Responsive Mobile: 320px - 767px (Drawer Mode) ── */
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .hr-sidebar-aside {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 280px;
-    max-width: 85vw;
-    z-index: 101;
-    transform: translateX(-100%);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  }
-
-  .hr-sidebar-aside.drawer-open {
-    transform: translateX(0);
+    display: none !important;
   }
 }
