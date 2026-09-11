@@ -42,6 +42,20 @@ public class MockGatewayService implements PaymentGatewayService {
     }
 
     @Override
+    public PaymentDetails fetchPaymentDetails(String gatewayPaymentId) {
+        log.info("Fetching MOCK payment details for {}", gatewayPaymentId);
+        return PaymentDetails.builder()
+                .paymentId(gatewayPaymentId)
+                .orderId("mock_order")
+                .status("captured")
+                .amount(new java.math.BigDecimal("99.00"))
+                .currency("INR")
+                .paymentMethod("UPI")
+                .maskedDetails("candidate@okhdfcbank")
+                .build();
+    }
+
+    @Override
     public String getProviderName() {
         return "MOCK";
     }

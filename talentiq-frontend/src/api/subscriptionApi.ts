@@ -39,6 +39,8 @@ export interface TransactionResponse {
   currency: string;
   status: string;
   planName: string;
+  paymentMethod?: string;
+  maskedDetails?: string;
   createdAt: string;
   errorMessage?: string;
 }

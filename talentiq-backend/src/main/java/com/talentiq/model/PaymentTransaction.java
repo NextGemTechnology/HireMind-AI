@@ -72,6 +72,14 @@ public class PaymentTransaction extends AuditEntity {
     @Builder.Default
     private PaymentTransactionStatus status = PaymentTransactionStatus.CREATED;
 
+    /** E.g. CARD, UPI, NETBANKING, WALLET */
+    @Column(name = "payment_method", length = 50)
+    private String paymentMethod;
+
+    /** Safe masked details, e.g. "•••• 4242 (Visa)" or "user@okhdfcbank" - NEVER raw CVV/PIN/Card */
+    @Column(name = "masked_details", length = 255)
+    private String maskedDetails;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "gateway_provider", nullable = false, length = 30)
     @Builder.Default

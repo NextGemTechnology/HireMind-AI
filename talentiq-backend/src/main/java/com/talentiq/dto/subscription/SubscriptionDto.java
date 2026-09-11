@@ -104,6 +104,8 @@ public class SubscriptionDto {
         private String currency;
         private String status;
         private String planName;
+        private String paymentMethod;
+        private String maskedDetails;
         private Instant createdAt;
         private String errorMessage;
     }

@@ -9,7 +9,9 @@ import {
   FileText,
   Download,
   CreditCard,
+  RotateCw,
   X,
+  CreditCard as CardIcon
 } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
 import '../../css/subscription.css';
@@ -34,11 +36,15 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 4000);
+    setTimeout(() => setToastMsg(null), 4500);
   };
 
   const isCandidatePro =
     subscription?.status === 'ACTIVE' && subscription?.plan?.planCode === 'CANDIDATE_PRO';
+
+  // Check if latest transaction failed to present safe retry
+  const latestTx = transactions.length > 0 ? transactions[0] : null;
+  const showRetryBanner = latestTx && (latestTx.status === 'FAILED' || latestTx.status === 'CANCELLED') && !isCandidatePro;
 
   const handlePurchase = async () => {
     const res = await purchasePlan('CANDIDATE_PRO', 'MONTHLY');
@@ -123,6 +129,32 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
         </div>
       )}
 
+      {/* Safe Retry Banner for Failed/Cancelled Attempt */}
+      {showRetryBanner && (
+        <div className="sub-retry-banner">
+          <div className="sub-retry-content">
+            <div className="sub-retry-icon-box">
+              <AlertCircle size={20} color="#F43F5E" />
+            </div>
+            <div>
+              <h4 className="sub-retry-title">Your recent payment attempt was not completed</h4>
+              <p className="sub-retry-desc">
+                Order <code style={{ color: '#CBD5E1' }}>{latestTx.orderId}</code> was {latestTx.status.toLowerCase()}
+                {latestTx.errorMessage ? `: "${latestTx.errorMessage}"` : ''}. No funds were deducted. You can safely retry whenever you're ready.
+              </p>
+            </div>
+          </div>
+          <button 
+            className="sub-btn sub-btn-primary sub-retry-btn"
+            onClick={handlePurchase}
+            disabled={actionLoading}
+          >
+            <RotateCw size={14} className={actionLoading ? 'sub-spin' : ''} />
+            {actionLoading ? 'Connecting...' : 'Retry Payment (₹99)'}
+          </button>
+        </div>
+      )}
+
       {/* Active Status Card */}
       <div
         className={`sub-status-card ${
@@ -145,7 +177,7 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
               </span>
             )}
             <span style={{ fontSize: '12px', color: '#94A3B8' }}>
-              Member since {new Date().getFullYear()}
+              Candidate Role &bull; Plan ID: {isCandidatePro ? 'CANDIDATE_PRO' : 'FREE_TIER'}
             </span>
           </div>
 
@@ -165,10 +197,10 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
                   })}
                 </strong>{' '}
                 ({daysRemaining} days remaining) &bull;{' '}
-                {subscription!.autoRenew ? 'Auto-renews at ₹99/mo' : 'Auto-renew cancelled'}
+                {subscription!.autoRenew ? 'Auto-renews at ₹99/month' : 'Auto-renew cancelled'}
               </>
             ) : (
-              'Standard job applications with basic AI matching limits.'
+              'Standard job applications with basic AI matching limits. Upgrade to unlock direct recruiter access & verified badge.'
             )}
           </div>
         </div>
@@ -241,7 +273,7 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
             </p>
             <div className="sub-card-price-row">
               <span className="sub-card-price">₹99</span>
-              <span className="sub-card-period">/ month (incl. GST)</span>
+              <span className="sub-card-period">/ month (Cards & UPI)</span>
             </div>
             <ul className="sub-card-features">
               <li className="sub-card-feature-item">
@@ -275,7 +307,7 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
               </>
             ) : (
               <>
-                <Sparkles size={16} /> {actionLoading ? 'Connecting...' : 'Upgrade with Razorpay'}
+                <Sparkles size={16} /> {actionLoading ? 'Connecting...' : 'Pay ₹99 with Razorpay'}
               </>
             )}
           </button>
@@ -303,7 +335,7 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
                 fontSize: '13px',
               }}
             >
-              No payment transactions yet. When you upgrade or renew, your invoices will appear here.
+              No payment transactions yet. When you upgrade or renew, your invoices and payment method details will appear here.
             </div>
           ) : (
             <table className="sub-table">
@@ -313,60 +345,108 @@ export const CandidateSubscriptionTab: React.FC<CandidateSubscriptionTabProps> =
                   <th>Date & Time</th>
                   <th>Plan Tier</th>
                   <th>Amount</th>
-                  <th>Payment Status</th>
+                  <th>Payment Method</th>
+                  <th>Status</th>
                   <th>Receipt</th>
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((tx) => (
-                  <tr key={tx.orderId}>
-                    <td className="sub-order-code">{tx.orderId}</td>
-                    <td>
-                      {new Date(tx.createdAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </td>
-                    <td style={{ color: '#F8FAFC', fontWeight: 600 }}>{tx.planName}</td>
-                    <td className="sub-amount">
-                      ₹{tx.amount.toFixed(2)} {tx.currency}
-                    </td>
-                    <td>
-                      <span
-                        className={`sub-badge ${
-                          tx.status === 'CAPTURED'
-                            ? 'sub-badge-active'
-                            : tx.status === 'FAILED'
-                            ? 'sub-badge-expired'
-                            : 'sub-badge-free'
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() => showToast(`Receipt download ready for ${tx.orderId}`)}
-                        style={{
-                          background: 'rgba(99, 102, 241, 0.12)',
-                          border: '1px solid rgba(99, 102, 241, 0.3)',
-                          borderRadius: '6px',
-                          color: '#818CF8',
-                          padding: '4px 10px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                        }}
-                      >
-                        <Download size={11} /> PDF
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {transactions.map((tx) => {
+                  const isPaid = tx.status === 'PAID' || tx.status === 'CAPTURED';
+                  const isFailed = tx.status === 'FAILED';
+                  const isPending = tx.status === 'PENDING' || tx.status === 'CREATED' || tx.status === 'AUTHORIZED';
+
+                  return (
+                    <tr key={tx.orderId}>
+                      <td className="sub-order-code">
+                        <span>{tx.orderId}</span>
+                        {tx.gatewayPaymentId && (
+                          <div style={{ fontSize: '11px', color: '#64748B', fontFamily: 'monospace' }}>
+                            {tx.gatewayPaymentId}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {new Date(tx.createdAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </td>
+                      <td style={{ color: '#F8FAFC', fontWeight: 600 }}>{tx.planName}</td>
+                      <td className="sub-amount">
+                        ₹{tx.amount.toFixed(2)} {tx.currency}
+                      </td>
+                      <td>
+                        {tx.paymentMethod ? (
+                          <span className="sub-payment-method-pill">
+                            <CardIcon size={12} />
+                            <span>{tx.maskedDetails || tx.paymentMethod}</span>
+                          </span>
+                        ) : (
+                          <span style={{ color: '#64748B', fontSize: '12px' }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          className={`sub-badge ${
+                            isPaid
+                              ? 'sub-badge-active'
+                              : isFailed
+                              ? 'sub-badge-expired'
+                              : isPending
+                              ? 'sub-badge-expiring'
+                              : 'sub-badge-free'
+                          }`}
+                        >
+                          {tx.status}
+                        </span>
+                      </td>
+                      <td>
+                        {isPaid ? (
+                          <button
+                            onClick={() => showToast(`Receipt download ready for ${tx.orderId}`)}
+                            style={{
+                              background: 'rgba(99, 102, 241, 0.12)',
+                              border: '1px solid rgba(99, 102, 241, 0.3)',
+                              borderRadius: '6px',
+                              color: '#818CF8',
+                              padding: '4px 10px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <Download size={11} /> PDF
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handlePurchase}
+                            disabled={actionLoading}
+                            style={{
+                              background: 'rgba(244, 63, 94, 0.12)',
+                              border: '1px solid rgba(244, 63, 94, 0.3)',
+                              borderRadius: '6px',
+                              color: '#FB7185',
+                              padding: '4px 10px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <RotateCw size={11} /> Retry
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

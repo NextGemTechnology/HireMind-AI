@@ -88,6 +88,89 @@ public class RazorpayGatewayService implements PaymentGatewayService {
     }
 
     @Override
+    public PaymentDetails fetchPaymentDetails(String gatewayPaymentId) {
+        try {
+            com.razorpay.Payment payment = razorpayClient.payments.fetch(gatewayPaymentId);
+            
+            // Amount in Razorpay is returned in paise (integer)
+            Integer amountPaise = payment.get("amount");
+            BigDecimal amount = amountPaise != null 
+                    ? new BigDecimal(amountPaise).divide(new BigDecimal("100"), 2, java.math.RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            String currency = payment.has("currency") ? (String) payment.get("currency") : "INR";
+            String status = payment.has("status") ? (String) payment.get("status") : "unknown";
+            String orderId = payment.has("order_id") ? (String) payment.get("order_id") : null;
+            String method = payment.has("method") ? (String) payment.get("method") : null;
+            
+            String maskedDetails = extractMaskedDetails(payment, method);
+            
+            String errorCode = payment.has("error_code") && payment.get("error_code") != null 
+                    ? payment.get("error_code").toString() : null;
+            String errorDescription = payment.has("error_description") && payment.get("error_description") != null 
+                    ? payment.get("error_description").toString() : null;
+
+            log.info("Fetched Razorpay payment {}: status={}, method={}, amount={} {}", 
+                    gatewayPaymentId, status, method, amount, currency);
+
+            return PaymentDetails.builder()
+                    .paymentId(gatewayPaymentId)
+                    .orderId(orderId)
+                    .status(status)
+                    .amount(amount)
+                    .currency(currency)
+                    .paymentMethod(method != null ? method.toUpperCase() : "UNKNOWN")
+                    .maskedDetails(maskedDetails)
+                    .errorCode(errorCode)
+                    .errorDescription(errorDescription)
+                    .build();
+
+        } catch (RazorpayException e) {
+            log.error("Error fetching Razorpay payment details for id {}", gatewayPaymentId, e);
+            throw new BusinessException("PAYMENT_GATEWAY_ERROR", "Failed to fetch payment details from Razorpay: " + e.getMessage());
+        }
+    }
+
+    private String extractMaskedDetails(com.razorpay.Payment payment, String method) {
+        if (method == null) {
+            return null;
+        }
+        try {
+            switch (method.toLowerCase()) {
+                case "card":
+                    if (payment.has("card") && payment.get("card") != null) {
+                        JSONObject cardObj = payment.toJson().optJSONObject("card");
+                        if (cardObj != null) {
+                            String last4 = cardObj.optString("last4", "");
+                            String network = cardObj.optString("network", "");
+                            return (network + " •••• " + last4).trim();
+                        }
+                    }
+                    break;
+                case "upi":
+                    if (payment.has("vpa") && payment.get("vpa") != null) {
+                        return payment.get("vpa").toString();
+                    }
+                    break;
+                case "netbanking":
+                    if (payment.has("bank") && payment.get("bank") != null) {
+                        return "NetBanking (" + payment.get("bank").toString() + ")";
+                    }
+                    break;
+                case "wallet":
+                    if (payment.has("wallet") && payment.get("wallet") != null) {
+                        return "Wallet (" + payment.get("wallet").toString() + ")";
+                    }
+                    break;
+                default:
+                    break;
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to extract masked details from payment payload", ex);
+        }
+        return method.toUpperCase();
+    }
+
+    @Override
     public String getProviderName() {
         return "RAZORPAY";
     }

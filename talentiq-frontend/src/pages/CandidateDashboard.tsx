@@ -28,7 +28,8 @@ import {
   Moon,
   Sun,
   X,
-  CreditCard
+  CreditCard,
+  Zap
 } from 'lucide-react';
 import { validateAndCompressProfileImage } from '../utils/imageCompressor';
 
@@ -41,6 +42,7 @@ import { UserMessages } from './UserMessages';
 import { GroupCollaborationChat } from './GroupCollaborationChat';
 import { NotificationBell } from '../components/NotificationBell';
 import { CandidateSubscriptionTab } from '../components/subscription/CandidateSubscriptionTab';
+import { useSubscription } from '../hooks/useSubscription';
 
 import '../css/candidate-dashboard.css';
 
@@ -71,6 +73,10 @@ export const CandidateDashboard: React.FC = () => {
 
   // Active Tab derived from query param, defaults to 'overview'
   const activeTab = (searchParams.get('tab') as CandidateTabKey) || 'overview';
+
+  // Subscription state for profile badge & quick actions
+  const { subscription, purchasePlan, actionLoading: subActionLoading } = useSubscription({ role: 'CANDIDATE', autoFetch: true });
+  const isCandidatePro = subscription?.status === 'ACTIVE' && subscription?.plan?.planCode === 'CANDIDATE_PRO';
 
   // Candidate Dashboard Theme: 'dark' (Slate Dark) or 'light' (Crisp Light)
   const [candTheme, setCandTheme] = useState<'dark' | 'light'>(() => {
@@ -566,16 +572,69 @@ export const CandidateDashboard: React.FC = () => {
                     </div>
                   </button>
 
-                  {/* Menu Option 8: Subscription & Plans */}
-                  <button
-                    onClick={() => handleTabChange('subscription')}
-                    className={`candidate-dropdown-item ${activeTab === 'subscription' ? 'active' : ''}`}
+                  {/* Menu Option: Subscription & Career Pro Plan */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      width: '100%',
+                      padding: '4px 6px',
+                      borderRadius: '8px',
+                      background: isCandidatePro ? 'rgba(16, 185, 129, 0.08)' : 'rgba(99, 102, 241, 0.08)',
+                      margin: '2px 0',
+                    }}
                   >
-                    <div className="candidate-dropdown-item-left">
-                      <CreditCard size={15} color="#10B981" />
-                      <span>Subscription & Plans</span>
-                    </div>
-                  </button>
+                    <button
+                      onClick={() => handleTabChange('subscription')}
+                      className={`candidate-dropdown-item ${activeTab === 'subscription' ? 'active' : ''}`}
+                      style={{ padding: '6px 8px', flex: 1, background: 'transparent' }}
+                    >
+                      <div className="candidate-dropdown-item-left">
+                        <CreditCard size={15} color={isCandidatePro ? '#10B981' : '#6366F1'} />
+                        <span style={{ fontWeight: 600 }}>Subscription</span>
+                      </div>
+                      <span
+                        className="candidate-dropdown-badge"
+                        style={{
+                          background: isCandidatePro ? 'rgba(16, 185, 129, 0.2)' : 'rgba(99, 102, 241, 0.2)',
+                          color: isCandidatePro ? '#34D399' : '#818CF8',
+                          marginRight: isCandidatePro ? 0 : '6px',
+                        }}
+                      >
+                        {isCandidatePro ? 'Pro (Active)' : 'Free'}
+                      </span>
+                    </button>
+                    {!isCandidatePro && (
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setShowProfileMenu(false);
+                          handleTabChange('subscription');
+                          await purchasePlan('CANDIDATE_PRO', 'MONTHLY');
+                        }}
+                        disabled={subActionLoading}
+                        style={{
+                          background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)',
+                          border: 'none',
+                          borderRadius: '6px',
+                          color: '#FFFFFF',
+                          padding: '5px 9px',
+                          fontSize: '11px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          whiteSpace: 'nowrap',
+                          boxShadow: '0 2px 6px rgba(99, 102, 241, 0.4)',
+                        }}
+                        title="Subscribe to Candidate Pro for ₹99/month"
+                      >
+                        <Zap size={11} /> Pay ₹99
+                      </button>
+                    )}
+                  </div>
 
                   {/* Menu Option 8: Switch to Developer Workspace (if eligible) */}
                   {devWorkspaceEligible && (

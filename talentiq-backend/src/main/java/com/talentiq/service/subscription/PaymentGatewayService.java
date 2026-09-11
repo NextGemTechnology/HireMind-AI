@@ -16,6 +16,11 @@ public interface PaymentGatewayService {
     boolean verifyPaymentSignature(String gatewayOrderId, String gatewayPaymentId, String signature);
     
     /**
+     * Fetches detailed information for a captured/authorized payment from the gateway.
+     */
+    PaymentDetails fetchPaymentDetails(String gatewayPaymentId);
+    
+    /**
      * Returns the name of the provider (e.g., RAZORPAY, MOCK).
      */
     String getProviderName();
