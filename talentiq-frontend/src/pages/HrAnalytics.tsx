@@ -5,13 +5,12 @@ import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   Search, TrendingUp, ChevronDown,
-  Plus, MoreVertical, RefreshCw, Sun, Moon,
+  Plus, MoreVertical, RefreshCw,
   Star, BarChart2, Settings,
   Calendar, Download, Award
 } from 'lucide-react';
 import { Client as StompClient } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
 import { NotificationBell } from '../components/NotificationBell';
 import { HrEmployeeManagement } from '../components/HrEmployeeManagement';
@@ -122,7 +121,7 @@ export const HrAnalytics: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
-  const { theme, toggleTheme, isUniverse } = useTheme();
+  const { theme, isUniverse } = useTheme();
 
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
@@ -377,19 +376,16 @@ export const HrAnalytics: React.FC = () => {
       transition: 'background 0.3s, color 0.3s',
       position: 'relative',
     }}>
-      <InteractiveGalaxyBackground theme={theme} />
-
-      {/* ══════════ UNIFIED STABLE LEFT SIDEBAR ══════════ */}
       <HrSidebar
         activeNav={activeNav}
         onSelectNav={handleSelectNav}
       />
 
       {/* ══════════ MAIN CONTENT ══════════ */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div className="hr-dashboard-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
         {/* ── Top Header Bar ── */}
-        <header style={{
+        <header className="hr-dashboard-header" style={{
           height: '64px',
           background: styles.headerBg,
           borderBottom: styles.headerBorder,
@@ -401,7 +397,7 @@ export const HrAnalytics: React.FC = () => {
           top: 0,
           zIndex: 10,
         }}>
-          <div style={{ flex: 1 }}>
+          <div className="hr-dashboard-title-group" style={{ flex: 1 }}>
             <h1 style={{ fontSize: '20px', fontWeight: 700, color: styles.heading, margin: 0 }}>
               {activeNav === 'Referrals' ? 'Candidate Referrals & Rewards' :
                activeNav === 'Employee' ? 'Verified Company Team & Employees' :
@@ -416,7 +412,7 @@ export const HrAnalytics: React.FC = () => {
           </div>
 
           {/* Search */}
-          <div style={{ position: 'relative', width: '260px' }}>
+          <div className="hr-dashboard-search" style={{ position: 'relative', width: '260px' }}>
             <Search size={15} color={styles.subtext} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="text"
@@ -436,28 +432,6 @@ export const HrAnalytics: React.FC = () => {
               }}
             />
           </div>
-
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              border: isUniverse ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid #CBD5E1',
-              background: isUniverse ? 'rgba(99, 102, 241, 0.15)' : '#F1F5F9',
-              color: isUniverse ? '#FDBA74' : '#475569',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-          >
-            {isUniverse ? <Sun size={14} color="#F59E0B" /> : <Moon size={14} color="#7C3AED" />}
-            {isUniverse ? 'Light Mode' : 'Galaxy Universe'}
-          </button>
 
           {/* Refresh & Notifications */}
           <button onClick={loadDashboardData} title="Refresh data" style={{ background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: styles.subtext, display: 'flex', alignItems: 'center' }}>
@@ -617,13 +591,13 @@ export const HrAnalytics: React.FC = () => {
 
         {/* ── Standard Dashboard View ── */}
         {activeNav === 'Dashboard' && (
-          <div style={{ flex: 1, padding: '24px', overflowY: 'auto', display: 'flex', gap: '24px' }}>
+          <div className="hr-dashboard-content" style={{ flex: 1, padding: '24px', overflowY: 'auto', display: 'flex', gap: '24px' }}>
 
             {/* ── Center Column ── */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
+            <div className="hr-dashboard-center" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
 
               {/* KPI Cards Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div className="hr-dashboard-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 {stats.map((s, i) => (
                   <div key={i} style={{
                     background: styles.cardBg,
@@ -652,7 +626,7 @@ export const HrAnalytics: React.FC = () => {
               </div>
 
               {/* Monthly Bar Chart */}
-              <div style={{
+              <div className="hr-dashboard-chart-card" style={{
                 background: styles.cardBg,
                 borderRadius: '16px',
                 padding: '24px',
@@ -660,7 +634,7 @@ export const HrAnalytics: React.FC = () => {
                 boxShadow: styles.cardShadow,
                 backdropFilter: isUniverse ? 'blur(16px)' : 'none',
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div className="hr-dashboard-chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{ fontSize: '15px', fontWeight: 700, color: styles.heading, margin: 0 }}>Statistics of active Applications</h3>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     {[{ c: '#38BDF8', l: 'Applications' }, { c: '#FBBF24', l: 'Shortlisted' }, { c: '#FB7185', l: 'Rejected' }].map(item => (
@@ -693,7 +667,7 @@ export const HrAnalytics: React.FC = () => {
               </div>
 
               {/* Activity Feed + Meetings Row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="hr-dashboard-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
                 {/* Activity Feed */}
                 <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
@@ -852,7 +826,7 @@ export const HrAnalytics: React.FC = () => {
             </div>
 
             {/* ══════════ RIGHT SIDEBAR ══════════ */}
-            <aside style={{
+            <aside className="hr-dashboard-right-rail" style={{
               width: '240px',
               flexShrink: 0,
               display: 'flex',

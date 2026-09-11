@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { apiClient } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { AiLogo } from "../components/AiLogo";
+import { HireMindLogo } from "../components/HireMindLogo";
 import {
   Terminal,
   Server,
@@ -446,21 +447,7 @@ export const AppDeveloperDashboard: React.FC = () => {
       <aside className="dev-sidebar">
         <div className="dev-sidebar-header">
           <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-            <div
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "10px",
-                background: "rgba(239, 68, 68, 0.15)",
-                border: "1px solid rgba(239, 68, 68, 0.5)",
-                boxShadow: "0 0 12px rgba(239, 68, 68, 0.3)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center"
-              }}
-            >
-              <AiLogo size={26} animated color="red" title="App Developer AI Core" />
-            </div>
+            <HireMindLogo variant="navbar" size="xs" theme="dark" animated={false} />
             <div>
               <div
                 style={{

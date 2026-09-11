@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import {
-  Shield,
   CheckCircle,
   Search,
   RefreshCw,
@@ -14,6 +13,7 @@ import {
   Send
 } from 'lucide-react';
 import '../css/admin-dashboards-distinct.css';
+import { HireMindLogo } from '../components/HireMindLogo';
 
 export const ServiceTeamDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -104,19 +104,7 @@ export const ServiceTeamDashboard: React.FC = () => {
       <aside className="service-sidebar">
         <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(99, 102, 241, 0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <div style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '8px',
-              background: 'rgba(99, 102, 241, 0.2)',
-              border: '1px solid #6366F1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#818CF8'
-            }}>
-              <Shield size={18} />
-            </div>
+            <HireMindLogo variant="navbar" size="xs" theme="dark" animated={false} />
             <div>
               <div style={{ fontSize: '14px', fontWeight: 800, color: '#A5B4FC', letterSpacing: '0.05em' }}>
                 SERVICE & SUPPORT

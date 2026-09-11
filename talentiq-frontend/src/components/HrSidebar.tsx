@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   LayoutDashboard, MessageSquare, Calendar, Briefcase,
   Users, Star, UserCircle2, BarChart2,
-  Settings, LogOut, Sparkles, CreditCard
+  Settings, LogOut, Sparkles, ChevronDown,
+  UserPlus, DollarSign, AlertTriangle, ShieldCheck,
+  CreditCard, X
 } from 'lucide-react';
 import { AiLogo } from './AiLogo';
 import '../css/hr-sidebar.css';
 
 export type HrNavKey =
   | 'Dashboard'
-  | 'Subscription'
   | 'Message'
   | 'Calendar'
   | 'Jobs'
@@ -23,22 +23,48 @@ export type HrNavKey =
   | 'Referrals'
   | 'Employee'
   | 'Report'
-  | 'Settings';
+  | 'Settings'
+  | 'Subscription';
+
+interface HrSubmenuItem {
+  id: string;
+  label: string;
+  navKey: HrNavKey;
+  path: string;
+  icon?: React.ReactNode;
+  badge?: string | number;
+  badgeColor?: string;
+}
+
+interface HrNavGroup {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  defaultNavKey: HrNavKey;
+  defaultPath: string;
+  badge?: string | number;
+  badgeColor?: string;
+  submenus: HrSubmenuItem[];
+}
 
 interface HrSidebarProps {
   activeNav: HrNavKey | string;
   onSelectNav?: (nav: HrNavKey) => void;
   unreadCount?: number;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const HrSidebar: React.FC<HrSidebarProps> = ({
   activeNav,
   onSelectNav,
   unreadCount = 0,
+  isOpen = false,
+  onClose,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
-  const { isUniverse } = useTheme();
   const [hrProfile, setHrProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -51,6 +77,86 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
       .catch(() => {});
   }, []);
 
+  const HR_NAV_GROUPS: HrNavGroup[] = [
+    {
+      id: 'DASHBOARD',
+      label: 'Dashboard & Analytics',
+      icon: <LayoutDashboard size={17} />,
+      defaultNavKey: 'Dashboard',
+      defaultPath: '/hr-analytics',
+      submenus: [
+        { id: 'dash_overview', label: 'Executive Overview', navKey: 'Dashboard', path: '/hr-analytics', icon: <BarChart2 size={14} /> },
+        { id: 'dash_referrals', label: 'Candidate Referrals', navKey: 'Referrals', path: '/hr-analytics?tab=referrals', icon: <Star size={14} /> },
+        { id: 'dash_sub', label: 'Subscription & Billing', navKey: 'Subscription', path: '/hr-analytics?tab=subscription', icon: <CreditCard size={14} /> },
+        { id: 'dash_telemetry', label: 'Telemetry Reports', navKey: 'Report', path: '/hr-analytics?tab=report', icon: <BarChart2 size={14} /> },
+        { id: 'dash_settings', label: 'Workspace Settings', navKey: 'Settings', path: '/hr-analytics?tab=settings', icon: <Settings size={14} /> },
+      ],
+    },
+    {
+      id: 'RECRUITMENT',
+      label: 'Recruitment & Jobs',
+      icon: <Briefcase size={17} />,
+      defaultNavKey: 'Jobs',
+      defaultPath: '/jobs',
+      submenus: [
+        { id: 'rec_jobs', label: 'Active Job Postings', navKey: 'Jobs', path: '/jobs', icon: <Briefcase size={14} /> },
+        { id: 'rec_candidates', label: 'Applications & Pipeline', navKey: 'Candidates', path: '/hr-applications', icon: <Users size={14} /> },
+        { id: 'rec_copilot', label: 'AI Talent Copilot', navKey: 'Copilot', path: '/copilot', icon: <AiLogo size={14} /> },
+      ],
+    },
+    {
+      id: 'COMMUNICATIONS',
+      label: 'Interviews & Comms',
+      icon: <MessageSquare size={17} />,
+      defaultNavKey: 'Message',
+      defaultPath: '/hr-messages',
+      badge: unreadCount > 0 ? unreadCount : undefined,
+      badgeColor: '#EF4444',
+      submenus: [
+        {
+          id: 'comms_msg',
+          label: 'Candidate Messages',
+          navKey: 'Message',
+          path: '/hr-messages',
+          icon: <MessageSquare size={14} />,
+          badge: unreadCount > 0 ? unreadCount : undefined,
+          badgeColor: '#EF4444'
+        },
+        { id: 'comms_cal', label: 'Interview Calendar', navKey: 'Calendar', path: '/hr-calendar', icon: <Calendar size={14} /> },
+        { id: 'comms_chat', label: 'Team Collaboration', navKey: 'TeamChat', path: '/team-chat', icon: <Sparkles size={14} /> },
+      ],
+    },
+    {
+      id: 'WORKFORCE',
+      label: 'Verified Workforce',
+      icon: <UserCircle2 size={17} />,
+      defaultNavKey: 'Employee',
+      defaultPath: '/hr-analytics?tab=employee',
+      submenus: [
+        { id: 'wf_dir', label: 'Verified Directory', navKey: 'Employee', path: '/hr-analytics?tab=employee', icon: <ShieldCheck size={14} /> },
+        { id: 'wf_onboard', label: 'Onboard Candidate', navKey: 'Employee', path: '/hr-analytics?tab=employee&open=onboard', icon: <UserPlus size={14} /> },
+        { id: 'wf_salary', label: 'Salary Disbursements', navKey: 'Employee', path: '/hr-analytics?tab=employee&filter=ACTIVE', icon: <DollarSign size={14} /> },
+        { id: 'wf_notice', label: 'Separation & Notices', navKey: 'Employee', path: '/hr-analytics?tab=employee&filter=ON_NOTICE', icon: <AlertTriangle size={14} /> },
+      ],
+    },
+  ];
+
+  // Accordion open state per menu group
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const init: Record<string, boolean> = {
+      DASHBOARD: true,
+      RECRUITMENT: true,
+      COMMUNICATIONS: true,
+      WORKFORCE: false,
+    };
+    HR_NAV_GROUPS.forEach(grp => {
+      if (grp.defaultNavKey === activeNav || grp.submenus.some(s => s.navKey === activeNav)) {
+        init[grp.id] = true;
+      }
+    });
+    return init;
+  });
+
   const handleNavClick = (key: HrNavKey, directPath?: string) => {
     if (onSelectNav) {
       onSelectNav(key);
@@ -58,346 +164,179 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
     if (directPath) {
       navigate(directPath);
     }
+    if (onClose) {
+      onClose();
+    }
   };
 
-  const navItemStyle = (isActive: boolean) => ({
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    padding: '9px 12px',
-    borderRadius: '10px',
-    border: 'none',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: isActive ? 700 : 500,
-    background: isActive
-      ? (isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#2563EB')
-      : 'transparent',
-    color: isActive ? '#FFFFFF' : (isUniverse ? '#CBD5E1' : '#475569'),
-    transition: 'all 0.18s ease',
-    textAlign: 'left' as const,
-    marginBottom: '3px',
-  });
+  const isGroupActive = (group: HrNavGroup) => {
+    return group.defaultNavKey === activeNav || group.submenus.some(s => s.navKey === activeNav);
+  };
+
+  const toggleGroup = (groupId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenGroups(prev => ({
+      ...prev,
+      [groupId]: !prev[groupId]
+    }));
+  };
+
+  const isSubmenuActive = (sub: HrSubmenuItem) => {
+    const currentFullPath = location.pathname + location.search;
+    if (sub.path.includes('?')) {
+      return currentFullPath === sub.path || (location.pathname === sub.path.split('?')[0] && location.search.includes(sub.path.split('?')[1]));
+    }
+    return location.pathname === sub.path && !location.search;
+  };
 
   const hrName = user ? `${user.firstName || 'HR'} ${user.lastName || 'Recruiter'}`.trim() : 'HR Lead';
   const hrEmail = user?.email || 'hr.recruiter@hiremind.ai';
 
-  return (
-    <aside className="hr-sidebar-aside" style={{
-      background: isUniverse ? '#0F172A' : '#FFFFFF',
-      borderRight: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
-    }}>
-      {/* ── Brand / Logo ── */}
-      <div
-        onClick={() => navigate('/hr-analytics')}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '4px 8px 18px',
-          cursor: 'pointer',
-          borderBottom: isUniverse ? '1px solid rgba(255,255,255,0.06)' : '1px solid #F1F5F9',
-          marginBottom: '12px'
-        }}
-      >
-        <div style={{
-          width: '36px',
-          height: '36px',
-          borderRadius: '10px',
-          background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: isUniverse ? '0 4px 14px rgba(99,102,241,0.4)' : '0 4px 12px rgba(37,99,235,0.3)'
-        }}>
-          <span style={{ fontSize: '17px' }}>🌌</span>
-        </div>
-        <div className="hr-sidebar-brand-text">
-          <div style={{ fontWeight: 800, fontSize: '15px', color: isUniverse ? '#F8FAFC' : '#1E293B', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-            HireMind AI
+  const sidebarContent = (
+    <aside className={`hr-sidebar-aside ${isOpen ? 'mobile-open' : ''}`}>
+      {/* ── Brand / Logo Header ── */}
+      <div className="hr-sidebar-brand-container">
+        <div
+          onClick={() => handleNavClick('Dashboard', '/hr-analytics')}
+          className="hr-sidebar-brand-link"
+        >
+          <div className="hr-sidebar-brand-icon">
+            <Briefcase size={20} color="#FFFFFF" />
           </div>
-          <div style={{ fontSize: '10.5px', color: '#818CF8', fontWeight: 600, letterSpacing: '0.04em' }}>
-            HR EXECUTIVE PORTAL
+          <div className="hr-sidebar-brand-text">
+            <div className="hr-sidebar-brand-name">HireMind AI</div>
+            <div className="hr-sidebar-brand-sub">HR Portal</div>
           </div>
         </div>
+
+        {onClose && (
+          <button onClick={onClose} className="hr-sidebar-close-btn" aria-label="Close sidebar">
+            <X size={18} />
+          </button>
+        )}
       </div>
 
-      {/* ── Scrollable Nav Menu List ── */}
-      <div style={{ flex: 1, overflowY: 'auto', paddingRight: '2px' }}>
-        {/* MAIN MENU */}
-        <div style={{ marginBottom: '14px' }}>
-          <p style={{
-            fontSize: '10px',
-            fontWeight: 700,
-            color: isUniverse ? '#64748B' : '#94A3B8',
-            letterSpacing: '0.08em',
-            padding: '0 12px',
-            margin: '0 0 6px 0',
-            textTransform: 'uppercase'
-          }}>
-            MAIN MENU
-          </p>
-
-          <button
-            onClick={() => handleNavClick('Dashboard', '/hr-analytics')}
-            style={navItemStyle(activeNav === 'Dashboard')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <LayoutDashboard size={16} />
-              <span>Dashboard</span>
-            </div>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('Message', '/hr-messages')}
-            style={navItemStyle(activeNav === 'Message')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <MessageSquare size={16} />
-              <span>Candidate Messages</span>
-            </div>
-            {unreadCount > 0 && (
-              <span style={{
-                background: '#EF4444',
-                color: '#FFF',
-                fontSize: '10px',
-                fontWeight: 700,
-                padding: '1px 6px',
-                borderRadius: '999px',
-                minWidth: '16px',
-                textAlign: 'center'
-              }}>
-                {unreadCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            onClick={() => handleNavClick('Calendar', '/hr-calendar')}
-            style={navItemStyle(activeNav === 'Calendar')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Calendar size={16} />
-              <span>Interviews & Calendar</span>
-            </div>
-          </button>
+      {/* ── Navigation Menu List with Collapsible Groups ── */}
+      <div className="hr-sidebar-scroll-body">
+        <div className="hr-sidebar-section-title">
+          WORKSPACE NAVIGATION
         </div>
 
-        {/* RECRUITMENT & TALENT */}
-        <div style={{ marginBottom: '14px' }}>
-          <p style={{
-            fontSize: '10px',
-            fontWeight: 700,
-            color: isUniverse ? '#64748B' : '#94A3B8',
-            letterSpacing: '0.08em',
-            padding: '0 12px',
-            margin: '0 0 6px 0',
-            textTransform: 'uppercase'
-          }}>
-            RECRUITMENT & TALENT
-          </p>
+        {HR_NAV_GROUPS.map((group) => {
+          const groupActive = isGroupActive(group);
+          const isGroupExpanded = Boolean(openGroups[group.id]);
 
-          <button
-            onClick={() => handleNavClick('Jobs', '/jobs')}
-            style={navItemStyle(activeNav === 'Jobs')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Briefcase size={16} />
-              <span>Job Postings</span>
+          return (
+            <div key={group.id} className={`hr-menu-group ${groupActive ? 'active' : ''}`}>
+              {/* Parent Group Accordion Button */}
+              <button
+                type="button"
+                className={`hr-menu-header-btn ${groupActive ? 'active' : ''}`}
+                onClick={(e) => toggleGroup(group.id, e)}
+              >
+                <div className="hr-menu-header-left">
+                  <span className="hr-menu-icon">{group.icon}</span>
+                  <span className="hr-menu-header-title">{group.label}</span>
+                </div>
+
+                <div className="hr-menu-header-right">
+                  {group.badge !== undefined && (
+                    <span
+                      className="hr-menu-badge"
+                      style={{ background: group.badgeColor || '#EF4444' }}
+                    >
+                      {group.badge}
+                    </span>
+                  )}
+                  <ChevronDown
+                    size={15}
+                    className={`hr-chevron-icon ${isGroupExpanded ? 'open' : ''}`}
+                  />
+                </div>
+              </button>
+
+              {/* Submenu List */}
+              {isGroupExpanded && (
+                <div className="hr-submenu-list">
+                  {group.submenus.map((sub) => {
+                    const isSubActive = isSubmenuActive(sub);
+
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        className={`hr-submenu-item ${isSubActive ? 'active' : ''}`}
+                        onClick={() => handleNavClick(sub.navKey, sub.path)}
+                      >
+                        <div className="hr-submenu-item-left">
+                          <span className="hr-submenu-icon">{sub.icon}</span>
+                          <span className="hr-submenu-label">{sub.label}</span>
+                        </div>
+
+                        {sub.badge !== undefined && (
+                          <span
+                            className="hr-submenu-badge"
+                            style={{ background: sub.badgeColor || '#EF4444' }}
+                          >
+                            {sub.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('Candidates', '/hr-applications')}
-            style={navItemStyle(activeNav === 'Candidates')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Users size={16} />
-              <span>Applications & Pipeline</span>
-            </div>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('Copilot', '/copilot')}
-            style={navItemStyle(activeNav === 'Copilot')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <AiLogo size={16} />
-              <span>AI Copilot</span>
-            </div>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('TeamChat', '/team-chat')}
-            style={navItemStyle(activeNav === 'TeamChat')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Sparkles size={16} />
-              <span>Team Collaboration</span>
-            </div>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('Referrals', '/hr-analytics?tab=referrals')}
-            style={navItemStyle(activeNav === 'Referrals')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Star size={16} />
-              <span>My Referrals</span>
-            </div>
-          </button>
-        </div>
-
-        {/* SUBSCRIPTION & BILLING */}
-        <div style={{ marginBottom: '14px' }}>
-          <p style={{
-            fontSize: '10px',
-            fontWeight: 700,
-            color: isUniverse ? '#64748B' : '#94A3B8',
-            letterSpacing: '0.08em',
-            padding: '0 12px',
-            margin: '0 0 6px 0',
-            textTransform: 'uppercase'
-          }}>
-            SUBSCRIPTION & PLANS
-          </p>
-
-          <button
-            onClick={() => handleNavClick('Subscription', '/hr-analytics?tab=subscription')}
-            style={navItemStyle(activeNav === 'Subscription')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <CreditCard size={16} />
-              <span>Subscription & Plans</span>
-            </div>
-          </button>
-        </div>
-
-        {/* ORGANIZATION */}
-        <div style={{ marginBottom: '8px' }}>
-          <p style={{
-            fontSize: '10px',
-            fontWeight: 700,
-            color: isUniverse ? '#64748B' : '#94A3B8',
-            letterSpacing: '0.08em',
-            padding: '0 12px',
-            margin: '0 0 6px 0',
-            textTransform: 'uppercase'
-          }}>
-            ORGANIZATION & GOVERNANCE
-          </p>
-
-          <button
-            onClick={() => handleNavClick('Employee', '/hr-analytics?tab=employee')}
-            style={navItemStyle(activeNav === 'Employee')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <UserCircle2 size={16} />
-              <span>Verified Employees</span>
-            </div>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('Report', '/hr-analytics?tab=report')}
-            style={navItemStyle(activeNav === 'Report')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <BarChart2 size={16} />
-              <span>Telemetry Reports</span>
-            </div>
-          </button>
-
-          <button
-            onClick={() => handleNavClick('Settings', '/hr-analytics?tab=settings')}
-            style={navItemStyle(activeNav === 'Settings')}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Settings size={16} />
-              <span>Settings</span>
-            </div>
-          </button>
-        </div>
+          );
+        })}
       </div>
 
-      {/* ── Bottom User Profile Card & Logout ── */}
-      <div style={{
-        marginTop: 'auto',
-        paddingTop: '12px',
-        borderTop: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
-      }}>
-        <div className="hr-sidebar-user-badge" style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '8px 10px',
-          borderRadius: '10px',
-          background: isUniverse ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
-          marginBottom: '8px',
-        }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '12px',
-            fontWeight: 700,
-            color: '#FFFFFF',
-            flexShrink: 0
-          }}>
+      {/* ── Bottom HR User Profile & Logout ── */}
+      <div className="hr-sidebar-footer">
+        <div className="hr-sidebar-user-card">
+          <div className="hr-sidebar-avatar">
             {hrName.charAt(0).toUpperCase()}
           </div>
-          <div className="hr-sidebar-user-details" style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              color: isUniverse ? '#F8FAFC' : '#1E293B',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
+          <div className="hr-sidebar-user-details">
+            <div className="hr-sidebar-user-name" title={hrName}>
               {hrName}
             </div>
-            <div style={{
-              fontSize: '10.5px',
-              color: isUniverse ? '#94A3B8' : '#64748B',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {hrProfile?.company?.name || hrEmail}
+            <div className="hr-sidebar-user-email" title={hrEmail}>
+              {hrEmail}
             </div>
+            {hrProfile?.companyVerified ? (
+              <div className="hr-sidebar-verified-tag" title={`Verified by ${hrProfile.company?.name || 'Company'}`}>
+                <ShieldCheck size={11} color="#10B981" />
+                <span>{hrProfile.company?.name || 'Verified HR'}</span>
+              </div>
+            ) : hrProfile ? (
+              <div className="hr-sidebar-unverified-tag" title="Awaiting company verification">
+                <AlertTriangle size={11} color="#F59E0B" />
+                <span>Pending Verification</span>
+              </div>
+            ) : null}
           </div>
         </div>
 
         <button
-          onClick={() => { logout('/hr-login'); }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            width: '100%',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'transparent',
-            color: '#FB7185',
-            fontSize: '12.5px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'background 0.2s',
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(251, 113, 133, 0.12)'; }}
-          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+          type="button"
+          onClick={() => { logout(); navigate('/login'); }}
+          className="hr-sidebar-signout-btn"
         >
           <LogOut size={15} />
-          <span className="hr-sidebar-signout-text">Sign Out</span>
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {isOpen && onClose && (
+        <div className="hr-sidebar-overlay" onClick={onClose} />
+      )}
+      {sidebarContent}
+    </>
   );
 };
 

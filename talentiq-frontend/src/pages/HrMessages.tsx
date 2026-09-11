@@ -11,7 +11,6 @@ import {
   Check, CheckCheck, Clock, ChevronDown, CheckCircle2, Sparkles, X,
   UserCheck, ShieldCheck, User as UserIcon, Flag, Award, ArrowLeft
 } from 'lucide-react';
-import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
 import '../css/hr-messages.css';
 
@@ -734,8 +733,6 @@ export const HrMessages: React.FC = () => {
 
   return (
     <div className={`messages-page-wrapper theme-${theme} ${selectedContact ? 'has-active-chat' : 'no-active-chat'}`}>
-      {/* ── Retain Background Theme (Untouched Interactive Canvas Background) ── */}
-      {theme === 'galaxy' && <InteractiveGalaxyBackground />}
       <audio ref={remoteAudioRef} autoPlay />
 
       {/* ── 2-Second Notification Toast Popup ── */}

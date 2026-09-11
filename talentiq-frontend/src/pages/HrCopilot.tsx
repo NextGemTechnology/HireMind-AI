@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
-import { Send, Sparkles, UserCheck, Briefcase, Settings, Sun, Moon, Plus, Trash2, RotateCcw, ShieldAlert, MessageSquare } from 'lucide-react';
-import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
+import {
+  Send, Sparkles, UserCheck, Briefcase, Settings,
+  Plus, Trash2, RotateCcw, ShieldAlert, MessageSquare
+} from 'lucide-react';
 import { HrSidebar } from '../components/HrSidebar';
 import { AiLogo } from '../components/AiLogo';
 import '../css/hr-copilot.css';
@@ -30,7 +31,6 @@ export const HrCopilot: React.FC = () => {
   const [contextType, setContextType] = useState<'GENERAL' | 'CANDIDATE' | 'JOB'>('GENERAL');
   const [contextId, setContextId] = useState<string>('');
   const [preferredModel, setPreferredModel] = useState('gpt-4o');
-  const { theme, toggleTheme, isUniverse } = useTheme();
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [conversations, setConversations] = useState<ConversationItem[]>([]);
   const [securityNotice, setSecurityNotice] = useState<string | null>(null);
@@ -190,33 +190,20 @@ export const HrCopilot: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-      <InteractiveGalaxyBackground theme={theme} />
+    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1, backgroundColor: '#F8FAFC' }}>
       <HrSidebar activeNav="Copilot" />
 
-      <div className={`copilot-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ flex: 1, height: '100vh', overflowY: 'auto' }}>
+      <div className="copilot-container theme-light" style={{ flex: 1, height: '100vh', overflowY: 'auto' }}>
         
         {/* Left Context & Session Dock */}
         <div className="glass-panel copilot-sidebar solar-theme-accent" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* Header & Theme */}
+          {/* Header */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h3 className="copilot-sidebar-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <AiLogo size={20} animated /> HR Copilot
               </h3>
-              <button
-                onClick={toggleTheme}
-                className="btn btn-secondary"
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '4px',
-                  padding: '4px 10px', borderRadius: '16px', fontSize: '11px', fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-                title="Toggle Light / Galaxy Theme"
-              >
-                {isUniverse ? <Sun size={13} color="#F59E0B" /> : <Moon size={13} color="#7C3AED" />}
-              </button>
             </div>
             <p className="copilot-sidebar-subtitle">Recruiter Intelligence & RAG Dock</p>
 

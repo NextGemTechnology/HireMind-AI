@@ -4,7 +4,8 @@ import '../css/hiremind-logo.css';
 
 export interface HireMindLogoProps {
   variant?: 'full' | 'navbar' | 'icon' | 'badge' | 'emblem';
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'auto';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'auto';
+  theme?: 'dark' | 'light' | 'auto';
   showTagline?: boolean;
   animated?: boolean;
   className?: string;
@@ -14,6 +15,7 @@ export interface HireMindLogoProps {
 export const HireMindLogo: React.FC<HireMindLogoProps> = ({
   variant = 'navbar',
   size = 'md',
+  theme = 'auto',
   showTagline = false,
   animated = true,
   className = '',
@@ -31,6 +33,7 @@ export const HireMindLogo: React.FC<HireMindLogoProps> = ({
     <HireMindAiLogo
       variant={aiVariant}
       size={size}
+      theme={theme}
       animated={animated}
       showTagline={showTagline}
       className={`hiremind-app-logo ${className}`}

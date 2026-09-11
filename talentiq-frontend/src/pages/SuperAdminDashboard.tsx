@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import {
-  Crown,
   DollarSign,
   TrendingUp,
   KeyRound,
@@ -15,6 +14,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import '../css/admin-dashboards-distinct.css';
+import { HireMindLogo } from '../components/HireMindLogo';
 
 export const SuperAdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -90,19 +90,7 @@ export const SuperAdminDashboard: React.FC = () => {
       <aside className="super-sidebar">
         <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(139, 92, 246, 0.25)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <div style={{
-              width: '34px',
-              height: '34px',
-              borderRadius: '8px',
-              background: 'rgba(139, 92, 246, 0.25)',
-              border: '1px solid #8B5CF6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#C4B5FD'
-            }}>
-              <Crown size={18} />
-            </div>
+            <HireMindLogo variant="navbar" size="xs" theme="dark" animated={false} />
             <div>
               <div style={{ fontSize: '14px', fontWeight: 800, color: '#C4B5FD', letterSpacing: '0.05em' }}>
                 SUPERADMIN COMMAND

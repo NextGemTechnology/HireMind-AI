@@ -46,6 +46,7 @@ import {
   Clock
 } from 'lucide-react';
 import { AiLogo } from '../components/AiLogo';
+import { HireMindLogo } from '../components/HireMindLogo';
 import { CompanyEmployeeApprovalQueue } from '../components/CompanyEmployeeApprovalQueue';
 import { CompanyPayrollQueue } from '../components/CompanyPayrollQueue';
 import { CompanyTagApprovalQueue } from '../components/CompanyTagApprovalQueue';
@@ -560,20 +561,7 @@ export const CompanyManagerDashboard: React.FC = () => {
         {/* HQ Branding Header */}
         <div style={{ padding: '20px 18px', borderBottom: '1px solid rgba(56, 189, 248, 0.2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.3) 0%, rgba(56, 189, 248, 0.15) 100%)',
-              border: '1px solid #38BDF8',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#38BDF8',
-              boxShadow: '0 0 16px rgba(56, 189, 248, 0.3)'
-            }}>
-              <Building2 size={19} />
-            </div>
+            <HireMindLogo variant="navbar" size="xs" theme="dark" animated={false} />
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: '14px', fontWeight: 900, color: '#38BDF8', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
                 CORPORATE HQ

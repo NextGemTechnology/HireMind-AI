@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../context/ThemeContext';
 import { apiClient } from '../api/client';
 import {
   Users,
@@ -13,11 +12,8 @@ import {
   Search,
   MessageSquare,
   User,
-  Sparkles,
-  Sun,
-  Moon
+  Sparkles
 } from 'lucide-react';
-import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
 import { AiLogo } from '../components/AiLogo';
 import '../css/hr-applications.css';
@@ -49,7 +45,6 @@ interface ApplicationItem {
 }
 
 export const HrApplications: React.FC = () => {
-  const { theme, toggleTheme, isUniverse } = useTheme();
   const navigate = useNavigate();
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,36 +138,15 @@ export const HrApplications: React.FC = () => {
   });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-      <InteractiveGalaxyBackground theme={theme} />
+    <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1, backgroundColor: '#F8FAFC' }}>
       <HrSidebar activeNav="Candidates" />
-      <div className={`hr-apps-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ flex: 1, height: '100vh', overflowY: 'auto', boxSizing: 'border-box' }}>
+      <div className="hr-apps-container theme-light" style={{ flex: 1, height: '100vh', overflowY: 'auto', boxSizing: 'border-box' }}>
         {/* Header */}
       <div className="hr-apps-header">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
           <div className="solar-badge-hr" style={{ margin: 0 }}>
             <Users size={14} /> HR Recruiter Portal
           </div>
-          <button
-            onClick={toggleTheme}
-            className="btn btn-secondary"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 14px',
-              borderRadius: '20px',
-              fontSize: '12px',
-              fontWeight: 600,
-              background: isUniverse ? 'rgba(15, 23, 42, 0.85)' : '#FFFFFF',
-              borderColor: isUniverse ? 'rgba(139, 92, 246, 0.4)' : '#CBD5E1',
-              color: isUniverse ? '#FDBA74' : '#475569',
-              cursor: 'pointer'
-            }}
-            title={isUniverse ? 'Switch to Light Mode' : 'Switch to Galaxy / Universe Theme'}
-          >
-            {isUniverse ? <><Sun size={15} color="#F59E0B" /> Light Mode</> : <><Moon size={15} color="#7C3AED" /> Galaxy Universe Theme</>}
-          </button>
         </div>
         <h2 className="hr-apps-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           Candidate Applicants & Resume Verification <Sparkles size={24} color="#F59E0B" />

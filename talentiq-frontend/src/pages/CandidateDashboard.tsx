@@ -41,6 +41,7 @@ import { PortfolioBuilder } from './PortfolioBuilder';
 import { UserMessages } from './UserMessages';
 import { GroupCollaborationChat } from './GroupCollaborationChat';
 import { NotificationBell } from '../components/NotificationBell';
+import { HireMindLogo } from '../components/HireMindLogo';
 import { CandidateSubscriptionTab } from '../components/subscription/CandidateSubscriptionTab';
 import { useSubscription } from '../hooks/useSubscription';
 
@@ -400,14 +401,7 @@ export const CandidateDashboard: React.FC = () => {
         <header className="candidate-top-header">
           {/* Left: Brand Header */}
           <div className="candidate-header-brand" onClick={() => handleTabChange('overview')} title="HireMind Home">
-            <div className="candidate-header-brand-title">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="24" height="24" rx="6" fill="#2563EB"/>
-                <path d="M7 6V18M17 6V18M7 12H17" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-              </svg>
-              <span>HireMind</span>
-            </div>
-            <span className="candidate-header-brand-sub">Developed by NextGem Technology</span>
+            <HireMindLogo variant="navbar" size="md" theme={candTheme === 'dark' ? 'dark' : 'light'} animated={false} />
           </div>
 
           <div className="candidate-header-actions">

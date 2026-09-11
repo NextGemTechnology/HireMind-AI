@@ -8,6 +8,17 @@
   padding: 0 24px;
 }
 
+@media (max-width: 1279px) {
+  .hr-apps-container { max-width: none; margin: 28px auto; padding: 0 22px; }
+  .hr-app-card { padding: 20px !important; }
+}
+
+@media (max-width: 1024px) {
+  .hr-apps-title { font-size: 28px; }
+  .hr-apps-search-wrapper { min-width: min(280px, 100%); }
+  .hr-apps-filter-bar { gap: 10px; }
+}
+
 .hr-apps-header {
   margin-bottom: 32px;
 }
