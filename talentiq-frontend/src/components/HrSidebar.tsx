@@ -7,13 +7,14 @@ import {
   LayoutDashboard, MessageSquare, Calendar, Briefcase,
   Users, Star, UserCircle2, BarChart2,
   Settings, LogOut, Sparkles, ChevronDown, Pin,
-  UserPlus, DollarSign, AlertTriangle, ShieldCheck
+  UserPlus, DollarSign, AlertTriangle, ShieldCheck, CreditCard
 } from 'lucide-react';
 import { AiLogo } from './AiLogo';
 import '../css/hr-sidebar.css';
 
 export type HrNavKey =
   | 'Dashboard'
+  | 'Subscription'
   | 'Message'
   | 'Calendar'
   | 'Jobs'
@@ -81,6 +82,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
       defaultPath: '/hr-analytics',
       submenus: [
         { id: 'dash_overview', label: 'Executive Overview', navKey: 'Dashboard', path: '/hr-analytics', icon: <BarChart2 size={13} /> },
+        { id: 'dash_subscription', label: 'Subscription & Plans', navKey: 'Subscription', path: '/hr-analytics?tab=subscription', icon: <CreditCard size={13} /> },
         { id: 'dash_referrals', label: 'Candidate Referrals', navKey: 'Referrals', path: '/hr-analytics?tab=referrals', icon: <Star size={13} /> },
         { id: 'dash_telemetry', label: 'Telemetry Reports', navKey: 'Report', path: '/hr-analytics?tab=report', icon: <BarChart2 size={13} /> },
         { id: 'dash_settings', label: 'Workspace Settings', navKey: 'Settings', path: '/hr-analytics?tab=settings', icon: <Settings size={13} /> },

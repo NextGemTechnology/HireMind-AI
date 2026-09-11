@@ -27,7 +27,8 @@ import {
   Settings,
   Moon,
   Sun,
-  X
+  X,
+  CreditCard
 } from 'lucide-react';
 import { validateAndCompressProfileImage } from '../utils/imageCompressor';
 
@@ -39,6 +40,7 @@ import { PortfolioBuilder } from './PortfolioBuilder';
 import { UserMessages } from './UserMessages';
 import { GroupCollaborationChat } from './GroupCollaborationChat';
 import { NotificationBell } from '../components/NotificationBell';
+import { CandidateSubscriptionTab } from '../components/subscription/CandidateSubscriptionTab';
 
 import '../css/candidate-dashboard.css';
 
@@ -49,7 +51,8 @@ export type CandidateTabKey =
   | 'applications'
   | 'portfolio'
   | 'messages'
-  | 'team-chat';
+  | 'team-chat'
+  | 'subscription';
 
 interface CompanyBadgeItem {
   id: string | number;
@@ -563,6 +566,17 @@ export const CandidateDashboard: React.FC = () => {
                     </div>
                   </button>
 
+                  {/* Menu Option 8: Subscription & Plans */}
+                  <button
+                    onClick={() => handleTabChange('subscription')}
+                    className={`candidate-dropdown-item ${activeTab === 'subscription' ? 'active' : ''}`}
+                  >
+                    <div className="candidate-dropdown-item-left">
+                      <CreditCard size={15} color="#10B981" />
+                      <span>Subscription & Plans</span>
+                    </div>
+                  </button>
+
                   {/* Menu Option 8: Switch to Developer Workspace (if eligible) */}
                   {devWorkspaceEligible && (
                     <button
@@ -1065,6 +1079,13 @@ export const CandidateDashboard: React.FC = () => {
         {activeTab === 'team-chat' && (
           <div style={{ flex: 1, height: '100%' }}>
             <GroupCollaborationChat />
+          </div>
+        )}
+
+        {/* ── TAB 8: SUBSCRIPTION & BILLING ── */}
+        {activeTab === 'subscription' && (
+          <div style={{ flex: 1, height: '100%', overflowY: 'auto' }}>
+            <CandidateSubscriptionTab embedded={true} />
           </div>
         )}
       </main>

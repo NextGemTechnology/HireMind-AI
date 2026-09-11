@@ -15,6 +15,7 @@ import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBack
 import { HrSidebar } from '../components/HrSidebar';
 import { NotificationBell } from '../components/NotificationBell';
 import { HrEmployeeManagement } from '../components/HrEmployeeManagement';
+import { HrSubscriptionTab } from '../components/subscription/HrSubscriptionTab';
 import '../css/hr-analytics.css';
 
 /* ─── Types ─── */
@@ -406,6 +407,7 @@ export const HrAnalytics: React.FC = () => {
                activeNav === 'Employee' ? 'Verified Company Team & Employees' :
                activeNav === 'Report' ? 'Recruitment Telemetry & Reports' :
                activeNav === 'Settings' ? 'Recruiter & Organization Settings' :
+               activeNav === 'Subscription' ? 'Subscription & Billing' :
                (analytics?.companyName || 'Dashboard')}
             </h1>
             <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>
@@ -776,6 +778,13 @@ export const HrAnalytics: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Sub-view: Subscription & Billing ── */}
+        {activeNav === 'Subscription' && (
+          <div style={{ flex: 1, height: '100%', overflowY: 'auto' }}>
+            <HrSubscriptionTab />
           </div>
         )}
 

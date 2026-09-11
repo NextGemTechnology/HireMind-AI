@@ -49,6 +49,8 @@ import { AiLogo } from '../components/AiLogo';
 import { CompanyEmployeeApprovalQueue } from '../components/CompanyEmployeeApprovalQueue';
 import { CompanyPayrollQueue } from '../components/CompanyPayrollQueue';
 import { CompanyTagApprovalQueue } from '../components/CompanyTagApprovalQueue';
+import { subscriptionApi } from '../api/subscriptionApi';
+import type { PlanResponse, SubscriptionResponse, TransactionResponse } from '../api/subscriptionApi';
 import '../css/admin-dashboards-distinct.css';
 
 export const CompanyManagerDashboard: React.FC = () => {
@@ -1435,62 +1437,9 @@ export const CompanyManagerDashboard: React.FC = () => {
               </div>
             )}
 
-            {/* Subtab 4: Subscription Plan */}
+            {/* Subtab 4: Subscription Plan — Live API */}
             {profileSubTab === 'SUBSCRIPTION' && (
-              <div className="company-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
-                  <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#F8FAFC', margin: 0 }}>
-                      Active Subscription & SaaS Licensing Tier
-                    </h3>
-                    <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94A3B8' }}>
-                      Manage enterprise seats, recruiter allocations, and billing cycles.
-                    </p>
-                  </div>
-                  <span className="cmp-badge cmp-badge-success">
-                    <CheckCircle2 size={12} /> ACTIVE LICENSE
-                  </span>
-                </div>
-
-                <div style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(15,23,42,0.6) 100%)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '12px', color: '#38BDF8', fontWeight: 800, letterSpacing: '0.05em' }}>ENTERPRISE UNLIMITED TIER</div>
-                      <div style={{ fontSize: '24px', fontWeight: 900, color: '#F8FAFC', marginTop: '4px' }}>$499 <span style={{ fontSize: '14px', color: '#94A3B8', fontWeight: 500 }}>/ month</span></div>
-                      <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>Renews on October 1, 2026 | Billed Annually</div>
-                    </div>
-                    <button
-                      style={{
-                        padding: '10px 18px',
-                        background: '#2563EB',
-                        border: 'none',
-                        borderRadius: '8px',
-                        color: '#FFF',
-                        fontSize: '13px',
-                        fontWeight: 800,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Manage SaaS Subscription
-                    </button>
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-                  <div style={{ padding: '14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>HR Recruiter Seats</div>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#F8FAFC', marginTop: '2px' }}>{hrTeam.length} / 25 Used</div>
-                  </div>
-                  <div style={{ padding: '14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>Active Job Postings</div>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#F8FAFC', marginTop: '2px' }}>Unlimited</div>
-                  </div>
-                  <div style={{ padding: '14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: '#64748B' }}>Candidate Talent Discovery</div>
-                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#10B981', marginTop: '2px' }}>Enabled (Global Pool)</div>
-                  </div>
-                </div>
-              </div>
+              <CompanySubscriptionSubTab hrTeam={hrTeam} showToast={showToast} />
             )}
 
             {/* Subtab 5: Verification Badge */}
@@ -3067,44 +3016,7 @@ export const CompanyManagerDashboard: React.FC = () => {
 
             {/* Subtab: Billing */}
             {settingsSubTab === 'BILLING' && (
-              <div className="company-card">
-                <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#F8FAFC', margin: '0 0 16px' }}>
-                  Corporate Billing & Paid Invoices History
-                </h3>
-                <table className="cmp-table">
-                  <thead>
-                    <tr>
-                      <th>Invoice ID</th>
-                      <th>Billing Date</th>
-                      <th>Amount</th>
-                      <th>Plan Details</th>
-                      <th>Receipt</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      { id: 'INV-2026-09', date: 'Sep 01, 2026', amt: '$499.00', plan: 'Enterprise Unlimited SaaS' },
-                      { id: 'INV-2026-08', date: 'Aug 01, 2026', amt: '$499.00', plan: 'Enterprise Unlimited SaaS' },
-                      { id: 'INV-2026-07', date: 'Jul 01, 2026', amt: '$499.00', plan: 'Enterprise Unlimited SaaS' }
-                    ].map(inv => (
-                      <tr key={inv.id}>
-                        <td style={{ color: '#38BDF8', fontWeight: 700 }}>{inv.id}</td>
-                        <td style={{ color: '#CBD5E1' }}>{inv.date}</td>
-                        <td style={{ color: '#10B981', fontWeight: 700 }}>{inv.amt}</td>
-                        <td style={{ color: '#94A3B8' }}>{inv.plan}</td>
-                        <td>
-                          <button
-                            onClick={() => showToast(`Invoice ${inv.id} downloaded.`)}
-                            style={{ padding: '4px 10px', background: 'rgba(56,189,248,0.12)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '6px', color: '#38BDF8', fontSize: '11px', cursor: 'pointer' }}
-                          >
-                            <Download size={11} style={{ display: 'inline', marginRight: '4px' }} /> PDF
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <CompanyBillingSubTab showToast={showToast} />
             )}
           </div>
         )}
@@ -3729,3 +3641,163 @@ export const CompanyManagerDashboard: React.FC = () => {
 };
 
 export default CompanyManagerDashboard;
+
+/* ══════════════════════════════════════════════════════════════════
+   COMPANY SUBSCRIPTION SUB-TAB (Live API)
+   ══════════════════════════════════════════════════════════════════ */
+const CompanySubscriptionSubTab: React.FC<{ hrTeam: any[]; showToast: (msg: string) => void }> = ({ hrTeam, showToast }) => {
+  const [sub, setSub] = useState<SubscriptionResponse | null>(null);
+  const [plans, setPlans] = useState<PlanResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [subRes, plansRes] = await Promise.all([
+          subscriptionApi.getMySubscription().catch(() => null),
+          subscriptionApi.getPlans('COMPANY').catch(() => null)
+        ]);
+        if (subRes?.data?.data) setSub(subRes.data.data);
+        if (plansRes?.data?.data) setPlans(plansRes.data.data);
+      } catch (e) { /* silent */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  if (loading) return <div className="company-card" style={{ textAlign: 'center', padding: '40px' }}><RefreshCw size={20} className="spin" style={{ color: '#6366F1' }} /> Loading...</div>;
+
+  return (
+    <div className="company-card">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#F8FAFC', margin: 0 }}>
+            Active Subscription & SaaS Licensing Tier
+          </h3>
+          <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#94A3B8' }}>
+            Manage enterprise seats, recruiter allocations, and billing cycles.
+          </p>
+        </div>
+        <span className={`cmp-badge ${sub?.status === 'ACTIVE' ? 'cmp-badge-success' : 'cmp-badge-warning'}`}>
+          <CheckCircle2 size={12} /> {sub?.status || 'NO PLAN'}
+        </span>
+      </div>
+
+      {sub ? (
+        <div style={{ background: 'linear-gradient(135deg, rgba(37,99,235,0.2) 0%, rgba(15,23,42,0.6) 100%)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <div style={{ fontSize: '12px', color: '#38BDF8', fontWeight: 800, letterSpacing: '0.05em' }}>{sub.plan.name.toUpperCase()}</div>
+              <div style={{ fontSize: '24px', fontWeight: 900, color: '#F8FAFC', marginTop: '4px' }}>₹{sub.plan.priceAmount.toLocaleString()} <span style={{ fontSize: '14px', color: '#94A3B8', fontWeight: 500 }}>/ {sub.plan.billingCycle?.toLowerCase()}</span></div>
+              <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px' }}>Renews {new Date(sub.currentPeriodEnd).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' })}</div>
+            </div>
+            <button onClick={() => showToast('Subscription management coming soon')} style={{ padding: '10px 18px', background: '#2563EB', border: 'none', borderRadius: '8px', color: '#FFF', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>
+              Manage SaaS Subscription
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '22px', marginBottom: '20px', textAlign: 'center' }}>
+          <p style={{ color: '#94A3B8', fontSize: '14px' }}>No active subscription. Choose a plan below.</p>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+        <div style={{ padding: '14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '11px', color: '#64748B' }}>HR Recruiter Seats</div>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: '#F8FAFC', marginTop: '2px' }}>{hrTeam.length} / {sub?.plan?.maxJobs || '∞'} Used</div>
+        </div>
+        <div style={{ padding: '14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '11px', color: '#64748B' }}>Active Job Postings</div>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: '#F8FAFC', marginTop: '2px' }}>{sub?.plan?.maxJobs ?? 'Unlimited'}</div>
+        </div>
+        <div style={{ padding: '14px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
+          <div style={{ fontSize: '11px', color: '#64748B' }}>Candidate Talent Discovery</div>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: '#10B981', marginTop: '2px' }}>Enabled (Global Pool)</div>
+        </div>
+      </div>
+
+      {/* Available Plans */}
+      {plans.length > 0 && (
+        <div style={{ marginTop: '24px' }}>
+          <h4 style={{ fontSize: '14px', fontWeight: 700, color: '#F8FAFC', marginBottom: '12px' }}>Available Plans</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+            {plans.map(p => (
+              <div key={p.planCode} style={{ padding: '18px', background: sub?.plan.planCode === p.planCode ? 'rgba(99,102,241,0.15)' : 'rgba(0,0,0,0.3)', border: sub?.plan.planCode === p.planCode ? '1px solid #6366F1' : '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#F8FAFC' }}>{p.name}</div>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#6366F1', margin: '8px 0' }}>₹{p.priceAmount.toLocaleString()}<span style={{ fontSize: '12px', color: '#94A3B8' }}>/{p.billingCycle?.toLowerCase()}</span></div>
+                <ul style={{ margin: 0, padding: '0 0 0 16px', fontSize: '12px', color: '#94A3B8' }}>
+                  {p.features?.slice(0, 4).map((f, i) => <li key={i} style={{ marginBottom: '4px' }}>{f}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ══════════════════════════════════════════════════════════════════
+   COMPANY BILLING SUB-TAB (Live Transaction History)
+   ══════════════════════════════════════════════════════════════════ */
+const CompanyBillingSubTab: React.FC<{ showToast: (msg: string) => void }> = ({ showToast: _showToast }) => {
+  const [transactions, setTransactions] = useState<TransactionResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await subscriptionApi.getTransactions(0, 20);
+        setTransactions(res.data?.data?.content || []);
+      } catch (e) { /* silent */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  if (loading) return <div className="company-card" style={{ textAlign: 'center', padding: '40px' }}><RefreshCw size={20} className="spin" style={{ color: '#6366F1' }} /> Loading...</div>;
+
+  return (
+    <div className="company-card">
+      <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#F8FAFC', margin: '0 0 16px' }}>
+        Corporate Billing & Payment History
+      </h3>
+      {transactions.length === 0 ? (
+        <p style={{ color: '#94A3B8', fontSize: '14px', textAlign: 'center', padding: '20px' }}>No billing transactions yet.</p>
+      ) : (
+        <table className="cmp-table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Date</th>
+              <th>Amount</th>
+              <th>Plan</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transactions.map(tx => (
+              <tr key={tx.orderId}>
+                <td style={{ color: '#38BDF8', fontWeight: 700, fontSize: '12px' }}>{tx.orderId.substring(0, 16)}...</td>
+                <td style={{ color: '#CBD5E1' }}>{new Date(tx.createdAt).toLocaleDateString('en-IN')}</td>
+                <td style={{ color: '#10B981', fontWeight: 700 }}>₹{tx.amount.toLocaleString()}</td>
+                <td style={{ color: '#94A3B8' }}>{tx.planName}</td>
+                <td>
+                  <span style={{
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: tx.status === 'CAPTURED' ? 'rgba(16,185,129,0.15)' : tx.status === 'FAILED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                    color: tx.status === 'CAPTURED' ? '#10B981' : tx.status === 'FAILED' ? '#EF4444' : '#F59E0B'
+                  }}>
+                    {tx.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+};

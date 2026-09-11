@@ -69,7 +69,11 @@ public class SecurityConfig {
             "/v1/company/verifications/certificate/**",
             "/v1/company/invitations/validate/**",
             // Public user avatar endpoints (Instagram style)
-            "/v1/users/avatar/**"
+            "/v1/users/avatar/**",
+            // Public subscription pricing plans and gateway webhooks
+            "/v1/subscriptions/plans",
+            "/v1/subscriptions/plans/**",
+            "/v1/subscriptions/webhook/**"
     };
 
     @Bean
