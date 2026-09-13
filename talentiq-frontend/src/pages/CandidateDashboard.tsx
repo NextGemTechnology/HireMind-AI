@@ -43,6 +43,7 @@ import { GroupCollaborationChat } from './GroupCollaborationChat';
 import { NotificationBell } from '../components/NotificationBell';
 import { HireMindLogo } from '../components/HireMindLogo';
 import { CandidateSubscriptionTab } from '../components/subscription/CandidateSubscriptionTab';
+import { PaymentCheckoutModal } from '../components/subscription/PaymentCheckoutModal';
 import { useSubscription } from '../hooks/useSubscription';
 
 import '../css/candidate-dashboard.css';
@@ -62,6 +63,7 @@ interface CompanyBadgeItem {
   companyName: string;
   designation: string;
   dateStr: string;
+  logoUrl?: string;
   status: 'PENDING' | 'VERIFIED';
 }
 
@@ -71,12 +73,13 @@ export const CandidateDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [devWorkspaceEligible, setDevWorkspaceEligible] = useState<boolean>(false);
+  const [showCheckoutModal, setShowCheckoutModal] = useState<boolean>(false);
 
   // Active Tab derived from query param, defaults to 'overview'
   const activeTab = (searchParams.get('tab') as CandidateTabKey) || 'overview';
 
   // Subscription state for profile badge & quick actions
-  const { subscription, purchasePlan, actionLoading: subActionLoading } = useSubscription({ role: 'CANDIDATE', autoFetch: true });
+  const { subscription, plans, reload: reloadSub, actionLoading: subActionLoading } = useSubscription({ role: 'CANDIDATE', autoFetch: true });
   const isCandidatePro = subscription?.status === 'ACTIVE' && subscription?.plan?.planCode === 'CANDIDATE_PRO';
 
   // Candidate Dashboard Theme: 'dark' (Slate Dark) or 'light' (Crisp Light)
@@ -601,11 +604,10 @@ export const CandidateDashboard: React.FC = () => {
                     </button>
                     {!isCandidatePro && (
                       <button
-                        onClick={async (e) => {
+                        onClick={(e) => {
                           e.stopPropagation();
                           setShowProfileMenu(false);
-                          handleTabChange('subscription');
-                          await purchasePlan('CANDIDATE_PRO', 'MONTHLY');
+                          setShowCheckoutModal(true);
                         }}
                         disabled={subActionLoading}
                         style={{
@@ -1142,6 +1144,33 @@ export const CandidateDashboard: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Secure Payment Checkout Modal */}
+      {showCheckoutModal && (
+        <PaymentCheckoutModal
+          plan={
+            plans.find((p) => p.planCode === 'CANDIDATE_PRO') || {
+              planCode: 'CANDIDATE_PRO',
+              name: 'Candidate Pro',
+              description: 'Supercharge your job search with verified recruiter exposure',
+              targetRole: 'CANDIDATE',
+              priceAmount: 99,
+              currency: 'INR',
+              billingCycle: 'MONTHLY',
+              features: ['Unlimited AI Job Matches', 'Direct Recruiter InMail', 'Priority Application Queue'],
+              active: true,
+            }
+          }
+          billingCycle="MONTHLY"
+          isOpen={showCheckoutModal}
+          onClose={() => setShowCheckoutModal(false)}
+          onSuccess={() => {
+            setShowCheckoutModal(false);
+            reloadSub();
+            handleTabChange('subscription');
+          }}
+        />
+      )}
     </div>
   );
 };

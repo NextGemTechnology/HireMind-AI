@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Check,
   Sparkles,
@@ -10,8 +10,15 @@ import {
   Download,
   CreditCard,
   X,
+  CreditCard as CardIcon,
+  Search,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useSubscription } from '../../hooks/useSubscription';
+import { PaymentCheckoutModal } from './PaymentCheckoutModal';
+import type { PlanResponse } from '../../api/subscriptionApi';
 import '../../css/subscription.css';
 
 interface HrSubscriptionTabProps {
@@ -22,16 +29,25 @@ interface HrSubscriptionTabProps {
 export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
   const {
     subscription,
+    plans,
     transactions,
     actionLoading,
     error,
-    purchasePlan,
+    reload,
+    fetchTransactions,
     cancelSubscription,
   } = useSubscription({ role: 'HR', autoFetch: true });
 
+  const [checkoutPlan, setCheckoutPlan] = useState<PlanResponse | null>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  // Filters & Pagination for Transaction History
+  const [historyStatus, setHistoryStatus] = useState<string>('');
+  const [historySearch, setHistorySearch] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -43,14 +59,32 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
   const isHrEnterprise = currentPlanCode === 'HR_ENTERPRISE';
   const hasActiveSub = isHrPro || isHrEnterprise;
 
-  const handlePurchase = async (planCode: string) => {
-    const res = await purchasePlan(planCode, 'MONTHLY');
-    if (res.success) {
-      showToast(`🎉 Upgraded to ${planCode === 'HR_ENTERPRISE' ? 'HR Enterprise' : 'HR Pro'}!`);
-    } else if (res.error) {
-      showToast(`Error: ${res.error}`);
-    }
+  const handlePurchase = (planCode: string) => {
+    const targetPlan = plans.find((p) => p.planCode === planCode) || {
+      planCode,
+      name: planCode === 'HR_ENTERPRISE' ? 'HR Enterprise' : 'HR Pro',
+      description:
+        planCode === 'HR_ENTERPRISE'
+          ? 'High-volume hiring & unlimited candidate outreach'
+          : 'Professional AI recruitment suite',
+      targetRole: 'HR',
+      priceAmount: planCode === 'HR_ENTERPRISE' ? 1999 : 499,
+      currency: 'INR',
+      billingCycle: 'MONTHLY',
+      features: ['Unlimited AI Candidate Match', 'Bulk Interview Scheduling', 'Automated Verification'],
+      active: true,
+    };
+    setCheckoutPlan(targetPlan);
   };
+
+  // Re-fetch transactions on filter/page change
+  useEffect(() => {
+    fetchTransactions(currentPage, 10, historyStatus, historySearch).then((res) => {
+      if (res) {
+        setTotalPages(res.totalPages || 1);
+      }
+    });
+  }, [fetchTransactions, currentPage, historyStatus, historySearch]);
 
   const handleCancel = async () => {
     const ok = await cancelSubscription(cancelReason || 'Switching plans');
@@ -315,6 +349,41 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
           </span>
         </div>
 
+        {/* Filter and Search Bar */}
+        <div style={{ padding: '12px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(15, 23, 42, 0.4)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px', maxWidth: '380px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '6px', padding: '6px 10px' }}>
+            <Search size={14} color="#94A3B8" />
+            <input
+              type="text"
+              placeholder="Search Order ID or method..."
+              value={historySearch}
+              onChange={(e) => { setHistorySearch(e.target.value); setCurrentPage(0); }}
+              style={{ background: 'transparent', border: 'none', color: '#F8FAFC', fontSize: '12px', width: '100%', outline: 'none' }}
+            />
+            {historySearch && (
+              <button onClick={() => setHistorySearch('')} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: 0 }}>
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Filter size={14} color="#94A3B8" />
+            <select
+              value={historyStatus}
+              onChange={(e) => { setHistoryStatus(e.target.value); setCurrentPage(0); }}
+              style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(255,255,255,0.15)', color: '#F8FAFC', borderRadius: '6px', padding: '6px 10px', fontSize: '12px', outline: 'none' }}
+            >
+              <option value="">All Statuses</option>
+              <option value="PAID">Paid</option>
+              <option value="PENDING">Pending</option>
+              <option value="FAILED">Failed</option>
+              <option value="EXPIRED">Expired</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
         <div className="sub-table-wrapper">
           {transactions.length === 0 ? (
             <div
@@ -325,7 +394,7 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
                 fontSize: '13px',
               }}
             >
-              No payment transactions yet. Once you upgrade your recruiter tier, GST invoices will appear here.
+              No payment transactions matching your filter. Once you upgrade your recruiter tier, GST invoices will appear here.
             </div>
           ) : (
             <table className="sub-table">
@@ -335,6 +404,7 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
                   <th>Date & Time</th>
                   <th>Tier Name</th>
                   <th>Amount Paid</th>
+                  <th>Payment Method</th>
                   <th>Status</th>
                   <th>GST Invoice</th>
                 </tr>
@@ -342,7 +412,14 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
               <tbody>
                 {transactions.map((tx) => (
                   <tr key={tx.orderId}>
-                    <td className="sub-order-code">{tx.orderId}</td>
+                    <td className="sub-order-code">
+                      <span>{tx.orderId}</span>
+                      {tx.gatewayPaymentId && (
+                        <div style={{ fontSize: '11px', color: '#64748B', fontFamily: 'monospace' }}>
+                          {tx.gatewayPaymentId}
+                        </div>
+                      )}
+                    </td>
                     <td>
                       {new Date(tx.createdAt).toLocaleDateString(undefined, {
                         month: 'short',
@@ -355,12 +432,24 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
                       ₹{tx.amount.toFixed(2)} {tx.currency}
                     </td>
                     <td>
+                      {tx.paymentMethod ? (
+                        <span className="sub-payment-method-pill">
+                          <CardIcon size={12} />
+                          <span>{tx.maskedDetails || tx.paymentMethod}</span>
+                        </span>
+                      ) : (
+                        <span style={{ color: '#64748B', fontSize: '12px' }}>—</span>
+                      )}
+                    </td>
+                    <td>
                       <span
                         className={`sub-badge ${
-                          tx.status === 'CAPTURED'
+                          tx.status === 'CAPTURED' || tx.status === 'PAID'
                             ? 'sub-badge-active'
                             : tx.status === 'FAILED'
                             ? 'sub-badge-expired'
+                            : tx.status === 'PENDING'
+                            ? 'sub-badge-expiring'
                             : 'sub-badge-free'
                         }`}
                       >
@@ -393,6 +482,29 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
             </table>
           )}
         </div>
+
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(255,255,255,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: currentPage === 0 ? '#64748B' : '#F8FAFC', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', cursor: currentPage === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <ChevronLeft size={14} /> Previous
+            </button>
+            <span style={{ fontSize: '12px', color: '#94A3B8' }}>
+              Page {currentPage + 1} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage >= totalPages - 1}
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: currentPage >= totalPages - 1 ? '#64748B' : '#F8FAFC', borderRadius: '6px', padding: '5px 12px', fontSize: '12px', cursor: currentPage >= totalPages - 1 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cancellation Modal */}
@@ -470,6 +582,21 @@ export const HrSubscriptionTab: React.FC<HrSubscriptionTabProps> = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Checkout Modal */}
+      {checkoutPlan && (
+        <PaymentCheckoutModal
+          plan={checkoutPlan}
+          billingCycle="MONTHLY"
+          isOpen={Boolean(checkoutPlan)}
+          onClose={() => setCheckoutPlan(null)}
+          onSuccess={() => {
+            setCheckoutPlan(null);
+            reload();
+            showToast(`🎉 Upgraded to ${checkoutPlan.name}!`);
+          }}
+        />
       )}
     </div>
   );

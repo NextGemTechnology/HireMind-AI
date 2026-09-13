@@ -37,6 +37,7 @@ export const ProfilePage: React.FC = () => {
   const [location, setLocation] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState('');
+  const [saveError, setSaveError] = useState('');
 
   // Resume state for candidates
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -96,6 +97,7 @@ export const ProfilePage: React.FC = () => {
     e.preventDefault();
     setSaving(true);
     setSaveSuccess('');
+    setSaveError('');
 
     try {
       // Update User Core profile
@@ -113,7 +115,8 @@ export const ProfilePage: React.FC = () => {
             department: department.trim()
           });
         } catch {
-          // ignore if company not linked
+          setSaveError('Your name and phone were saved, but recruiter details could not be updated. Please try again.');
+          return;
         }
       }
 
@@ -121,9 +124,7 @@ export const ProfilePage: React.FC = () => {
       setIsEditing(false);
       setTimeout(() => setSaveSuccess(''), 5000);
     } catch (err) {
-      setSaveSuccess('Profile updated successfully (local session updated).');
-      setIsEditing(false);
-      setTimeout(() => setSaveSuccess(''), 5000);
+      setSaveError('Could not save your profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -173,7 +174,7 @@ export const ProfilePage: React.FC = () => {
   return (
     <div className={`profile-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ position: 'relative', zIndex: 1 }}>
       {/* ── Interactive Galaxy Background with Mouse Motion & Attraction ── */}
-      <InteractiveGalaxyBackground theme={theme} />
+      {!isHr && <InteractiveGalaxyBackground theme={theme} />}
 
       {/* Header Banner */}
       <div className="profile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
@@ -235,6 +236,7 @@ export const ProfilePage: React.FC = () => {
         </div>
       </div>
 
+      {saveError && <div className="hr-error" role="alert">{saveError}</div>}
       {saveSuccess && (
         <div className="profile-alert-success" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px', marginBottom: '24px', borderRadius: '12px' }}>
           <CheckCircle2 size={18} /> {saveSuccess}

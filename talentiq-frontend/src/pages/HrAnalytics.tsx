@@ -1,987 +1,125 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { apiClient } from '../api/client';
-import {
-  Search, TrendingUp, ChevronDown,
-  Plus, MoreVertical, RefreshCw,
-  Star, BarChart2, Settings,
-  Calendar, Download, Award
-} from 'lucide-react';
-import { Client as StompClient } from '@stomp/stompjs';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Briefcase, Users, UserCheck, Calendar, RefreshCw, Plus, Inbox, BarChart3, Download, Star, Settings, MessageSquare } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import { HrSidebar } from '../components/HrSidebar';
-import { NotificationBell } from '../components/NotificationBell';
+import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { HrEmployeeManagement } from '../components/HrEmployeeManagement';
 import { HrSubscriptionTab } from '../components/subscription/HrSubscriptionTab';
-import '../css/hr-analytics.css';
 
-/* ─── Types ─── */
-interface AnalyticsData {
-  companyName: string;
-  activeJobsCount: number;
-  totalApplicationsCount: number;
-  shortlistedCount: number;
-  hiredCandidatesCount: number;
-  conversionRate: number;
-  avgTimeToHireDays: number;
-  applicationsByStatus: Record<string, number>;
-  monthlyStats?: Array<{ month: string; applications: number; shortlisted: number; rejected: number }>;
+interface Analytics {
+  companyName?: string; activeJobsCount: number; totalApplicationsCount: number;
+  shortlistedCount: number; hiredCandidatesCount: number; conversionRate?: number;
+  avgTimeToHireDays?: number; applicationsByStatus?: Record<string, number>;
+  monthlyStats?: { month: string; applications: number; shortlisted: number; rejected: number }[];
 }
-
-interface ActivityItem {
-  id: number;
-  avatar: string;
-  name: string;
-  action: string;
-  job: string;
-  time: string;
-  tag: string;
-  tagColor: string;
-}
-
-interface MeetingItem {
-  id: number;
-  day: string;
-  date: number;
-  month: string;
-  title: string;
-  candidateName: string;
-  jobTitle: string;
-  time: string;
-  color: string;
-  status: string;
-  isPast: boolean;
-  meetingLink?: string;
-}
-
-interface RecentJob {
-  id: number;
-  icon: string;
-  iconBg: string;
-  title: string;
-  company: string;
-  location: string;
-  ago: string;
-}
-
-interface ContactMessage {
-  userId: number;
-  name: string;
-  email: string;
-  lastMessage?: string;
-  unreadCount: number;
-}
-
-/* ─── Circular Progress Ring ─── */
-const RingChart: React.FC<{ pct: number; color: string; isUniverse?: boolean }> = ({ pct, color, isUniverse }) => {
-  const r = 28, circ = 2 * Math.PI * r;
-  const filled = circ - (Math.min(100, Math.max(0, pct)) / 100) * circ;
-  return (
-    <svg width="72" height="72" viewBox="0 0 72 72">
-      <circle cx="36" cy="36" r={r} fill="none" stroke={isUniverse ? 'rgba(255,255,255,0.08)' : '#E2E8F0'} strokeWidth="7" />
-      <circle cx="36" cy="36" r={r} fill="none" stroke={color} strokeWidth="7"
-        strokeDasharray={circ} strokeDashoffset={filled}
-        strokeLinecap="round" transform="rotate(-90 36 36)" />
-      <text x="36" y="40" textAnchor="middle" fontSize="11" fontWeight="700" fill={color}>{pct}%</text>
-    </svg>
-  );
+interface Person { firstName?: string; lastName?: string; user?: { firstName?: string; lastName?: string } }
+interface Application { id: number; candidate?: Person; job?: { title?: string }; status: string; appliedAt?: string }
+interface Meeting { id: number; candidateName?: string; jobTitle?: string; scheduledAt: string; status: string; meetingLink?: string }
+interface Job { id: number; title: string; location?: string; company?: { name: string } }
+interface Contact { userId: number; name: string; lastMessage?: string; unreadCount: number }
+const employeeStyles = {
+  cardBg: '#fff', cardBorder: '1px solid #e2e8f0', cardShadow: '0 3px 12px #18243b05',
+  heading: '#18243b', subtext: '#64748b', cardSubBg: '#f8fafc', inputBg: '#fff',
+  inputBorder: '1px solid #cbd5e1', inputText: '#18243b',
 };
+function list<T>(response: { data: { data?: unknown } }): T[] {
+  const data = response.data?.data ?? response.data;
+  if (Array.isArray(data)) return data as T[];
+  return data && typeof data === 'object' && 'content' in data && Array.isArray(data.content) ? data.content as T[] : [];
+}
+function Empty({ title, detail }: { title: string; detail: string }) {
+  return <div className="hr-state"><Inbox size={25} /><strong>{title}</strong><p>{detail}</p></div>;
+}
+function Badge({ status }: { status: string }) { return <span className="hr-badge" data-status={status}>{status.replaceAll('_', ' ')}</span>; }
 
-/* ─── Custom Bar Chart ─── */
-const BarChartComponent: React.FC<{ data: Array<{ month: string; apps: number; shortlisted: number; rejected: number }>; isUniverse?: boolean }> = ({ data, isUniverse }) => {
-  const maxVal = Math.max(...data.map(d => Math.max(d.apps, d.shortlisted, d.rejected, 1)), 10);
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '200px', padding: '0 8px' }}>
-      {data.map((d, i) => {
-        const appH = Math.max(4, (d.apps / maxVal) * 170);
-        const slH = Math.max(4, (d.shortlisted / maxVal) * 170);
-        const rjH = Math.max(4, (d.rejected / maxVal) * 170);
-        const monthLabel = d.month ? d.month.split(' ')[0] : `M${i+1}`;
-        return (
-          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '180px' }}>
-              <div title={`Apps: ${d.apps}`} style={{ width: '7px', height: `${appH}px`, background: '#38BDF8', borderRadius: '4px 4px 0 0', transition: 'height 0.5s' }} />
-              <div title={`Shortlisted: ${d.shortlisted}`} style={{ width: '7px', height: `${slH}px`, background: '#FBBF24', borderRadius: '4px 4px 0 0', transition: 'height 0.5s' }} />
-              <div title={`Rejected: ${d.rejected}`} style={{ width: '7px', height: `${rjH}px`, background: '#FB7185', borderRadius: '4px 4px 0 0', transition: 'height 0.5s' }} />
-            </div>
-            <span style={{ fontSize: '10px', color: isUniverse ? '#94A3B8' : '#64748B', marginTop: '4px' }}>{monthLabel}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════
-   MAIN COMPONENT — HR ANALYTICS DASHBOARD
-═══════════════════════════════════ */
-export const HrAnalytics: React.FC = () => {
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+export default function HrAnalytics() {
   const { user } = useAuth();
-  const { theme, isUniverse } = useTheme();
-
-  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
-  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
-  const [meetings, setMeetings] = useState<MeetingItem[]>([]);
-  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
-  const [contacts, setContacts] = useState<ContactMessage[]>([]);
-
-  const initialTab = searchParams.get('tab') || 'Dashboard';
-  const [activeNav, setActiveNav] = useState<string>(
-    initialTab.toLowerCase() === 'referrals' ? 'Referrals' :
-    initialTab.toLowerCase() === 'employee' ? 'Employee' :
-    initialTab.toLowerCase() === 'report' ? 'Report' :
-    initialTab.toLowerCase() === 'settings' ? 'Settings' : 'Dashboard'
-  );
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter] = useState('Month');
+  const [params] = useSearchParams();
+  const activeTab = params.get('tab')?.toLowerCase() || 'dashboard';
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hrProfile, setHrProfile] = useState<any>(null);
-
-  const stompRef = useRef<StompClient | null>(null);
-
-  useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam) {
-      const normalized = tabParam.charAt(0).toUpperCase() + tabParam.slice(1).toLowerCase();
-      setActiveNav(normalized);
-    } else {
-      setActiveNav('Dashboard');
-    }
-  }, [searchParams]);
-
-  const handleSelectNav = (nav: string) => {
-    setActiveNav(nav);
-    if (['Referrals', 'Employee', 'Report', 'Settings'].includes(nav)) {
-      setSearchParams({ tab: nav.toLowerCase() });
-    } else if (nav === 'Dashboard') {
-      setSearchParams({});
-    }
-  };
-
-  /* ── Fetch Real DB Data ── */
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [analyticsRes, appsRes, calRes, jobsRes, chatRes, hrMeRes] = await Promise.all([
-        apiClient.get('/analytics/hr').catch(() => null),
-        apiClient.get('/applications/hr?size=5&sort=appliedAt,desc').catch(() => null),
-        apiClient.get('/interviews/calendar').catch(() => null),
-        apiClient.get('/jobs?size=4').catch(() => null),
-        apiClient.get('/chat/contacts').catch(() => null),
-        apiClient.get('/hr/me').catch(() => null),
-      ]);
-
-      if (hrMeRes?.data?.data) {
-        setHrProfile(hrMeRes.data.data);
-      }
-
-      if (analyticsRes?.data?.data) {
-        const d = analyticsRes.data.data;
-        setAnalytics({
-          companyName: d.companyName || 'HireMind Platform',
-          activeJobsCount: d.activeJobsCount ?? 0,
-          totalApplicationsCount: d.totalApplicationsCount ?? 0,
-          shortlistedCount: d.shortlistedCount ?? 0,
-          hiredCandidatesCount: d.hiredCandidatesCount ?? 0,
-          conversionRate: d.conversionRate ? Number(d.conversionRate) : 0,
-          avgTimeToHireDays: d.avgTimeToHireDays ? Number(d.avgTimeToHireDays) : 14,
-          applicationsByStatus: d.applicationsByStatus || {},
-          monthlyStats: d.monthlyStats || [],
-        });
-      }
-
-      if (appsRes?.data?.data?.content) {
-        const items: ActivityItem[] = appsRes.data.data.content.map((app: any) => {
-          const name = `${app.candidate?.user?.firstName || 'Candidate'} ${app.candidate?.user?.lastName || ''}`.trim();
-          const job = app.job?.title || 'Position';
-          const avatar = name.charAt(0).toUpperCase();
-          const time = app.appliedAt ? timeAgo(app.appliedAt) : 'Recently';
-
-          let tag = 'Applying';
-          let tagColor = '#3B82F6';
-          if (app.status === 'SHORTLISTED') { tag = 'Shortlisted'; tagColor = '#FBBF24'; }
-          else if (app.status === 'INTERVIEWING') { tag = 'Interviewed'; tagColor = '#8B5CF6'; }
-          else if (app.status === 'HIRED' || app.status === 'OFFERED') { tag = 'Hired'; tagColor = '#10B981'; }
-          else if (app.status === 'REJECTED') { tag = 'Rejected'; tagColor = '#FB7185'; }
-
-          return {
-            id: app.id,
-            avatar,
-            name,
-            action: 'applied for the job',
-            job,
-            time,
-            tag,
-            tagColor,
-          };
-        });
-        setActivityFeed(items);
-      }
-
-      if (calRes?.data?.data) {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const colors = ['#3B82F6', '#F59E0B', '#10B981', '#8B5CF6'];
-        const now = new Date();
-
-        const mtgs: MeetingItem[] = calRes.data.data.slice(0, 10).map((slot: any) => {
-          const dt = new Date(slot.scheduledAt);
-          const isPast = dt < now;
-          let status = slot.status || (isPast ? 'COMPLETED' : 'UPCOMING');
-          if (isPast && status === 'PENDING') status = 'COMPLETED';
-
-          return {
-            id: slot.id,
-            day: days[dt.getDay()],
-            date: dt.getDate(),
-            month: months[dt.getMonth()],
-            title: `Interview: ${slot.candidateName || 'Candidate'}`,
-            candidateName: slot.candidateName || 'Candidate',
-            jobTitle: slot.jobTitle || 'Discussion',
-            time: `${dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (${dt.toLocaleDateString([], { month: 'short', day: 'numeric' })})`,
-            color: colors[slot.id % colors.length],
-            status,
-            isPast,
-            meetingLink: slot.meetingLink,
-          };
-        });
-        setMeetings(mtgs);
-      }
-
-      if (jobsRes?.data?.data?.content) {
-        const jbs: RecentJob[] = jobsRes.data.data.content.slice(0, 4).map((j: any) => ({
-          id: j.id,
-          icon: j.title?.charAt(0) || '💼',
-          iconBg: isUniverse ? '#6366F1' : '#2563EB',
-          title: j.title,
-          company: j.company?.name || 'Company',
-          location: j.location || 'Remote',
-          ago: j.createdAt ? timeAgo(j.createdAt) : 'New',
-        }));
-        setRecentJobs(jbs);
-      }
-
-      if (chatRes?.data?.data) {
-        setContacts(chatRes.data.data.slice(0, 3));
-      }
-
-    } catch (err) {
-      console.warn('Dashboard fetch error', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDashboardData();
+  const [failures, setFailures] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [copyState, setCopyState] = useState('');
+  const load = useCallback(async () => {
+    setLoading(true);
+    const results = await Promise.allSettled([
+      apiClient.get('/analytics/hr'), apiClient.get('/applications/hr?size=5&sort=appliedAt,desc'),
+      apiClient.get('/interviews/calendar'), apiClient.get('/jobs?size=4'), apiClient.get('/chat/contacts'),
+    ]);
+    const names = ['Analytics', 'Applications', 'Interviews', 'Jobs', 'Messages'];
+    setFailures(results.flatMap((r, i) => r.status === 'rejected' ? [names[i]] : []));
+    if (results[0].status === 'fulfilled') setAnalytics(results[0].value.data?.data ?? results[0].value.data);
+    if (results[1].status === 'fulfilled') setApplications(list<Application>(results[1].value));
+    if (results[2].status === 'fulfilled') setMeetings(list<Meeting>(results[2].value));
+    if (results[3].status === 'fulfilled') setJobs(list<Job>(results[3].value));
+    if (results[4].status === 'fulfilled') setContacts(list<Contact>(results[4].value));
+    setLoading(false);
   }, []);
-
+  useEffect(() => { void load(); }, [load]);
   useEffect(() => {
-    const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+    const token = localStorage.getItem('accessToken');
     if (!token) return;
-
-    const wsUrl = `${window.location.origin}/api/ws`;
-    const client = new StompClient({
-      webSocketFactory: () => new SockJS(wsUrl),
-      connectHeaders: { Authorization: `Bearer ${token}` },
-      reconnectDelay: 5000,
-      onConnect: () => {
-        client.subscribe('/user/queue/notifications', () => {
-          loadDashboardData();
-        });
-      },
+    const client = new Client({ webSocketFactory: () => new SockJS(`${window.location.origin}/api/ws`), connectHeaders: { Authorization: `Bearer ${token}` }, reconnectDelay: 5000,
+      onConnect: () => { client.subscribe('/user/queue/notifications', () => { void load(); }); },
     });
     client.activate();
-    stompRef.current = client;
-    return () => { client.deactivate(); };
-  }, []);
+    return () => { void client.deactivate(); };
+  }, [load]);
 
-  const timeAgo = (iso: string) => {
-    const diff = Date.now() - new Date(iso).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 60) return `${m}m ago`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
+  const exportReport = () => {
+    if (!analytics) return;
+    const rows = [['Metric', 'Value'], ['Applications', analytics.totalApplicationsCount], ['Active jobs', analytics.activeJobsCount], ['Shortlisted', analytics.shortlistedCount], ['Hired', analytics.hiredCandidatesCount], ['Conversion rate (%)', analytics.conversionRate ?? ''], ['Average time to hire (days)', analytics.avgTimeToHireDays ?? '']];
+    const csv = rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'hiremind-recruitment-report.csv'; link.click(); URL.revokeObjectURL(url);
   };
-
-  const hrName = user ? `${user.firstName} ${user.lastName}` : 'HR Manager';
-  const hrRole = 'Director of Recruiting';
-
-  const chartData = (analytics?.monthlyStats && analytics.monthlyStats.length > 0)
-    ? analytics.monthlyStats.map(m => ({ month: m.month, apps: m.applications, shortlisted: m.shortlisted, rejected: m.rejected }))
-    : [
-        { month: 'Jan', apps: 72, shortlisted: 55, rejected: 40 },
-        { month: 'Feb', apps: 90, shortlisted: 70, rejected: 55 },
-        { month: 'Mar', apps: 65, shortlisted: 48, rejected: 30 },
-        { month: 'Apr', apps: 82, shortlisted: 62, rejected: 45 },
-        { month: 'May', apps: 94, shortlisted: 75, rejected: 60 },
-        { month: 'Jun', apps: 78, shortlisted: 58, rejected: 42 },
-      ];
-
+  const nameOf = (app: Application) => { const person = app.candidate?.user || app.candidate; return `${person?.firstName || ''} ${person?.lastName || ''}`.trim() || 'Candidate'; };
+  const upcoming = meetings.filter(m => new Date(m.scheduledAt).getTime() >= Date.now() && !['CANCELLED', 'COMPLETED'].includes(m.status)).sort((a,b) => Date.parse(a.scheduledAt) - Date.parse(b.scheduledAt));
+  const filtered = applications.filter(app => `${nameOf(app)} ${app.job?.title || ''}`.toLowerCase().includes(search.toLowerCase()));
   const stats = [
-    {
-      label: 'Total Applications',
-      value: analytics?.totalApplicationsCount ?? 0,
-      pct: analytics?.totalApplicationsCount ? 100 : 74,
-      color: '#22C55E',
-      trend: '+14% Inc.'
-    },
-    {
-      label: 'Shortlisted Candidates',
-      value: analytics?.shortlistedCount ?? 0,
-      pct: analytics?.totalApplicationsCount ? Math.round(((analytics?.shortlistedCount || 0) / (analytics?.totalApplicationsCount || 1)) * 100) : 55,
-      color: '#FBBF24',
-      trend: '+14% Inc.'
-    },
-    {
-      label: 'Rejected Candidates',
-      value: analytics?.applicationsByStatus?.['REJECTED'] ?? 0,
-      pct: analytics?.totalApplicationsCount ? Math.round(((analytics?.applicationsByStatus?.['REJECTED'] || 0) / (analytics?.totalApplicationsCount || 1)) * 100) : 25,
-      color: '#FB7185',
-      trend: '-5% Dec.'
-    },
+    { label: 'Applications', value: analytics?.totalApplicationsCount, icon: Users, caption: 'Across your hiring pipeline' },
+    { label: 'Open positions', value: analytics?.activeJobsCount, icon: Briefcase, caption: 'Active job postings' },
+    { label: 'Shortlisted', value: analytics?.shortlistedCount, icon: UserCheck, caption: 'Candidates under consideration' },
+    { label: 'Hired candidates', value: analytics?.hiredCandidatesCount, icon: UserCheck, caption: 'Completed hiring outcomes' },
   ];
+  const statCards = <div className="hr-stat-grid">{stats.map(stat => <div className="hr-card hr-stat" key={stat.label}><div className="hr-stat-top"><span>{stat.label}</span><span className="hr-stat-icon"><stat.icon size={17} /></span></div><strong className="hr-stat-value">{stat.value ?? '—'}</strong><small>{stat.caption}</small></div>)}</div>;
 
-  // Theme-dependent styles
-  const styles = {
-    bg: isUniverse
-      ? 'radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.15), transparent 40%), radial-gradient(circle at 90% 80%, rgba(56, 189, 248, 0.12), transparent 40%), #070B19'
-      : '#F8FAFC',
-    headerBg: isUniverse ? '#0F172A' : '#FFFFFF',
-    headerBorder: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
-    cardBg: isUniverse ? 'rgba(15, 23, 42, 0.75)' : '#FFFFFF',
-    cardBorder: isUniverse ? '1px solid rgba(255,255,255,0.08)' : '1px solid #E2E8F0',
-    cardShadow: isUniverse ? '0 8px 32px rgba(0,0,0,0.37)' : '0 1px 3px rgba(0,0,0,0.05)',
-    heading: isUniverse ? '#F8FAFC' : '#1E293B',
-    subtext: isUniverse ? '#94A3B8' : '#64748B',
-    cardSubBg: isUniverse ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
-    inputBg: isUniverse ? 'rgba(255,255,255,0.06)' : '#F8FAFC',
-    inputBorder: isUniverse ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0',
-    inputText: isUniverse ? '#F8FAFC' : '#1E293B',
-  };
+  if (activeTab === 'employee') return <HrEmployeeManagement styles={employeeStyles} theme="light" />;
+  if (activeTab === 'subscription') return <HrSubscriptionTab />;
+  if (activeTab === 'settings') return <div className="hr-page">
+    <div className="hr-page-heading"><div><span className="hr-eyebrow">Organization</span><h1>Workspace settings</h1><p>Manage your recruiter profile and workspace services.</p></div><Settings size={24} /></div>
+    <section className="hr-card"><div className="hr-setting-row"><div><strong>Recruiter profile</strong><p className="hr-note">Update your name, contact details, designation and department.</p></div><Link className="hr-button" to="/profile">Edit profile</Link></div>
+      <div className="hr-setting-row"><div><strong>Subscription & billing</strong><p className="hr-note">Review your plan, invoices and subscription status.</p></div><Link className="hr-button" to="/hr-analytics?tab=subscription">Manage billing</Link></div>
+      <div className="hr-setting-row"><div><strong>Message notifications</strong><p className="hr-note">Incoming updates are available in the notification center and messages. Per-user notification preferences are not available yet.</p></div><Link className="hr-button" to="/hr-messages">Open messages</Link></div>
+      <div className="hr-setting-row"><div><strong>Calendar connections</strong><p className="hr-note">Add a meeting link when scheduling an interview. Automatic calendar synchronization is not connected.</p></div><Link className="hr-button" to="/hr-calendar">Open calendar</Link></div>
+    </section></div>;
+  if (activeTab === 'referrals') return <div className="hr-page"><div className="hr-page-heading"><div><span className="hr-eyebrow">Talent network</span><h1>Candidate referrals</h1><p>Share your available opportunities with your network.</p></div><Star size={24} /></div><section className="hr-card"><Empty title="Referral tracking is not connected" detail="Referral counts, hiring attribution and rewards are not available. You can still share the jobs page with potential candidates." /><div className="hr-actions"><Link className="hr-button hr-button-primary" to="/jobs">View jobs</Link><button className="hr-button" onClick={async () => { try { await navigator.clipboard.writeText(`${window.location.origin}/jobs`); setCopyState('Jobs link copied.'); } catch { setCopyState('Could not copy the link. Open jobs and copy the address.'); } }}>Copy jobs link</button><span role="status" className="hr-note">{copyState}</span></div></section></div>;
 
-  return (
-    <div className={`analytics-page-wrapper ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{
-      display: 'flex',
-      minHeight: '100vh',
-      background: styles.bg,
-      color: styles.heading,
-      fontFamily: "'Inter', 'Outfit', sans-serif",
-      transition: 'background 0.3s, color 0.3s',
-      position: 'relative',
-    }}>
-      <HrSidebar
-        activeNav={activeNav}
-        onSelectNav={handleSelectNav}
-      />
-
-      {/* ══════════ MAIN CONTENT ══════════ */}
-      <div className="hr-dashboard-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-
-        {/* ── Top Header Bar ── */}
-        <header className="hr-dashboard-header" style={{
-          height: '64px',
-          background: styles.headerBg,
-          borderBottom: styles.headerBorder,
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 24px',
-          gap: '16px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 10,
-        }}>
-          <div className="hr-dashboard-title-group" style={{ flex: 1 }}>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, color: styles.heading, margin: 0 }}>
-              {activeNav === 'Referrals' ? 'Candidate Referrals & Rewards' :
-               activeNav === 'Employee' ? 'Verified Company Team & Employees' :
-               activeNav === 'Report' ? 'Recruitment Telemetry & Reports' :
-               activeNav === 'Settings' ? 'Recruiter & Organization Settings' :
-               activeNav === 'Subscription' ? 'Subscription & Billing' :
-               (analytics?.companyName || 'Dashboard')}
-            </h1>
-            <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>
-              Hello, {user?.firstName || 'HR Manager'}. Welcome to HireMind AI Enterprise Suite
-            </p>
-          </div>
-
-          {/* Search */}
-          <div className="hr-dashboard-search" style={{ position: 'relative', width: '260px' }}>
-            <Search size={15} color={styles.subtext} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search candidate, job..."
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 36px',
-                border: styles.inputBorder,
-                borderRadius: '10px',
-                fontSize: '13px',
-                background: styles.inputBg,
-                color: styles.inputText,
-                outline: 'none',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          {/* Refresh & Notifications */}
-          <button onClick={loadDashboardData} title="Refresh data" style={{ background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9', border: 'none', borderRadius: '8px', padding: '8px', cursor: 'pointer', color: styles.subtext, display: 'flex', alignItems: 'center' }}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
-          <NotificationBell />
-          <div
-            onClick={() => navigate('/profile')}
-            style={{
-              width: '34px', height: '34px', borderRadius: '50%',
-              background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#FFF'
-            }}>
-            {(user?.firstName?.[0] || 'H')}
-          </div>
-        </header>
-
-        {/* ── Sub-view 1: Referrals Tab ── */}
-        {activeNav === 'Referrals' && (
-          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow, marginBottom: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Star size={20} color="#FBBF24" /> Candidate Referrals & Talent Incentives
-                  </h2>
-                  <p style={{ margin: 0, fontSize: '13px', color: styles.subtext }}>
-                    Track candidate employee referral tokens, bounty bonuses, and priority verification badges
-                  </p>
-                </div>
-                <button
-                  onClick={() => alert('Referral Link Copied: https://hiremind.ai/jobs?ref=HR-EXECUTIVE')}
-                  style={{
-                    padding: '10px 18px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
-                    color: '#FFF', border: 'none', fontWeight: 700, fontSize: '13px',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-                  }}
-                >
-                  <Award size={16} /> Copy My Recruiter Referral Link
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '24px' }}>
-                <div style={{ padding: '18px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div style={{ fontSize: '12px', color: styles.subtext, marginBottom: '4px' }}>Total Candidates Referred</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#38BDF8' }}>18</div>
-                  <div style={{ fontSize: '11px', color: '#10B981', marginTop: '4px' }}>+4 this week</div>
-                </div>
-                <div style={{ padding: '18px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div style={{ fontSize: '12px', color: styles.subtext, marginBottom: '4px' }}>Hired via Referral</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#10B981' }}>6</div>
-                  <div style={{ fontSize: '11px', color: styles.subtext, marginTop: '4px' }}>33.3% Conversion</div>
-                </div>
-                <div style={{ padding: '18px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div style={{ fontSize: '12px', color: styles.subtext, marginBottom: '4px' }}>Earned Referral Rewards</div>
-                  <div style={{ fontSize: '28px', fontWeight: 800, color: '#FBBF24' }}>$4,200</div>
-                  <div style={{ fontSize: '11px', color: '#818CF8', marginTop: '4px' }}>Disbursed in Q3 Cycle</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Sub-view 2: Employee Verification & Management Tab ── */}
-        {activeNav === 'Employee' && (
-          <HrEmployeeManagement styles={styles} theme={theme} />
-        )}
-
-        {/* ── Sub-view 3: Telemetry Report Tab ── */}
-        {activeNav === 'Report' && (
-          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <div>
-                  <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BarChart2 size={20} color="#818CF8" /> Executive Hiring & Telemetry Report
-                  </h2>
-                  <p style={{ margin: 0, fontSize: '13px', color: styles.subtext }}>
-                    Real-time performance analytics, candidate pipeline throughput, and time-to-hire metrics
-                  </p>
-                </div>
-                <button
-                  onClick={() => alert('Exporting Full Recruitment Telemetry PDF...')}
-                  style={{
-                    padding: '10px 18px', borderRadius: '10px',
-                    background: isUniverse ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
-                    color: styles.heading, border: styles.cardBorder, fontWeight: 700, fontSize: '13px',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
-                  }}
-                >
-                  <Download size={16} /> Export Telemetry Report
-                </button>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '24px' }}>
-                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div style={{ fontSize: '11px', color: styles.subtext }}>Average Time to Hire</div>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: styles.heading }}>{analytics?.avgTimeToHireDays || 14} Days</div>
-                </div>
-                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div style={{ fontSize: '11px', color: styles.subtext }}>Shortlist Conversion</div>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#38BDF8' }}>{analytics?.conversionRate || 22}%</div>
-                </div>
-                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div style={{ fontSize: '11px', color: styles.subtext }}>Active Open Positions</div>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#FBBF24' }}>{analytics?.activeJobsCount || 8}</div>
-                </div>
-                <div style={{ padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div style={{ fontSize: '11px', color: styles.subtext }}>Interviews Conducted</div>
-                  <div style={{ fontSize: '24px', fontWeight: 800, color: '#10B981' }}>{meetings.length || 12}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Sub-view 4: Settings Tab ── */}
-        {activeNav === 'Settings' && (
-          <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
-            <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '28px', border: styles.cardBorder, boxShadow: styles.cardShadow }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 6px', color: styles.heading, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Settings size={20} color="#94A3B8" /> Recruiter Configuration & Preferences
-              </h2>
-              <p style={{ margin: '0 0 20px', fontSize: '13px', color: styles.subtext }}>
-                Manage calendar integrations, real-time message notification triggers, and auto-response templates
-              </p>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: styles.heading }}>Real-time 2-Second Message Alerts</div>
-                    <div style={{ fontSize: '12px', color: styles.subtext }}>Displays immediate animated toast notification on incoming candidate inquiries</div>
-                  </div>
-                  <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: '#6366F1' }} />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', background: styles.cardSubBg, border: styles.cardBorder }}>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: styles.heading }}>Google Meet Calendar Sync</div>
-                    <div style={{ fontSize: '12px', color: styles.subtext }}>Auto-generate video conference links on interview slot confirmation</div>
-                  </div>
-                  <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: '#6366F1' }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Sub-view: Subscription & Billing ── */}
-        {activeNav === 'Subscription' && (
-          <div style={{ flex: 1, height: '100%', overflowY: 'auto' }}>
-            <HrSubscriptionTab />
-          </div>
-        )}
-
-        {/* ── Standard Dashboard View ── */}
-        {activeNav === 'Dashboard' && (
-          <div className="hr-dashboard-content" style={{ flex: 1, padding: '24px', overflowY: 'auto', display: 'flex', gap: '24px' }}>
-
-            {/* ── Center Column ── */}
-            <div className="hr-dashboard-center" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', minWidth: 0 }}>
-
-              {/* KPI Cards Row */}
-              <div className="hr-dashboard-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                {stats.map((s, i) => (
-                  <div key={i} style={{
-                    background: styles.cardBg,
-                    borderRadius: '16px',
-                    padding: '20px 24px',
-                    border: styles.cardBorder,
-                    boxShadow: styles.cardShadow,
-                    backdropFilter: isUniverse ? 'blur(16px)' : 'none',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}>
-                    <div>
-                      <p style={{ fontSize: '12px', color: styles.subtext, margin: '0 0 4px', fontWeight: 500 }}>{s.label}</p>
-                      <h2 style={{ fontSize: '32px', fontWeight: 800, color: styles.heading, margin: '0 0 8px', lineHeight: 1 }}>
-                        {s.value.toLocaleString()}
-                      </h2>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: s.color }}>
-                        <TrendingUp size={12} />
-                        <span>{s.trend}</span>
-                      </div>
-                    </div>
-                    <RingChart pct={s.pct} color={s.color} isUniverse={isUniverse} />
-                  </div>
-                ))}
-              </div>
-
-              {/* Monthly Bar Chart */}
-              <div className="hr-dashboard-chart-card" style={{
-                background: styles.cardBg,
-                borderRadius: '16px',
-                padding: '24px',
-                border: styles.cardBorder,
-                boxShadow: styles.cardShadow,
-                backdropFilter: isUniverse ? 'blur(16px)' : 'none',
-              }}>
-                <div className="hr-dashboard-chart-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <h3 style={{ fontSize: '15px', fontWeight: 700, color: styles.heading, margin: 0 }}>Statistics of active Applications</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    {[{ c: '#38BDF8', l: 'Applications' }, { c: '#FBBF24', l: 'Shortlisted' }, { c: '#FB7185', l: 'Rejected' }].map(item => (
-                      <div key={item.l} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: styles.subtext }}>
-                        <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: item.c }} />
-                        {item.l}
-                      </div>
-                    ))}
-                    <button style={{
-                      padding: '5px 12px', borderRadius: '8px', border: styles.cardBorder,
-                      background: styles.cardBg, fontSize: '12px', color: styles.heading, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '4px'
-                    }}>
-                      {timeFilter} <ChevronDown size={12} />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Y-axis labels & Bar Chart */}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '210px', alignItems: 'flex-end', paddingBottom: '20px' }}>
-                    {['100%', '80%', '60%', '40%', '20%'].map(l => (
-                      <span key={l} style={{ fontSize: '10px', color: styles.subtext }}>{l}</span>
-                    ))}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <BarChartComponent data={chartData} isUniverse={isUniverse} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Activity Feed + Meetings Row */}
-              <div className="hr-dashboard-bottom-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-
-                {/* Activity Feed */}
-                <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <h3 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: 0 }}>Activity Feed</h3>
-                    <button onClick={() => navigate('/hr-applications')} style={{
-                      padding: '4px 10px', borderRadius: '8px', border: styles.cardBorder,
-                      background: styles.cardBg, fontSize: '11px', color: styles.subtext, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '4px'
-                    }}>
-                      All Activity <ChevronDown size={11} />
-                    </button>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {activityFeed.length === 0 ? (
-                      <div style={{ fontSize: '12px', color: styles.subtext, textAlign: 'center', padding: '20px 0' }}>
-                        No recent activity recorded yet.
-                      </div>
-                    ) : (
-                      activityFeed.map(item => (
-                        <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                          <div style={{
-                            width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-                            background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#FFF', fontSize: '12px', fontWeight: 700,
-                          }}>{item.avatar}</div>
-                          <div style={{ flex: 1 }}>
-                            <p style={{ margin: 0, fontSize: '12px', color: styles.heading }}>
-                              <strong>{item.name}</strong> {item.action} <strong>{item.job}</strong>
-                            </p>
-                            <span style={{ fontSize: '10px', color: styles.subtext }}>{item.time}</span>
-                          </div>
-                          <span style={{
-                            fontSize: '10px', fontWeight: 600, padding: '3px 8px', borderRadius: '20px',
-                            background: item.tagColor + '20', color: item.tagColor, flexShrink: 0,
-                          }}>{item.tag}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Last 10 Meetings Widget */}
-                <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <h3 style={{ fontSize: '15px', fontWeight: 700, color: styles.heading, margin: 0 }}>Recent & Scheduled Meetings</h3>
-                      <span style={{ fontSize: '11px', fontWeight: 700, padding: '2px 8px', borderRadius: '12px', background: isUniverse ? 'rgba(99,102,241,0.2)' : '#EFF6FF', color: isUniverse ? '#818CF8' : '#2563EB' }}>
-                        {meetings.length}
-                      </span>
-                    </div>
-                    <button onClick={() => navigate('/hr-calendar')} style={{
-                      padding: '4px 10px', borderRadius: '8px', border: styles.cardBorder,
-                      background: styles.cardBg, fontSize: '11px', fontWeight: 600, color: styles.subtext, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', gap: '4px'
-                    }}>
-                      View Calendar <ChevronDown size={11} />
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
-                    {meetings.length === 0 ? (
-                      <div style={{ fontSize: '12px', color: styles.subtext, textAlign: 'center', padding: '30px 0' }}>
-                        No meetings recorded. Schedule your first candidate interview!
-                      </div>
-                    ) : (
-                      meetings.map(m => {
-                        const badgeBg = m.status === 'CONFIRMED' ? 'rgba(16,185,129,0.15)' : m.status === 'COMPLETED' ? 'rgba(59,130,246,0.15)' : m.status === 'CANCELLED' ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)';
-                        const badgeColor = m.status === 'CONFIRMED' ? '#10B981' : m.status === 'COMPLETED' ? '#3B82F6' : m.status === 'CANCELLED' ? '#EF4444' : '#F59E0B';
-
-                        return (
-                          <div key={m.id} style={{
-                            display: 'flex', alignItems: 'center', gap: '12px',
-                            padding: '10px 12px', borderRadius: '12px', background: styles.cardSubBg,
-                            border: styles.cardBorder,
-                            borderLeft: `3px solid ${badgeColor}`
-                          }}>
-                            <div style={{
-                              width: '42px', height: '42px', borderRadius: '10px',
-                              background: m.color + '18', display: 'flex', flexDirection: 'column',
-                              alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                            }}>
-                              <span style={{ fontSize: '9px', color: m.color, fontWeight: 700, textTransform: 'uppercase' }}>{m.month || m.day}</span>
-                              <span style={{ fontSize: '14px', color: m.color, fontWeight: 800, lineHeight: 1 }}>{m.date}</span>
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
-                                <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: styles.heading, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {m.candidateName}
-                                </p>
-                                <span style={{
-                                  fontSize: '9px', fontWeight: 700, padding: '2px 6px', borderRadius: '10px',
-                                  background: badgeBg, color: badgeColor, flexShrink: 0
-                                }}>
-                                  {m.status}
-                                </span>
-                              </div>
-                              <p style={{ margin: 0, fontSize: '11px', color: styles.subtext, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {m.jobTitle}
-                              </p>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                                <span style={{ fontSize: '10px', color: styles.subtext, fontWeight: 500 }}>
-                                  ⏰ {m.time}
-                                </span>
-                                {m.meetingLink && (
-                                  <a
-                                    href={m.meetingLink}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{ fontSize: '10px', color: isUniverse ? '#818CF8' : '#2563EB', textDecoration: 'none', fontWeight: 600 }}
-                                  >
-                                    📹 Join Call
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                            <button onClick={() => navigate('/hr-calendar')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: styles.subtext, padding: 4 }}>
-                              <MoreVertical size={14} />
-                            </button>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* Quick Action Buttons */}
-                  <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-                    <button
-                      onClick={() => navigate('/hr-calendar')}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: '10px',
-                        background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : '#2563EB', color: '#FFFFFF !important', border: 'none',
-                        fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                      }}
-                    >
-                      <Calendar size={14} /> Schedule Meeting
-                    </button>
-                    <button
-                      onClick={() => navigate('/jobs')}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: '10px',
-                        background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
-                        border: styles.cardBorder,
-                        color: styles.heading,
-                        fontSize: '12px', fontWeight: 600, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                      }}
-                    >
-                      <Plus size={14} /> Post Job
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ══════════ RIGHT SIDEBAR ══════════ */}
-            <aside className="hr-dashboard-right-rail" style={{
-              width: '240px',
-              flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '16px',
-            }}>
-
-              {/* Profile Card */}
-              <div style={{
-                background: styles.cardBg,
-                borderRadius: '16px',
-                padding: '24px 20px',
-                border: styles.cardBorder,
-                boxShadow: styles.cardShadow,
-                backdropFilter: isUniverse ? 'blur(16px)' : 'none',
-                textAlign: 'center',
-              }}>
-                <div style={{
-                  width: '72px', height: '72px', borderRadius: '50%',
-                  background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '28px', fontWeight: 800, color: '#FFF',
-                  margin: '0 auto 12px',
-                  boxShadow: isUniverse ? '0 4px 24px rgba(99, 102, 241, 0.45)' : '0 4px 20px rgba(37, 99, 235, 0.35)',
-                }}>
-                  {(user?.firstName?.[0] || 'H')}
-                </div>
-                <p style={{ fontWeight: 700, fontSize: '16px', color: styles.heading, margin: '0 0 4px' }}>{hrName}</p>
-                <p style={{ fontSize: '12px', color: styles.subtext, margin: 0 }}>{hrRole}</p>
-
-                {hrProfile?.companyVerified && (
-                  <div style={{
-                    marginTop: '16px',
-                    padding: '10px 12px',
-                    borderRadius: '12px',
-                    background: isUniverse ? 'rgba(16, 185, 129, 0.08)' : '#ECFDF5',
-                    border: isUniverse ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #A7F3D0',
-                    textAlign: 'center',
-                  }}>
-                    <div style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      color: '#10B981',
-                      fontWeight: 800,
-                      fontSize: '11.5px',
-                      marginBottom: '3px'
-                    }}>
-                      <Award size={14} />
-                      <span>{hrProfile.activeBadgeAchievement?.title || 'Verified Recruiter'}</span>
-                    </div>
-                    <div style={{ fontSize: '11px', color: styles.subtext, fontWeight: 500 }}>
-                      {hrProfile.company?.name || 'Verified Company'}
-                    </div>
-                    <div style={{
-                      marginTop: '6px',
-                      display: 'inline-block',
-                      fontSize: '9px',
-                      fontWeight: 800,
-                      color: '#059669',
-                      background: isUniverse ? 'rgba(16, 185, 129, 0.15)' : '#D1FAE5',
-                      padding: '2px 8px',
-                      borderRadius: '10px',
-                      letterSpacing: '0.03em'
-                    }}>
-                      🏆 1 OF 1 ACTIVE BADGE
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Messages */}
-              <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: 0 }}>Messages</h4>
-                  <button onClick={() => navigate('/hr-messages')} style={{ background: 'none', border: 'none', color: isUniverse ? '#A78BFA' : '#2563EB', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}>View All</button>
-                </div>
-                {contacts.length === 0 ? (
-                  <div style={{ fontSize: '11px', color: styles.subtext }}>No recent messages</div>
-                ) : (
-                  contacts.map((m, i) => (
-                    <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: i < contacts.length - 1 ? '12px' : 0, cursor: 'pointer' }}
-                      onClick={() => navigate('/hr-messages')}>
-                      <div style={{
-                        width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-                        background: isUniverse ? 'linear-gradient(135deg, #6366F1, #8B5CF6)' : 'linear-gradient(135deg, #2563EB, #7C3AED)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#FFF', fontSize: '12px', fontWeight: 700,
-                      }}>{m.name.charAt(0)}</div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: styles.heading }}>{m.name}</p>
-                        <p style={{ margin: 0, fontSize: '11px', color: styles.subtext, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.lastMessage || m.email}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Recent Added Jobs */}
-              <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: '0 0 12px' }}>Recent Added Jobs</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {recentJobs.length === 0 ? (
-                    <div style={{ fontSize: '11px', color: styles.subtext }}>No active jobs</div>
-                  ) : (
-                    recentJobs.map(job => (
-                      <div key={job.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', cursor: 'pointer' }}
-                        onClick={() => navigate('/jobs')}>
-                        <div style={{
-                          width: '34px', height: '34px', borderRadius: '8px', flexShrink: 0,
-                          background: job.iconBg, display: 'flex', alignItems: 'center',
-                          justifyContent: 'center', fontSize: '14px', color: '#FFF', fontWeight: 700
-                        }}>{job.icon}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: '12px', fontWeight: 600, color: styles.heading, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{job.title}</p>
-                          <p style={{ margin: 0, fontSize: '10px', color: styles.subtext }}>{job.company}, {job.location}</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Hiring Funnel Stats */}
-              <div style={{ background: styles.cardBg, borderRadius: '16px', padding: '20px', border: styles.cardBorder, boxShadow: styles.cardShadow, backdropFilter: isUniverse ? 'blur(16px)' : 'none' }}>
-                <h4 style={{ fontSize: '14px', fontWeight: 700, color: styles.heading, margin: '0 0 12px' }}>Hiring Funnel</h4>
-                {[
-                  { label: 'Applied', val: analytics?.applicationsByStatus['APPLIED'] ?? 0, color: '#38BDF8' },
-                  { label: 'Screened', val: analytics?.applicationsByStatus['SCREENING'] ?? 0, color: '#FBBF24' },
-                  { label: 'Shortlisted', val: analytics?.shortlistedCount ?? 0, color: '#8B5CF6' },
-                  { label: 'Interviewing', val: analytics?.applicationsByStatus['INTERVIEWING'] ?? 0, color: '#A78BFA' },
-                  { label: 'Offered / Hired', val: (analytics?.hiredCandidatesCount ?? 0) + (analytics?.applicationsByStatus['OFFERED'] ?? 0), color: '#34D399' },
-                  { label: 'Rejected', val: analytics?.applicationsByStatus['REJECTED'] ?? 0, color: '#FB7185' },
-                ].map(s => {
-                  const total = Math.max(1, analytics?.totalApplicationsCount || 1);
-                  const pct = Math.round((s.val / total) * 100);
-                  return (
-                    <div key={s.label} style={{ marginBottom: '10px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                        <span style={{ fontSize: '11px', color: styles.subtext, fontWeight: 500 }}>{s.label}</span>
-                        <span style={{ fontSize: '11px', color: styles.heading, fontWeight: 700 }}>{s.val}</span>
-                      </div>
-                      <div style={{ height: '5px', background: isUniverse ? 'rgba(255,255,255,0.06)' : '#F1F5F9', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ width: `${pct}%`, height: '100%', background: s.color, borderRadius: '3px', transition: 'width 0.8s ease' }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </aside>
-          </div>
-        )}
-      </div>
+  return <div className="hr-page">
+    <div className="hr-page-heading"><div><span className="hr-eyebrow">{analytics?.companyName || 'Your hiring workspace'}</span><h1>{activeTab === 'report' ? 'Recruitment reports' : `Good to see you, ${user?.firstName || 'recruiter'}`}</h1><p>{activeTab === 'report' ? 'A clear view of your hiring results, based on available workspace data.' : 'Your hiring pipeline, people and next steps in one place.'}</p></div>
+      <div className="hr-actions"><button className="hr-button" onClick={() => void load()} disabled={loading} aria-label="Refresh dashboard"><RefreshCw size={15} />Refresh</button>{activeTab === 'report' ? <button className="hr-button hr-button-primary" onClick={exportReport} disabled={!analytics}><Download size={15} />Export CSV</button> : <Link className="hr-button hr-button-primary" to="/jobs"><Plus size={16} />Manage jobs</Link>}</div>
     </div>
-  );
-};
-
-export default HrAnalytics;
+    {failures.length > 0 && <div className="hr-error" role="alert"><span>Couldn’t refresh {failures.join(', ').toLowerCase()}. Previously loaded information may be out of date.</span><button className="hr-button" onClick={() => void load()} disabled={loading}>Try again</button></div>}
+    {loading && !analytics ? <div className="hr-stat-grid" role="status" aria-label="Loading hiring statistics">{stats.map(s => <div className="hr-skeleton" key={s.label} />)}</div> : statCards}
+    <div className="hr-dashboard-grid">
+      <section className="hr-card"><div className="hr-card-heading"><h2>Application activity</h2><span className="hr-note">Monthly volume</span></div>
+        {analytics?.monthlyStats?.length ? <div className="hr-chart" role="img" aria-label="Monthly application, shortlisted and rejected counts"><ResponsiveContainer width="100%" height="100%"><BarChart data={analytics.monthlyStats} barGap={3}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8edf5" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize:11,fill:'#64748b'}} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} width={30} tick={{fontSize:11,fill:'#64748b'}} /><Tooltip /><Legend wrapperStyle={{fontSize:11}} /><Bar dataKey="applications" name="Applications" fill="#6366f1" radius={[4,4,0,0]} /><Bar dataKey="shortlisted" name="Shortlisted" fill="#14b8a6" radius={[4,4,0,0]} /><Bar dataKey="rejected" name="Rejected" fill="#f87171" radius={[4,4,0,0]} /></BarChart></ResponsiveContainer></div> : <Empty title="No activity to chart yet" detail="Monthly hiring activity will appear when it is available." />}
+      </section>
+      <section className="hr-card"><div className="hr-card-heading"><h2>Candidate pipeline</h2><BarChart3 size={18} color="#64748b" /></div>{Object.keys(analytics?.applicationsByStatus || {}).length ? Object.entries(analytics?.applicationsByStatus || {}).map(([status,count]) => <div className="hr-pipeline-row" key={status}><span>{status.replaceAll('_',' ')}</span><div className="hr-pipeline-track"><div className="hr-pipeline-fill" style={{width:`${Math.min(100, count / Math.max(analytics?.totalApplicationsCount || 1,1) * 100)}%`}} /></div><strong>{count}</strong></div>) : <Empty title="Your pipeline starts here" detail="Application stages will appear as candidates apply." />}</section>
+    </div>
+    {activeTab === 'report' ? <section className="hr-card"><div className="hr-card-heading"><h2>Hiring performance</h2></div><div className="hr-setting-row"><span>Average time to hire</span><strong>{analytics?.avgTimeToHireDays == null ? 'Not available' : `${analytics.avgTimeToHireDays} days`}</strong></div><div className="hr-setting-row"><span>Conversion rate</span><strong>{analytics?.conversionRate == null ? 'Not available' : `${analytics.conversionRate}%`}</strong></div><div className="hr-setting-row"><span>Completed interviews</span><strong>{failures.includes('Interviews') ? 'Not available' : meetings.filter(m => m.status === 'COMPLETED').length}</strong></div></section> : <>
+      <div className="hr-dashboard-grid"><section className="hr-card"><div className="hr-card-heading"><h2>Recent applications</h2><Link to="/hr-applications">View all →</Link></div><input aria-label="Search recent applications" placeholder="Search recent candidates or jobs" value={search} onChange={e => setSearch(e.target.value)} style={{width:'100%',padding:'10px 12px'}} />{filtered.length ? filtered.map(app => <div className="hr-list-row" key={app.id}><span className="hr-stat-icon"><Users size={16} /></span><div><strong>{nameOf(app)}</strong><p>{app.job?.title || 'Job application'}</p></div><Badge status={app.status} /></div>) : <Empty title={search ? 'No matching applications' : 'No recent applications'} detail={search ? 'Try another candidate name or job title.' : 'New candidates will appear here when they apply.'} />}</section>
+      <section className="hr-card"><div className="hr-card-heading"><h2>Upcoming interviews</h2><Link to="/hr-calendar">Calendar →</Link></div>{upcoming.length ? upcoming.slice(0,4).map(m => <div className="hr-list-row" key={m.id}><span className="hr-stat-icon"><Calendar size={16} /></span><div><strong>{m.candidateName || 'Candidate interview'}</strong><p>{new Date(m.scheduledAt).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}</p><p>{m.jobTitle}</p></div><Badge status={m.status} /></div>) : <Empty title="Your calendar is clear" detail="Schedule an interview to keep the next stage of hiring moving." />}<Link className="hr-button" to="/hr-calendar"><Plus size={15} />Schedule interview</Link></section></div>
+      <div className="hr-dashboard-grid"><section className="hr-card"><div className="hr-card-heading"><h2>Recent job postings</h2><Link to="/jobs">Manage jobs →</Link></div>{jobs.length ? jobs.slice(0,4).map(job => <div className="hr-list-row" key={job.id}><span className="hr-stat-icon"><Briefcase size={17} /></span><div><strong>{job.title}</strong><p>{job.company?.name}{job.location ? ` · ${job.location}` : ''}</p></div></div>) : <Empty title="No jobs available" detail="Create a job posting to start receiving applications." />}</section>
+      <section className="hr-card"><div className="hr-card-heading"><h2>Candidate messages</h2><Link to="/hr-messages">Inbox →</Link></div>{contacts.length ? contacts.slice(0,3).map(contact => <Link key={contact.userId} className="hr-list-row" style={{textDecoration:'none',color:'inherit'}} to={`/hr-messages?contactId=${contact.userId}`}><MessageSquare size={17} color="#6366f1" /><div><strong>{contact.name}</strong><p>{contact.lastMessage || 'Open conversation'}</p></div>{contact.unreadCount > 0 && <span className="hr-badge">{contact.unreadCount} new</span>}</Link>) : <Empty title="No conversations yet" detail="Candidate conversations will appear in your inbox." />}</section></div>
+    </>}
+  </div>;
+}

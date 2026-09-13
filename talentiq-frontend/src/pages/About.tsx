@@ -11,6 +11,7 @@ import {
   Lock,
   ArrowRight
 } from 'lucide-react';
+import { HireMindLogo } from '../components/HireMindLogo';
 import '../css/about.css';
 
 // Clean SVG Icons for GitHub & LinkedIn
@@ -50,7 +51,7 @@ export const About: React.FC = () => {
         {/* ── Main Organization Card ── */}
         <div className="about-card-main no-copy">
           <div className="about-logo-box">
-            <span>NT</span>
+            <HireMindLogo variant="emblem" size="md" />
           </div>
           <div className="about-company-info">
             <h2>NextGem-Technology</h2>

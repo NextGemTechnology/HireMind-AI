@@ -8,7 +8,6 @@ import {
   Users, Plus, Send, Paperclip,
   FileText, X, Link, Copy, Check, ShieldCheck, AlertCircle
 } from 'lucide-react';
-import { InteractiveGalaxyBackground } from '../components/InteractiveGalaxyBackground';
 import { HrSidebar } from '../components/HrSidebar';
 import '../css/group-chat.css';
 
@@ -572,7 +571,6 @@ export const GroupCollaborationChat: React.FC = () => {
   if (isHr) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
-        <InteractiveGalaxyBackground />
         <HrSidebar activeNav="TeamChat" />
         {content}
       </div>

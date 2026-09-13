@@ -10,7 +10,9 @@ import {
   CreditCard, X
 } from 'lucide-react';
 import { AiLogo } from './AiLogo';
+import { HireMindLogo } from './HireMindLogo';
 import '../css/hr-sidebar.css';
+import { useHrWorkspace } from './HrWorkspace';
 
 export type HrNavKey =
   | 'Dashboard'
@@ -55,7 +57,12 @@ interface HrSidebarProps {
   onClose?: () => void;
 }
 
-export const HrSidebar: React.FC<HrSidebarProps> = ({
+export const HrSidebar: React.FC<HrSidebarProps> = (props) => {
+  const inWorkspace = useHrWorkspace();
+  return inWorkspace ? null : <LegacyHrSidebar {...props} />;
+};
+
+const LegacyHrSidebar: React.FC<HrSidebarProps> = ({
   activeNav,
   onSelectNav,
   unreadCount = 0,
@@ -200,13 +207,7 @@ export const HrSidebar: React.FC<HrSidebarProps> = ({
           onClick={() => handleNavClick('Dashboard', '/hr-analytics')}
           className="hr-sidebar-brand-link"
         >
-          <div className="hr-sidebar-brand-icon">
-            <Briefcase size={20} color="#FFFFFF" />
-          </div>
-          <div className="hr-sidebar-brand-text">
-            <div className="hr-sidebar-brand-name">HireMind AI</div>
-            <div className="hr-sidebar-brand-sub">HR Portal</div>
-          </div>
+          <HireMindLogo variant="navbar" size="sm" theme="dark" animated={false} />
         </div>
 
         {onClose && (

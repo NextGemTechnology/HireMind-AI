@@ -2,10 +2,33 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { Search, MapPin, Building, DollarSign, CheckCircle2, Plus, X, Sparkles, Filter, Rocket, Map, List, Globe, MessageSquare } from 'lucide-react';
-import { JobMap, type JobItem } from '../components/JobMap';
+import { Search, MapPin, Building, DollarSign, CheckCircle2, Plus, X, Sparkles, Filter, Rocket, MessageSquare } from 'lucide-react';
 import { HrSidebar } from '../components/HrSidebar';
 import '../css/jobs-list.css';
+
+export interface JobItem {
+  id: number;
+  title: string;
+  slug?: string;
+  company: {
+    id: number;
+    name: string;
+    logoUrl?: string;
+    verified?: boolean;
+  };
+  location: string;
+  jobType: string;
+  experienceLevel: string;
+  remote: boolean;
+  hybrid: boolean;
+  salaryMin?: number;
+  salaryMax?: number;
+  currency?: string;
+  description?: string;
+  requiredSkills: { skillName: string; required?: boolean }[];
+  postedAt?: string;
+  postedById?: number;
+}
 
 /* ══════════════════════════
    STAR CANVAS BACKGROUND
@@ -76,8 +99,6 @@ export const JobsList: React.FC<JobsListProps> = ({ embedded = false }) => {
   const [jobs, setJobs] = useState<JobItem[]>([]);
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState<string>('ALL');
-  const [mapRole, setMapRole] = useState<string>('ALL');
-  const [viewMode, setViewMode] = useState<'both' | 'map' | 'list'>('both');
   const [loading, setLoading] = useState(true);
   const [applyingJobId, setApplyingJobId] = useState<number | null>(null);
   const [appliedJobIds, setAppliedJobIds] = useState<number[]>([]);
@@ -307,13 +328,14 @@ export const JobsList: React.FC<JobsListProps> = ({ embedded = false }) => {
   const jobsContent = (
     <div className={`jobs-page-wrapper ${embedded ? 'is-embedded' : ''}`} style={isHr ? { flex: 1, height: '100vh', overflowY: 'auto' } : undefined}>
       {/* Star Canvas */}
-      {!embedded && <StarCanvas />}
+      {!embedded && !isHr && <StarCanvas />}
 
       {/* Cosmic Background Orbs */}
       <div className="jobs-orb-top-right" />
       <div className="jobs-orb-bottom-left" />
 
       <div className="jobs-content-container">
+        {isHr && <div className="hr-page-heading"><div><span className="hr-eyebrow">Recruitment</span><h1>Job postings</h1><p>Create opportunities, review applicants and manage your open roles.</p></div></div>}
         {/* 🚀 Cosmic Header Hero Section */}
         <div className="jobs-hero-panel">
           {/* Orbital Decorative Ring */}
@@ -342,68 +364,6 @@ export const JobsList: React.FC<JobsListProps> = ({ embedded = false }) => {
                 className="jobs-search-input"
               />
             </div>
-            {/* View Mode Toggle */}
-            {(!isHr && !isAdmin) && (
-              <div style={{ display: 'flex', gap: '6px', background: 'rgba(30, 41, 59, 0.7)', padding: '4px', borderRadius: '10px', border: '1px solid rgba(124, 58, 237, 0.3)' }}>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('both')}
-                  style={{
-                    background: viewMode === 'both' ? '#7C3AED' : 'transparent',
-                    color: viewMode === 'both' ? '#FFF' : '#94A3B8',
-                    border: 'none',
-                    borderRadius: '7px',
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <Globe size={13} /> Map & List
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('map')}
-                  style={{
-                    background: viewMode === 'map' ? '#7C3AED' : 'transparent',
-                    color: viewMode === 'map' ? '#FFF' : '#94A3B8',
-                    border: 'none',
-                    borderRadius: '7px',
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <Map size={13} /> Map Only
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode('list')}
-                  style={{
-                    background: viewMode === 'list' ? '#7C3AED' : 'transparent',
-                    color: viewMode === 'list' ? '#FFF' : '#94A3B8',
-                    border: 'none',
-                    borderRadius: '7px',
-                    padding: '6px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <List size={13} /> List Only
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Planet Pills Filter Row */}
@@ -426,35 +386,18 @@ export const JobsList: React.FC<JobsListProps> = ({ embedded = false }) => {
                 {pill.label}
               </button>
             ))}
-        <div className="jobs-hero-content">
-                    {(isHr || isAdmin) && (
-                      <button
-                        onClick={() => setShowPostModal(true)}
-                        className="cosmic-btn-primary jobs-post-btn-hero"
-                      >
-                        <Plus size={12} /> Post New Job
-                      </button>
-                    )}
-                  </div>
+            <div className="jobs-hero-content">
+              {(isHr || isAdmin) && (
+                <button
+                  onClick={() => setShowPostModal(true)}
+                  className="cosmic-btn-primary jobs-post-btn-hero"
+                >
+                  <Plus size={12} /> Post New Job
+                </button>
+              )}
+            </div>
           </div>
-
         </div>
-
-        {/* 🗺️ Interactive State-wise Job Map Section */}
-        {(!isHr && !isAdmin) && (viewMode === 'both' || viewMode === 'map') && (
-          <JobMap
-            jobs={filteredJobs}
-            appliedJobIds={appliedJobIds}
-            onApply={handleApply}
-            onShowDetails={handleShowDetails}
-            onChatRecruiter={handleChatWithRecruiter}
-            selectedSkillRole={mapRole}
-            onSkillRoleChange={(role) => setMapRole(role)}
-            activeSearchQuery={search}
-            height="460px"
-            title="Interactive Career Radar & State-wise Opportunities"
-          />
-        )}
 
         {/* 📋 Jobs List Grid */}
         {loading ? (
@@ -462,7 +405,7 @@ export const JobsList: React.FC<JobsListProps> = ({ embedded = false }) => {
             <Sparkles size={24} className="jobs-loading-icon" />
             <div>Scanning job orbits...</div>
           </div>
-        ) : (viewMode === 'both' || viewMode === 'list') && (
+        ) : (
           <div className="jobs-list-container">
             {filteredJobs.length === 0 ? (
               <div className="cosmic-card jobs-empty-card">

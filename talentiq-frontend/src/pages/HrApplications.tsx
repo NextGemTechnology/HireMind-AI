@@ -11,12 +11,12 @@ import {
   Mail,
   Search,
   MessageSquare,
-  User,
-  Sparkles
+  User
 } from 'lucide-react';
 import { HrSidebar } from '../components/HrSidebar';
 import { AiLogo } from '../components/AiLogo';
 import '../css/hr-applications.css';
+import { HrDialog } from '../components/HrDialog';
 
 interface ApplicationItem {
   id: number;
@@ -52,9 +52,16 @@ export const HrApplications: React.FC = () => {
   const [stageFilter, setStageFilter] = useState('ALL');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<{ id: number; status: string } | null>(null);
+  const [emailAppId, setEmailAppId] = useState<number | null>(null);
+  const [emailBody, setEmailBody] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   const fetchHrApplications = async (statusFilter?: string) => {
     setLoading(true);
+    setLoadError(false);
     try {
       const url = statusFilter && statusFilter !== 'ALL'
         ? `/applications/hr?status=${statusFilter}&page=0&size=50`
@@ -63,7 +70,7 @@ export const HrApplications: React.FC = () => {
       const data = res.data.data ? (res.data.data.content || res.data.data) : (res.data.content || []);
       setApplications(Array.isArray(data) ? data : []);
     } catch (e) {
-      setApplications([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -74,9 +81,7 @@ export const HrApplications: React.FC = () => {
   }, [stageFilter]);
 
   const handleUpdateStatus = async (appId: number, newStatus: string) => {
-    if (!window.confirm(`Are you sure you want to move candidate to ${newStatus}?`)) {
-      return;
-    }
+    setErrorMessage('');
     setUpdatingId(appId);
     try {
       await apiClient.put(`/applications/${appId}/status`, {
@@ -84,34 +89,37 @@ export const HrApplications: React.FC = () => {
         notes: `Recruiter moved candidate to stage ${newStatus}`
       });
       setApplications(applications.map(a => a.id === appId ? { ...a, status: newStatus } : a));
+      setPendingStatus(null);
       setSuccessMessage(`Applicant status updated to ${newStatus}. Notification sent to candidate!`);
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (e: any) {
-      const errDetail = e.response?.data?.message || `Failed to update status to ${newStatus}`;
-      setSuccessMessage(errDetail);
-      setTimeout(() => setSuccessMessage(''), 4000);
+      setErrorMessage('Could not update the application. Please try again.');
     } finally {
       setUpdatingId(null);
     }
   };
 
   const handleSendEmail = async (appId: number) => {
-    const body = prompt('Enter email message body:');
-    if (!body) return;
+    const body = emailBody.trim();
+    if (!body || sendingEmail) return;
+    setSendingEmail(true);
+    setErrorMessage('');
     try {
       await apiClient.post(`/applications/${appId}/email`, { body });
+      setEmailAppId(null);
+      setEmailBody('');
       setSuccessMessage('Email sent successfully to candidate!');
       setTimeout(() => setSuccessMessage(''), 4000);
     } catch (e: any) {
-      const errDetail = e.response?.data?.message || 'Email dispatch completed.';
-      setSuccessMessage(errDetail);
-      setTimeout(() => setSuccessMessage(''), 4000);
+      setErrorMessage('Could not send the email. Please try again.');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
   const handleDownloadResume = async (resumeId?: number) => {
     if (!resumeId) {
-      alert('Resume file is not attached for this candidate.');
+      setErrorMessage('No resume is attached for this candidate.');
       return;
     }
     try {
@@ -123,8 +131,9 @@ export const HrApplications: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (e) {
-      alert('Downloading Candidate Resume PDF...');
+      setErrorMessage('Could not download the resume. Please try again.');
     }
   };
 
@@ -149,7 +158,7 @@ export const HrApplications: React.FC = () => {
           </div>
         </div>
         <h2 className="hr-apps-title" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          Candidate Applicants & Resume Verification <Sparkles size={24} color="#F59E0B" />
+          Applications & candidates
         </h2>
         <p className="hr-apps-subtitle">Review candidate profiles, AI match scores, stage status, and download resumes in real time</p>
 
@@ -158,6 +167,8 @@ export const HrApplications: React.FC = () => {
             <CheckCircle2 size={18} /> {successMessage}
           </div>
         )}
+        {errorMessage && <div className="hr-error" role="alert">{errorMessage}</div>}
+        {loadError && <div className="hr-error" role="alert">Could not load applications.<button className="hr-button" onClick={() => fetchHrApplications(stageFilter)}>Try again</button></div>}
 
         {/* Filter Controls */}
         <div className="hr-apps-filter-bar">
@@ -165,6 +176,7 @@ export const HrApplications: React.FC = () => {
             <Search size={18} color="var(--text-muted)" className="hr-apps-search-icon" />
             <input
               type="text"
+              aria-label="Search applications"
               className="input-field hr-apps-search-input"
               placeholder="Search by candidate name, email, or job title..."
               value={search}
@@ -193,7 +205,7 @@ export const HrApplications: React.FC = () => {
       {loading ? (
         <div className="hr-apps-loading">
           <div className="candidate-spinner" style={{ margin: '0 auto 16px auto' }} />
-          <div>Scanning galactic applicant pipeline...</div>
+          <div role="status">Loading applications…</div>
         </div>
       ) : filteredApps.length === 0 ? (
         <div className="glass-panel hr-apps-empty solar-theme-accent">
@@ -295,28 +307,28 @@ export const HrApplications: React.FC = () => {
                   <div className="hr-app-stage-actions">
                     <span className="hr-app-stage-label">Move Stage:</span>
                     <button
-                      onClick={() => handleUpdateStatus(app.id, 'SCREENED')}
+                      onClick={() => { setErrorMessage(''); setPendingStatus({ id: app.id, status: 'SCREENED' }); }}
                       disabled={updatingId === app.id}
                       className={`btn btn-sm ${app.status === 'SCREENED' ? 'btn-primary' : 'btn-secondary'}`}
                     >
                       Screened
                     </button>
                     <button
-                      onClick={() => handleUpdateStatus(app.id, 'INTERVIEWING')}
+                      onClick={() => { setErrorMessage(''); setPendingStatus({ id: app.id, status: 'INTERVIEWING' }); }}
                       disabled={updatingId === app.id}
                       className={`btn btn-sm ${app.status === 'INTERVIEWING' ? 'btn-primary' : 'btn-secondary'}`}
                     >
                       Interviewing
                     </button>
                     <button
-                      onClick={() => handleUpdateStatus(app.id, 'OFFERED')}
+                      onClick={() => { setErrorMessage(''); setPendingStatus({ id: app.id, status: 'OFFERED' }); }}
                       disabled={updatingId === app.id}
                       className={`btn btn-sm ${app.status === 'OFFERED' ? 'btn-primary' : 'btn-secondary'}`}
                     >
                       Offered
                     </button>
                     <button
-                      onClick={() => handleUpdateStatus(app.id, 'REJECTED')}
+                      onClick={() => { setErrorMessage(''); setPendingStatus({ id: app.id, status: 'REJECTED' }); }}
                       disabled={updatingId === app.id}
                       className={`btn btn-sm ${app.status === 'REJECTED' ? 'btn-danger' : 'btn-secondary'}`}
                     >
@@ -324,7 +336,7 @@ export const HrApplications: React.FC = () => {
                     </button>
                     {(app.status === 'SCREENED' || app.status === 'INTERVIEWING' || app.status === 'OFFERED' || app.status === 'REJECTED') && (
                       <button
-                        onClick={() => handleSendEmail(app.id)}
+                        onClick={() => { setErrorMessage(''); setEmailAppId(app.id); }}
                         className="btn btn-sm btn-primary"
                         style={{ marginLeft: 'auto' }}
                       >
@@ -339,6 +351,18 @@ export const HrApplications: React.FC = () => {
         </div>
         )}
       </div>
+      {pendingStatus && <HrDialog title="Update application stage" onClose={() => { if (!updatingId) setPendingStatus(null); }}>
+        <p className="hr-note">Move this application to {pendingStatus.status.toLowerCase()}? This updates the candidate’s hiring pipeline.</p>
+        {errorMessage && <div className="hr-error" role="alert">{errorMessage}</div>}
+        <div className="hr-actions"><button className="hr-button" disabled={updatingId !== null} onClick={() => setPendingStatus(null)}>Cancel</button><button className="hr-button hr-button-primary" disabled={updatingId !== null} onClick={() => handleUpdateStatus(pendingStatus.id, pendingStatus.status)}>{updatingId ? 'Updating…' : 'Confirm stage'}</button></div>
+      </HrDialog>}
+      {emailAppId !== null && <HrDialog title="Email candidate" onClose={() => { if (!sendingEmail) setEmailAppId(null); }}>
+        <form onSubmit={event => { event.preventDefault(); void handleSendEmail(emailAppId); }}>
+          <label htmlFor="hr-email-body">Message</label><textarea id="hr-email-body" rows={6} value={emailBody} onChange={e => setEmailBody(e.target.value)} required />
+          {errorMessage && <div className="hr-error" role="alert">{errorMessage}</div>}
+          <div className="hr-actions"><button type="button" className="hr-button" onClick={() => setEmailAppId(null)} disabled={sendingEmail}>Cancel</button><button className="hr-button hr-button-primary" disabled={sendingEmail || !emailBody.trim()}>{sendingEmail ? 'Sending…' : 'Send email'}</button></div>
+        </form>
+      </HrDialog>}
     </div>
   );
 };

@@ -89,6 +89,13 @@ export const CandidateProfile: React.FC = () => {
   const { isUniverse } = useTheme();
   const [candidate, setCandidate] = useState<CandidateData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showTagModal, setShowTagModal] = useState(false);
+  const [tagJobTitle, setTagJobTitle] = useState('');
+  const [tagDept, setTagDept] = useState('');
+  const [tagNotes, setTagNotes] = useState('');
+  const [tagSubmitting, setTagSubmitting] = useState(false);
+  const [tagSuccessMsg, setTagSuccessMsg] = useState('');
+  const [tagErrorMsg, setTagErrorMsg] = useState('');
 
   useEffect(() => {
     const fetchCandidate = async () => {
@@ -150,14 +157,6 @@ export const CandidateProfile: React.FC = () => {
       </div>
     );
   }
-
-  const [showTagModal, setShowTagModal] = useState(false);
-  const [tagJobTitle, setTagJobTitle] = useState('');
-  const [tagDept, setTagDept] = useState('');
-  const [tagNotes, setTagNotes] = useState('');
-  const [tagSubmitting, setTagSubmitting] = useState(false);
-  const [tagSuccessMsg, setTagSuccessMsg] = useState('');
-  const [tagErrorMsg, setTagErrorMsg] = useState('');
 
   const handleSendTagRequest = async (e: React.FormEvent) => {
     e.preventDefault();

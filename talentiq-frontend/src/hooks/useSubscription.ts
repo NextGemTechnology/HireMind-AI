@@ -50,20 +50,28 @@ export const useSubscription = (options: UseSubscriptionOptions = {}) => {
     }
   }, [role]);
 
-  const fetchTransactions = useCallback(async (page: number = 0, size: number = 10): Promise<PagedResponse<TransactionResponse> | null> => {
-    try {
-      const res = await subscriptionApi.getTransactions(page, size);
-      if (res.data?.success && res.data.data) {
-        const paged = res.data.data;
-        setTransactions(paged.content || []);
-        return paged;
+  const fetchTransactions = useCallback(
+    async (
+      page: number = 0, 
+      size: number = 10,
+      status?: string,
+      search?: string
+    ): Promise<PagedResponse<TransactionResponse> | null> => {
+      try {
+        const res = await subscriptionApi.getTransactions(page, size, status, search);
+        if (res.data?.success && res.data.data) {
+          const paged = res.data.data;
+          setTransactions(paged.content || []);
+          return paged;
+        }
+        return null;
+      } catch (err: any) {
+        console.error('Failed to fetch transactions', err);
+        return null;
       }
-      return null;
-    } catch (err: any) {
-      console.error('Failed to fetch transactions', err);
-      return null;
-    }
-  }, []);
+    }, 
+    []
+  );
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -183,6 +191,83 @@ export const useSubscription = (options: UseSubscriptionOptions = {}) => {
     }
   };
 
+  const initiateOrder = async (
+    planCode: string,
+    billingCycle: string = 'MONTHLY'
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await subscriptionApi.initiatePurchase(planCode, billingCycle);
+      if (res.data?.success && res.data.data) {
+        return { success: true, data: res.data.data };
+      }
+      throw new Error(res.data?.message || 'Failed to initialize payment order');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to initialize payment order';
+      setError(msg);
+      return { success: false, error: msg };
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const createQrSession = async (orderId: string) => {
+    try {
+      const res = await subscriptionApi.createQrSession(orderId);
+      if (res.data?.success && res.data.data) {
+        return { success: true, data: res.data.data };
+      }
+      throw new Error(res.data?.message || 'Failed to create QR payment session');
+    } catch (err: any) {
+      return { success: false, error: err.response?.data?.message || err.message };
+    }
+  };
+
+  const getPaymentSessionStatus = async (orderId: string) => {
+    try {
+      const res = await subscriptionApi.getPaymentSessionStatus(orderId);
+      if (res.data?.success && res.data.data) {
+        return { success: true, data: res.data.data };
+      }
+      return { success: false, error: res.data?.message || 'Failed to fetch payment status' };
+    } catch (err: any) {
+      return { success: false, error: err.response?.data?.message || err.message };
+    }
+  };
+
+  const verifyPayment = async (
+    orderId: string,
+    gatewayPaymentId: string,
+    gatewaySignature: string,
+    paymentMethod?: string,
+    maskedDetails?: string
+  ): Promise<{ success: boolean; data?: any; error?: string }> => {
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await subscriptionApi.verifyPayment(
+        orderId,
+        gatewayPaymentId,
+        gatewaySignature,
+        paymentMethod,
+        maskedDetails
+      );
+      if (res.data?.success && res.data.data) {
+        setSubscription(res.data.data);
+        await fetchTransactions(0, 10);
+        return { success: true, data: res.data.data };
+      }
+      throw new Error(res.data?.message || 'Payment verification failed');
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Payment verification failed';
+      setError(msg);
+      return { success: false, error: msg };
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const cancelSubscription = async (reason: string): Promise<boolean> => {
     setActionLoading(true);
     try {
@@ -211,6 +296,10 @@ export const useSubscription = (options: UseSubscriptionOptions = {}) => {
     fetchSubscription,
     fetchPlans,
     fetchTransactions,
+    initiateOrder,
+    createQrSession,
+    getPaymentSessionStatus,
+    verifyPayment,
     purchasePlan,
     cancelSubscription,
   };

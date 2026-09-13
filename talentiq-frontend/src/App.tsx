@@ -31,6 +31,7 @@ import HrMessages from './pages/HrMessages';
 import HrCalendar from './pages/HrCalendar';
 import { HrGlobalNotificationToast } from './components/HrGlobalNotificationToast';
 import { AiGuideChatbot } from './components/AiGuideChatbot';
+import { HrWorkspace } from './components/HrWorkspace';
 
 // 4 Dedicated Admin Dashboards
 import { AppDeveloperDashboard } from './pages/AppDeveloperDashboard';
@@ -90,12 +91,14 @@ function AppLayout() {
     '/developer-workspace'
   ];
   const isHome = location.pathname === '/';
-  const hideNavbar = isHome || (location.pathname === '/jobs' && isHr) || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
+  const isHrWorkspace = isHr && (['/hr-analytics', '/hr-messages', '/hr-calendar', '/hr-applications', '/copilot', '/jobs', '/team-chat', '/profile'].includes(location.pathname) || location.pathname.startsWith('/candidate-profile/'));
+  const hideNavbar = isHome || isHrWorkspace || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {!hideNavbar && <Navbar />}
       <main style={{ flex: 1 }}>
+        <HrWorkspace enabled={isHrWorkspace}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -220,6 +223,7 @@ function AppLayout() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </HrWorkspace>
       </main>
       <HrGlobalNotificationToast />
       <AiGuideChatbot />

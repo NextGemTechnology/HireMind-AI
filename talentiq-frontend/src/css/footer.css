@@ -1,0 +1,171 @@
+/* ============================================================
+   TalentIQ / HireMind AI — Global Footer Styles
+   ============================================================ */
+
+.global-app-footer {
+  width: 100%;
+  background: #FFFFFF;
+  border-top: 1px solid var(--border-subtle, #E2E8F0);
+  color: var(--text-main, #0F172A);
+  box-sizing: border-box;
+  margin-top: auto;
+  position: relative;
+  z-index: 10;
+}
+
+[data-theme="dark"] .global-app-footer,
+[data-theme="universe"] .global-app-footer {
+  background: var(--bg-surface, #0B132B);
+  border-top-color: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  color: var(--text-main, #F8FAFC);
+}
+
+.footer-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-left: clamp(16px, 4vw, 32px);
+  padding-right: clamp(16px, 4vw, 32px);
+  box-sizing: border-box;
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 36px;
+  padding-top: 48px;
+  padding-bottom: 36px;
+}
+
+.footer-brand-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.footer-brand-link {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  max-width: 220px;
+}
+
+.footer-brand-desc {
+  font-size: 13.5px;
+  color: var(--text-dim);
+  line-height: 1.65;
+  margin: 0;
+  max-width: 320px;
+}
+
+.footer-links-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.footer-col-title {
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--heading-color);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 6px;
+}
+
+.footer-link {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.footer-link:hover {
+  color: var(--primary-cyan);
+  transform: translateX(2px);
+}
+
+.footer-external-icon {
+  opacity: 0.6;
+}
+
+.footer-bottom {
+  border-top: 1px solid var(--border-light);
+  padding-top: 20px;
+  padding-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.footer-support-email {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.footer-support-email a {
+  color: var(--primary-cyan);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer-support-email a:hover {
+  text-decoration: underline;
+}
+
+.footer-copyright {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.footer-copyright a {
+  color: var(--primary-indigo);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.footer-copyright a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive Footer Breakpoints */
+@media (max-width: 900px) {
+  .footer-inner {
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap: 28px;
+  }
+}
+
+@media (max-width: 680px) {
+  .footer-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+
+  .footer-brand-col {
+    grid-column: 1 / -1;
+  }
+
+  .footer-brand-desc {
+    max-width: 100%;
+  }
+
+  .footer-bottom {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .footer-inner {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}

@@ -32,6 +32,22 @@ export interface CreateOrderResponse {
   gatewayKeyId: string;
 }
 
+export interface CreateQrSessionResponse {
+  orderId: string;
+  upiUri: string;
+  amount: number;
+  currency: string;
+  expiresAt: number;
+  ttlSeconds: number;
+}
+
+export interface PaymentSessionStatusResponse {
+  orderId: string;
+  status: string;
+  expired: boolean;
+  ttlRemainingSeconds: number;
+}
+
 export interface TransactionResponse {
   orderId: string;
   gatewayPaymentId?: string;
@@ -67,9 +83,27 @@ export const subscriptionApi = {
     
   initiatePurchase: (planCode: string, billingCycle: string = 'MONTHLY') => 
     apiClient.post('/subscriptions/purchase', { planCode, billingCycle }),
+
+  createQrSession: (orderId: string) =>
+    apiClient.post('/subscriptions/payment-session/qr', null, { params: { orderId } }),
+
+  getPaymentSessionStatus: (orderId: string) =>
+    apiClient.get(`/subscriptions/payment-session/${orderId}`),
     
-  verifyPayment: (orderId: string, gatewayPaymentId: string, gatewaySignature: string) => 
-    apiClient.post('/subscriptions/verify', { orderId, gatewayPaymentId, gatewaySignature }),
+  verifyPayment: (
+    orderId: string, 
+    gatewayPaymentId: string, 
+    gatewaySignature: string,
+    paymentMethod?: string,
+    maskedDetails?: string
+  ) => 
+    apiClient.post('/subscriptions/verify', { 
+      orderId, 
+      gatewayPaymentId, 
+      gatewaySignature,
+      paymentMethod,
+      maskedDetails
+    }),
     
   renewSubscription: () => 
     apiClient.post('/subscriptions/renew', {}),
@@ -77,6 +111,13 @@ export const subscriptionApi = {
   cancelSubscription: (reason: string) => 
     apiClient.post('/subscriptions/cancel', { reason }),
     
-  getTransactions: (page: number = 0, size: number = 20) => 
-    apiClient.get('/subscriptions/transactions', { params: { page, size } }),
+  getTransactions: (page: number = 0, size: number = 20, status?: string, search?: string) => 
+    apiClient.get('/subscriptions/transactions', { 
+      params: { 
+        page, 
+        size,
+        status: status || undefined,
+        search: search || undefined
+      } 
+    }),
 };

@@ -23,10 +23,20 @@ interface InterviewSlot {
 
 interface Application {
   id: number;
-  candidate: { user: { firstName: string; lastName: string; email: string } };
+  candidate?: {
+    firstName?: string;
+    lastName?: string;
+    user?: { firstName?: string; lastName?: string; email?: string };
+  };
   job: { id: number; title: string };
   status: string;
 }
+
+const applicationCandidateName = (application: Application) => {
+  const candidate = application.candidate;
+  return [candidate?.firstName || candidate?.user?.firstName, candidate?.lastName || candidate?.user?.lastName]
+    .filter(Boolean).join(' ') || `Applicant #${application.id}`;
+};
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   PENDING: { bg: '#FEF3C7', text: '#D97706', border: '#FDE68A' },
@@ -45,6 +55,7 @@ export const HrCalendar: React.FC = () => {
   const [slots, setSlots] = useState<InterviewSlot[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   // Calendar navigation
   const today = new Date();
@@ -78,14 +89,16 @@ export const HrCalendar: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setLoadError(false);
       const [slotsRes, appsRes] = await Promise.all([
-        apiClient.get('/interviews/calendar').catch(() => ({ data: { data: [] } })),
-        apiClient.get('/applications/hr?size=50&sort=appliedAt,desc').catch(() => ({ data: { data: { content: [] } } })),
+        apiClient.get('/interviews/calendar'),
+        apiClient.get('/applications/hr?size=50&sort=appliedAt,desc'),
       ]);
       setSlots(slotsRes.data?.data || []);
-      setApplications(appsRes.data?.data?.content || []);
+      const appData = appsRes.data?.data;
+      setApplications(Array.isArray(appData) ? appData : appData?.content || []);
     } catch {
-      setSlots([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -283,6 +296,7 @@ export const HrCalendar: React.FC = () => {
 
       {/* ── Main Workspace ── */}
       <main className="cal-main-content">
+        {loadError && <div className="hr-error" role="alert">Could not load interviews or candidate applications.<button className="hr-button" onClick={fetchData}>Try again</button></div>}
         {/* Header Bar */}
         <header className="cal-top-header">
           <div className="cal-header-left">
@@ -623,7 +637,7 @@ export const HrCalendar: React.FC = () => {
                     <option value="">— Choose candidate application —</option>
                     {applications.map(app => (
                       <option key={app.id} value={app.id}>
-                        {app.candidate?.user?.firstName} {app.candidate?.user?.lastName} — {app.job?.title} ({app.status})
+                        {applicationCandidateName(app)} — {app.job?.title} ({app.status})
                       </option>
                     ))}
                   </select>
@@ -780,7 +794,7 @@ export const HrCalendar: React.FC = () => {
                   <option value="">— Choose candidate —</option>
                   {applications.map(app => (
                     <option key={app.id} value={app.id}>
-                      {app.candidate?.user?.firstName} {app.candidate?.user?.lastName} — {app.job?.title}
+                      {applicationCandidateName(app)} — {app.job?.title}
                     </option>
                   ))}
                 </select>

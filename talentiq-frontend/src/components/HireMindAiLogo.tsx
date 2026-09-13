@@ -277,30 +277,31 @@ export const HireMindAiLogo: React.FC<HireMindAiLogoProps> = ({
         title="HireMind AI"
       >
         <svg
-          viewBox="180 35 700 310"
+          viewBox={showTagline ? "170 38 880 220" : "170 38 880 185"}
           className="hm-logo-svg"
           xmlns="http://www.w3.org/2000/svg"
           style={{ height: '100%', width: 'auto', maxHeight: '100%' }}
         >
           {renderDefs(uniqueId)}
-          <g transform="scale(0.8) translate(10, 20)">
+          <g transform="translate(40, 20) scale(0.58)">
             {renderEmblem(uniqueId)}
           </g>
 
           {/* Typography Lockup beside emblem */}
-          <g transform="translate(465, 175)">
+          <g>
             <text
-              x="0"
-              y="0"
-              fontSize="68"
+              x="405"
+              y="162"
+              fontSize="118"
+              fontWeight="800"
               className={`hm-text-hiremind ${isDark ? 'hm-text-light' : 'hm-text-dark'}`}
             >
               HireMind
             </text>
             <text
-              x="305"
-              y="0"
-              fontSize="68"
+              x="905"
+              y="162"
+              fontSize="118"
               fontWeight="900"
               fill={`url(#${uniqueId}-aiTextGrad)`}
               letterSpacing="-0.02em"
@@ -309,26 +310,26 @@ export const HireMindAiLogo: React.FC<HireMindAiLogoProps> = ({
             </text>
 
             {/* Sparkle Star over 'I' */}
-            <g className="hm-sparkle-star hm-sparkle-star-3" transform="translate(378, -48)">
+            <g className="hm-sparkle-star hm-sparkle-star-3" transform="translate(1005, 76)">
               <path
-                d="M 0 -10 Q 0 0, -10 0 Q 0 0, 0 10 Q 0 0, 10 0 Q 0 0, 0 -10 Z"
+                d="M 0 -13 Q 0 0, -13 0 Q 0 0, 0 13 Q 0 0, 13 0 Q 0 0, 0 -13 Z"
                 fill={`url(#${uniqueId}-sparklePurple)`}
                 filter={`url(#${uniqueId}-sparkleGlow)`}
               />
-              <circle cx="0" cy="0" r="1.8" fill="#FFFFFF" />
+              <circle cx="0" cy="0" r="2.5" fill="#FFFFFF" />
             </g>
 
             {showTagline && (
               <>
                 <text
-                  x="2"
-                  y="36"
+                  x="408"
+                  y="196"
                   className={`hm-text-tagline ${isDark ? 'hm-tagline-light' : 'hm-tagline-dark'}`}
-                  fontSize="15"
+                  fontSize="24"
                 >
                   SMARTER HIRING. BETTER TEAMS.
                 </text>
-                <line x1="2" y1="46" x2="385" y2="46" stroke={`url(#${uniqueId}-taglineRuleGrad)`} strokeWidth="2" strokeLinecap="round" />
+                <line x1="408" y1="208" x2="1035" y2="208" stroke={`url(#${uniqueId}-taglineRuleGrad)`} strokeWidth="2.5" strokeLinecap="round" />
               </>
             )}
           </g>

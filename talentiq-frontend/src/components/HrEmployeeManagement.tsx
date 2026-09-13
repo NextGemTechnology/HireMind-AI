@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiClient } from '../api/client';
+import { HrModalFrame } from './HrModalFrame';
 import {
   UserPlus,
   ShieldCheck,
@@ -59,6 +60,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
@@ -101,9 +103,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
       setShowOnboardModal(true);
     }
     const filterParam = searchParams.get('filter');
-    if (filterParam) {
-      setStatusFilter(filterParam);
-    }
+    setStatusFilter(filterParam || 'ALL');
   }, [searchParams]);
 
   useEffect(() => {
@@ -112,6 +112,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
 
   const fetchData = async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const statusParam = statusFilter === 'ALL' ? '' : `?status=${statusFilter}`;
       const [empRes, statsRes] = await Promise.all([
@@ -121,6 +122,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
       setEmployees(empRes.data?.data?.content || empRes.data?.data || []);
       setStats(statsRes.data?.data || null);
     } catch (err) {
+      setLoadError(true);
       console.error('Failed to load employee directory:', err);
     } finally {
       setLoading(false);
@@ -285,7 +287,8 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
   });
 
   return (
-    <div style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+    <div className="hr-employees" style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+      {loadError && <div className="hr-error" role="alert">Could not load the employee directory.<button className="hr-button" onClick={fetchData}>Try again</button></div>}
       {/* Toast Alert */}
       {msg && (
         <div style={{
@@ -539,10 +542,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
 
       {/* ── Modal 1: Onboard Candidate ── */}
       {showOnboardModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
-        }}>
+        <HrModalFrame title="Onboard candidate" onClose={() => setShowOnboardModal(false)}>
           <div style={{
             background: '#0F172A', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '16px',
             width: '520px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
@@ -551,7 +551,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#FFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <UserPlus size={20} color="#38BDF8" /> Onboard Candidate as Employee
               </h2>
-              <button onClick={() => setShowOnboardModal(false)} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={18} /></button>
+              <button aria-label="Close onboarding" onClick={() => setShowOnboardModal(false)} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={18} /></button>
             </div>
 
             <form onSubmit={handleOnboard}>
@@ -671,15 +671,12 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
               </div>
             </form>
           </div>
-        </div>
+        </HrModalFrame>
       )}
 
       {/* ── Modal 2: Employee Details & Audit History ── */}
       {showDetailsModal && selectedEmployee && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
-        }}>
+        <HrModalFrame title="Employee details" onClose={() => setShowDetailsModal(false)}>
           <div style={{
             background: '#0F172A', border: '1px solid rgba(56,189,248,0.3)', borderRadius: '16px',
             width: '560px', maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
@@ -688,7 +685,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
               <h2 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#FFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FileText size={20} color="#38BDF8" /> Employee Dossier & Audit Log
               </h2>
-              <button onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={18} /></button>
+              <button aria-label="Close employee details" onClick={() => setShowDetailsModal(false)} style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}><X size={18} /></button>
             </div>
 
             <div style={{ background: '#1E293B', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
@@ -737,15 +734,12 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
               </button>
             </div>
           </div>
-        </div>
+        </HrModalFrame>
       )}
 
       {/* ── Modal 3: Termination Request ── */}
       {showTerminateModal && selectedEmployee && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
-        }}>
+        <HrModalFrame title="Request employee termination" onClose={() => setShowTerminateModal(false)}>
           <div style={{
             background: '#0F172A', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '16px',
             width: '460px', maxWidth: '100%', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
@@ -802,15 +796,12 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
               </div>
             </form>
           </div>
-        </div>
+        </HrModalFrame>
       )}
 
       {/* ── Modal 4: Create Salary Disbursement ── */}
       {showSalaryModal && selectedEmployee && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
-        }}>
+        <HrModalFrame title="Create salary request" onClose={() => setShowSalaryModal(false)}>
           <div style={{
             background: '#0F172A', border: '1px solid rgba(16,185,129,0.3)', borderRadius: '16px',
             width: '460px', maxWidth: '100%', padding: '24px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.7)'
@@ -890,7 +881,7 @@ export const HrEmployeeManagement: React.FC<HrEmployeeManagementProps> = ({ styl
               </div>
             </form>
           </div>
-        </div>
+        </HrModalFrame>
       )}
     </div>
   );
