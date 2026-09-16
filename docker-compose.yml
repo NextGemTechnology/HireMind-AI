@@ -95,7 +95,7 @@ services:
   backend:
     image: abhaygupta002/talentiq-backend:latest
     build:
-      context: ./talentiq-backend
+      context: ./backend/talentiq-backend
       dockerfile: Dockerfile
     container_name: talentiq-backend
     restart: unless-stopped
@@ -105,12 +105,13 @@ services:
       redis:
         condition: service_healthy
     environment:
+      JAVA_OPTS: "-Xms128m -Xmx300m -XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Djava.security.egd=file:/dev/./urandom"
       APP_PROFILE: dev
       DB_HOST: ${DB_HOST:-mysql}
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-HireMeAI}
       DB_USER: ${DB_USER:-talentiq_user}
-      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-}}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-dev-secret-change-in-production-minimum-256-bits}
@@ -135,11 +136,278 @@ services:
     networks:
       - talentiq-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
+      disable: true
+
+  # ── Auth & Identity Microservice ──────────────────────────────
+  auth-service:
+    image: talentiq-auth:latest
+    build:
+      context: ./backend/talentiq-platform/services/auth-service
+      dockerfile: Dockerfile
+    container_name: talentiq-auth
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx220m"
+      SERVER_PORT: 8082
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-HireMeAI}
+      DB_USER: ${DB_USER:-talentiq_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-hiremindai.ai@gmail.com}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+    ports:
+      - "8082:8082"
+    networks:
+      - talentiq-net
+
+  # ── Payment & Subscription Microservice ───────────────────────
+  payment-service:
+    image: talentiq-payment:latest
+    build:
+      context: ./backend/talentiq-platform/services/payment-service
+      dockerfile: Dockerfile
+    container_name: talentiq-payment
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx220m"
+      SERVER_PORT: 8087
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-HireMeAI}
+      DB_USER: ${DB_USER:-talentiq_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+      PAYMENT_GATEWAY_PROVIDER: mock
+    ports:
+      - "8087:8087"
+    networks:
+      - talentiq-net
+
+  # ── Chat & Collaboration Microservice ─────────────────────────
+  chat-service:
+    image: talentiq-chat:latest
+    build:
+      context: ./backend/talentiq-platform/services/chat-service
+      dockerfile: Dockerfile
+    container_name: talentiq-chat
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx220m"
+      SERVER_PORT: 8086
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-HireMeAI}
+      DB_USER: ${DB_USER:-talentiq_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+    ports:
+      - "8086:8086"
+    networks:
+      - talentiq-net
+
+  # ── Job & AI Matching Microservice ───────────────────────────
+  job-service:
+    image: talentiq-job:latest
+    build:
+      context: ./backend/talentiq-platform/services/job-service
+      dockerfile: Dockerfile
+    container_name: talentiq-job
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx220m"
+      SERVER_PORT: 8085
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-HireMeAI}
+      DB_USER: ${DB_USER:-talentiq_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+    ports:
+      - "8085:8085"
+    networks:
+      - talentiq-net
+
+  # ── Candidate & Resume Microservice ──────────────────────────
+  candidate-service:
+    image: talentiq-candidate:latest
+    build:
+      context: ./backend/talentiq-platform/services/candidate-service
+      dockerfile: Dockerfile
+    container_name: talentiq-candidate
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx220m"
+      SERVER_PORT: 8083
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-HireMeAI}
+      DB_USER: ${DB_USER:-talentiq_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+      STORAGE_BASE_PATH: /app/uploads
+    ports:
+      - "8083:8083"
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - talentiq-net
+
+  # ── Company & HR Microservice ────────────────────────────────
+  company-service:
+    image: talentiq-company:latest
+    build:
+      context: ./backend/talentiq-platform/services/company-service
+      dockerfile: Dockerfile
+    container_name: talentiq-company
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx220m"
+      SERVER_PORT: 8084
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-HireMeAI}
+      DB_USER: ${DB_USER:-talentiq_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+    ports:
+      - "8084:8084"
+    networks:
+      - talentiq-net
+
+  # ── Admin & Analytics Microservice ───────────────────────────
+  admin-service:
+    image: talentiq-admin:latest
+    build:
+      context: ./backend/talentiq-platform/services/admin-service
+      dockerfile: Dockerfile
+    container_name: talentiq-admin
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx220m"
+      SERVER_PORT: 8089
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-HireMeAI}
+      DB_USER: ${DB_USER:-talentiq_user}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-${DB_PASSWORD:-HireMeAiProject@2529}}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+    ports:
+      - "8089:8089"
+    networks:
+      - talentiq-net
+
+  # ── API Gateway ───────────────────────────────────────────────
+  api-gateway:
+    image: talentiq-gateway:latest
+    build:
+      context: ./backend/talentiq-platform/services/api-gateway
+      dockerfile: Dockerfile
+    container_name: talentiq-gateway
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - auth-service
+      - payment-service
+      - chat-service
+      - job-service
+      - candidate-service
+      - company-service
+      - admin-service
+    environment:
+      JAVA_OPTS: "-XX:+TieredCompilation -XX:TieredStopAtLevel=1 -Xms64m -Xmx200m"
+      SERVER_PORT: 8080
+      AUTH_SERVICE_URL: http://auth-service:8082
+      PAYMENT_SERVICE_URL: http://payment-service:8087
+      CHAT_SERVICE_URL: http://chat-service:8086
+      CHAT_SERVICE_WS_URL: http://chat-service:8086
+      JOB_SERVICE_URL: http://job-service:8085
+      CANDIDATE_SERVICE_URL: http://candidate-service:8083
+      COMPANY_SERVICE_URL: http://company-service:8084
+      ADMIN_SERVICE_URL: http://admin-service:8089
+      LEGACY_BACKEND_URL: http://backend:8080
+      JWT_SECRET: ${JWT_SECRET:-404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+    ports:
+      - "8000:8080"
+    networks:
+      - talentiq-net
+    healthcheck:
+      disable: true
 
   # ── Frontend ──────────────────────────────────────────────────
   frontend:
@@ -150,7 +418,7 @@ services:
     container_name: talentiq-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      - api-gateway
     environment:
       VITE_API_BASE_URL: http://backend:8080/api
       VITE_WS_URL: ws://backend:8080/api/ws

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiClient } from '../api/client';
@@ -8,8 +8,14 @@ import {
   Users, Plus, Send, Paperclip,
   FileText, X, Link, Copy, Check, ShieldCheck, AlertCircle
 } from 'lucide-react';
+import { HrModalFrame } from '../components/HrModalFrame';
 import { HrSidebar } from '../components/HrSidebar';
 import '../css/group-chat.css';
+
+function ChatModal({ manager, title, onClose, children }: { manager: boolean; title: string; onClose: () => void; children: React.ReactNode }) {
+  return manager ? <HrModalFrame title={title} onClose={onClose} className="cm-chat-dialog">{children}</HrModalFrame>
+    : <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, backdropFilter: 'blur(8px)' }}>{children}</div>;
+}
 
 interface GroupItem {
   id: number;
@@ -35,6 +41,8 @@ interface MessageItem {
 
 export const GroupCollaborationChat: React.FC = () => {
   const { user, isHr } = useAuth();
+  const manager = !!user?.roles?.includes('ROLE_COMPANY_ADMIN');
+  const [sending, setSending] = useState(false);
   const [searchParams] = useSearchParams();
   const [groups, setGroups] = useState<GroupItem[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<GroupItem | null>(null);
@@ -63,34 +71,35 @@ export const GroupCollaborationChat: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetchGroups();
-  }, []);
-
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       setLoading(true);
+      if (manager) setErrorMsg('');
       const res = await apiClient.get('/chat/groups');
       const list: GroupItem[] = res.data?.data || [];
       setGroups(list);
-      if (list.length > 0 && !selectedGroup) {
-        setSelectedGroup(list[0]);
-      }
+      setSelectedGroup(current => current ? list.find(group => group.id === current.id) || null : list[0] || null);
     } catch (e) {
       console.warn('Failed to load user groups', e);
       setGroups([]);
+      if (manager) setErrorMsg('Channels could not be loaded. Please retry.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [manager]);
+
+  useEffect(() => { fetchGroups(); }, [fetchGroups]);
 
   // Load message history for selected group
   useEffect(() => {
     if (!selectedGroup) return;
-    apiClient.get(`/chat/groups/${selectedGroup.id}/messages`)
-      .then(res => setMessages(res.data?.data || []))
-      .catch(() => setMessages([]));
-  }, [selectedGroup]);
+    const controller = new AbortController();
+    setMessages([]);
+    apiClient.get(`/chat/groups/${selectedGroup.id}/messages`, { signal: controller.signal })
+      .then(res => { if (!controller.signal.aborted) setMessages(res.data?.data || []); })
+      .catch(() => { if (!controller.signal.aborted) { setMessages([]); if (manager) setErrorMsg('Message history could not be loaded. Please select the channel again.'); } });
+    return () => controller.abort();
+  }, [selectedGroup, manager]);
 
   // Connect STOMP WebSocket for real-time group stream
   useEffect(() => {
@@ -125,16 +134,18 @@ export const GroupCollaborationChat: React.FC = () => {
     return () => {
       client.deactivate();
     };
-  }, [selectedGroup?.id]);
+  }, [selectedGroup]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!inputText.trim() || !selectedGroup) return;
+    if (!inputText.trim() || !selectedGroup || sending) return;
     const text = inputText.trim();
-    setInputText('');
+    if (!manager) setInputText('');
+    setSending(true);
+    if (manager) setErrorMsg('');
 
     const payload = {
       content: text,
@@ -143,6 +154,7 @@ export const GroupCollaborationChat: React.FC = () => {
 
     try {
       const res = await apiClient.post(`/chat/groups/${selectedGroup.id}/messages`, payload);
+      if (manager) setInputText(current => current.trim() === text ? '' : current);
       if (res.data?.data) {
         setMessages(prev => {
           if (prev.some(m => m.id === res.data.data.id)) return prev;
@@ -151,7 +163,8 @@ export const GroupCollaborationChat: React.FC = () => {
       }
     } catch (e) {
       console.error('Failed to send group message', e);
-    }
+      if (manager) setErrorMsg('Message was not sent. Your draft is still available to retry.');
+    } finally { setSending(false); }
   };
 
   const handleCreateGroup = async (e: React.FormEvent) => {
@@ -171,6 +184,7 @@ export const GroupCollaborationChat: React.FC = () => {
       }
     } catch (e) {
       console.error('Failed to create group', e);
+      if (manager) setErrorMsg('Channel could not be created. Please try again.');
     }
   };
 
@@ -193,17 +207,11 @@ export const GroupCollaborationChat: React.FC = () => {
       }
     } catch (err) {
       console.error('Group file upload failed', err);
+      if (manager) setErrorMsg('Attachment could not be sent. Please try again.');
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
-
-  useEffect(() => {
-    const joinToken = searchParams.get('join');
-    if (joinToken) {
-      handleJoinGroup(joinToken);
-    }
-  }, [searchParams]);
 
   const handleGenerateInvite = async () => {
     if (!selectedGroup) return;
@@ -227,7 +235,7 @@ export const GroupCollaborationChat: React.FC = () => {
     }
   };
 
-  const handleJoinGroup = async (token: string) => {
+  const handleJoinGroup = useCallback(async (token: string) => {
     if (!token.trim()) return;
     setErrorMsg('');
     setStatusMsg('');
@@ -244,11 +252,17 @@ export const GroupCollaborationChat: React.FC = () => {
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || 'Failed to join group. Company verification badge or valid link required.');
     }
-  };
+  }, [fetchGroups]);
 
-  const copyInviteToClipboard = () => {
+  useEffect(() => {
+    const joinToken = searchParams.get('join');
+    if (joinToken && manager) { setJoinTokenInput(joinToken); setShowJoinModal(true); }
+    else if (joinToken) handleJoinGroup(joinToken);
+  }, [searchParams, manager, handleJoinGroup]);
+
+  const copyInviteToClipboard = async () => {
     if (!generatedInviteLink) return;
-    navigator.clipboard.writeText(generatedInviteLink);
+    try { await navigator.clipboard.writeText(generatedInviteLink); } catch { setErrorMsg('Clipboard access was denied. Select and copy the link manually.'); return; }
     setInviteCopied(true);
     setTimeout(() => setInviteCopied(false), 2500);
   };
@@ -292,6 +306,7 @@ export const GroupCollaborationChat: React.FC = () => {
           </div>
         )}
 
+        {manager && errorMsg && <button className="cm-button" onClick={fetchGroups}>Retry channels</button>}
         <div className="group-list-scroll">
           {loading ? (
             <div style={{ padding: 20, textAlign: 'center', color: '#94A3B8', fontSize: 13 }}>
@@ -305,6 +320,9 @@ export const GroupCollaborationChat: React.FC = () => {
             groups.map(g => (
               <div
                 key={g.id}
+                role={manager ? "button" : undefined}
+                tabIndex={manager ? 0 : undefined}
+                onKeyDown={manager ? event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedGroup(g); } } : undefined}
                 onClick={() => setSelectedGroup(g)}
                 className={`group-item-card ${selectedGroup?.id === g.id ? 'active' : ''}`}
               >
@@ -399,6 +417,7 @@ export const GroupCollaborationChat: React.FC = () => {
               </button>
 
               <input
+                aria-label="Channel message"
                 className="group-input-box"
                 placeholder={`Message #${selectedGroup.name}...`}
                 value={inputText}
@@ -413,7 +432,7 @@ export const GroupCollaborationChat: React.FC = () => {
 
               <button
                 onClick={handleSendMessage}
-                disabled={!inputText.trim()}
+                disabled={!inputText.trim() || sending}
                 className="btn-send-group"
                 title="Send Message"
               >
@@ -432,14 +451,14 @@ export const GroupCollaborationChat: React.FC = () => {
 
       {/* Invite Modal */}
       {showInviteModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, backdropFilter: 'blur(8px)' }}>
+        <ChatModal manager={manager} title="Channel Invitation Link" onClose={() => setShowInviteModal(false)}>
           <div style={{ background: '#0F172A', border: '1px solid rgba(56, 189, 248, 0.4)', borderRadius: 18, width: 480, padding: 24, boxShadow: '0 20px 45px rgba(0,0,0,0.8)', color: '#FFFFFF' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ShieldCheck size={20} color="#38BDF8" />
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Channel Invitation Link</h3>
               </div>
-              <button onClick={() => setShowInviteModal(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
+              <button onClick={() => setShowInviteModal(false)} aria-label="Close dialog" style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
@@ -456,6 +475,7 @@ export const GroupCollaborationChat: React.FC = () => {
             <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
               <input
                 readOnly
+                aria-label="Channel invitation link"
                 value={generatedInviteLink}
                 style={{ flex: 1, background: '#1E293B', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, padding: '10px 14px', color: '#F8FAFC', fontSize: 12.5, outline: 'none' }}
               />
@@ -473,16 +493,16 @@ export const GroupCollaborationChat: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </ChatModal>
       )}
 
       {/* Join Channel Modal */}
       {showJoinModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, backdropFilter: 'blur(8px)' }}>
+        <ChatModal manager={manager} title="Join Channel with Link or Code" onClose={() => setShowJoinModal(false)}>
           <div style={{ background: '#0F172A', border: '1px solid rgba(56, 189, 248, 0.4)', borderRadius: 18, width: 440, padding: 24, boxShadow: '0 20px 45px rgba(0,0,0,0.8)', color: '#FFFFFF' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800 }}>Join Channel with Link or Code</h3>
-              <button onClick={() => setShowJoinModal(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
+              <button onClick={() => setShowJoinModal(false)} aria-label="Close dialog" style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
@@ -491,10 +511,11 @@ export const GroupCollaborationChat: React.FC = () => {
               Enter the invite code or token from your HR recruiter or company executive.
             </p>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleJoinGroup(joinTokenInput); }}>
+            <form onSubmit={(e) => { e.preventDefault(); handleJoinGroup(joinTokenInput); }}>{manager && errorMsg && <p role="alert">{errorMsg}</p>}
               <div style={{ marginBottom: 18 }}>
                 <input
                   required
+                  aria-label="Invite token or full link"
                   placeholder="Paste invite token or full link"
                   value={joinTokenInput}
                   onChange={e => {
@@ -516,25 +537,27 @@ export const GroupCollaborationChat: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </ChatModal>
       )}
 
       {/* Create Group Modal */}
       {showCreateModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, backdropFilter: 'blur(8px)' }}>
+        <ChatModal manager={manager} title="Create New Team Channel" onClose={() => setShowCreateModal(false)}>
           <div style={{ background: '#0F172A', border: '1px solid rgba(56, 189, 248, 0.4)', borderRadius: 18, width: 440, padding: 24, boxShadow: '0 20px 45px rgba(0,0,0,0.8)', color: '#FFFFFF' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800 }}>Create New Team Channel</h3>
-              <button onClick={() => setShowCreateModal(false)} style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
+              <button onClick={() => setShowCreateModal(false)} aria-label="Close dialog" style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateGroup}>
+            <form onSubmit={handleCreateGroup}>{manager && errorMsg && <p role="alert">{errorMsg}</p>}
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>Channel Name *</label>
                 <input
                   required
+                  aria-label="Channel name"
+                  maxLength={150}
                   placeholder="e.g. Engineering Leadership, HR-Tech Screening"
                   value={newGroupName}
                   onChange={e => setNewGroupName(e.target.value)}
@@ -546,6 +569,7 @@ export const GroupCollaborationChat: React.FC = () => {
                 <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: '#94A3B8', marginBottom: 6 }}>Description / Objective</label>
                 <textarea
                   rows={3}
+                  aria-label="Channel description"
                   placeholder="e.g. Collaboration on high-priority technical hiring and interviews."
                   value={newGroupDesc}
                   onChange={e => setNewGroupDesc(e.target.value)}
@@ -563,12 +587,12 @@ export const GroupCollaborationChat: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </ChatModal>
       )}
     </div>
   );
 
-  if (isHr) {
+  if (isHr && !manager) {
     return (
       <div style={{ display: 'flex', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
         <HrSidebar activeNav="TeamChat" />

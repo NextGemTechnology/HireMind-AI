@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import {
-  CheckCircle,
   Search,
   RefreshCw,
   Eye,
@@ -10,9 +9,13 @@ import {
   Users,
   Building2,
   LogOut,
-  Send
+  Send,
+  ShieldCheck,
+  ChevronRight,
+  Headphones,
+  CheckCircle2
 } from 'lucide-react';
-import '../css/admin-dashboards-distinct.css';
+import '../css/enterprise-admin-roles.css';
 import { HireMindLogo } from '../components/HireMindLogo';
 
 export const ServiceTeamDashboard: React.FC = () => {
@@ -98,391 +101,375 @@ export const ServiceTeamDashboard: React.FC = () => {
     setTicketReply('');
   };
 
+  const tabTitle =
+    activeTab === 'VERIFICATIONS' ? 'Corporate Verifications' :
+    activeTab === 'USERS' ? 'User Moderation' : 'Support Desk & SLAs';
+
   return (
-    <div className="service-desk-wrapper">
+    <div className="eadmin-shell">
       {/* ── Service Team Sidebar ── */}
-      <aside className="service-sidebar">
-        <div style={{ padding: '24px 20px', borderBottom: '1px solid rgba(99, 102, 241, 0.2)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+      <aside className="eadmin-sidebar">
+        <div className="eadmin-sidebar-head">
+          <div className="eadmin-brand-link">
             <HireMindLogo variant="navbar" size="xs" theme="dark" animated={false} />
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#A5B4FC', letterSpacing: '0.05em' }}>
-                SERVICE & SUPPORT
-              </div>
-              <div style={{ fontSize: '11px', color: '#64748B' }}>Customer Success Desk</div>
-            </div>
           </div>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            background: 'rgba(99, 102, 241, 0.12)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            padding: '3px 8px',
-            borderRadius: '12px',
-            fontSize: '11px',
-            color: '#A5B4FC',
-            marginTop: '6px'
-          }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#6366F1', display: 'inline-block' }} />
-            SLA HOTLINE ACTIVE
+          <div className="eadmin-role-badge-box">
+            <div className="eadmin-role-label">Operations</div>
+            <span className="eadmin-role-tag eadmin-tag-service">SERVICE TEAM</span>
           </div>
         </div>
 
-        <nav style={{ flex: 1, padding: '16px 0' }}>
+        <nav className="eadmin-nav-list">
+          <div className="eadmin-nav-group-title">Operations & Support</div>
           <button
-            className={`service-nav-btn ${activeTab === 'VERIFICATIONS' ? 'active' : ''}`}
+            className={`eadmin-nav-btn ${activeTab === 'VERIFICATIONS' ? 'active' : ''}`}
             onClick={() => setActiveTab('VERIFICATIONS')}
           >
-            <Building2 size={16} /> Corporate Verifications
+            <span className="eadmin-nav-btn-left">
+              <Building2 size={16} />
+              <span>Verifications</span>
+            </span>
             {pendingCompanies.length > 0 && (
-              <span style={{ marginLeft: 'auto', background: '#EF4444', color: '#FFF', fontSize: '10px', padding: '2px 6px', borderRadius: '10px' }}>
+              <span className="eadmin-badge eadmin-badge-rose" style={{ padding: '1px 6px', fontSize: '10px' }}>
                 {pendingCompanies.length}
               </span>
             )}
           </button>
           <button
-            className={`service-nav-btn ${activeTab === 'USERS' ? 'active' : ''}`}
+            className={`eadmin-nav-btn ${activeTab === 'USERS' ? 'active' : ''}`}
             onClick={() => setActiveTab('USERS')}
           >
-            <Users size={16} /> User & HR Moderation
+            <span className="eadmin-nav-btn-left">
+              <Users size={16} />
+              <span>User Moderation</span>
+            </span>
           </button>
           <button
-            className={`service-nav-btn ${activeTab === 'TICKETS' ? 'active' : ''}`}
+            className={`eadmin-nav-btn ${activeTab === 'TICKETS' ? 'active' : ''}`}
             onClick={() => setActiveTab('TICKETS')}
           >
-            <Ticket size={16} /> Customer Support Tickets
-            <span style={{ marginLeft: 'auto', background: '#F59E0B', color: '#000', fontSize: '10px', padding: '2px 6px', borderRadius: '10px', fontWeight: 800 }}>
+            <span className="eadmin-nav-btn-left">
+              <Ticket size={16} />
+              <span>Support Tickets</span>
+            </span>
+            <span className="eadmin-badge eadmin-badge-amber" style={{ padding: '1px 6px', fontSize: '10px' }}>
               2 OPEN
             </span>
           </button>
         </nav>
 
-        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(99, 102, 241, 0.2)', background: 'rgba(0,0,0,0.2)' }}>
-          <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>Signed in as Service Agent:</div>
-          <div style={{ fontSize: '12px', color: '#A5B4FC', fontWeight: 600, wordBreak: 'break-all', marginBottom: '12px' }}>
-            {user?.email}
+        <div className="eadmin-sidebar-footer">
+          <div className="eadmin-user-card">
+            <div className="eadmin-user-avatar">
+              <Headphones size={15} />
+            </div>
+            <div className="eadmin-user-info">
+              <span className="eadmin-user-name">Service Agent</span>
+              <span className="eadmin-user-email">{user?.email || 'service@hiremind.ai'}</span>
+            </div>
           </div>
           <button
             onClick={() => logout('/admin-login')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-              width: '100%',
-              padding: '8px',
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              borderRadius: '8px',
-              color: '#F87171',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
+            className="eadmin-signout-btn"
           >
-            <LogOut size={14} /> Exit Helpdesk
+            <LogOut size={14} /> Exit Operations
           </button>
         </div>
       </aside>
 
       {/* ── Main Operations Workspace ── */}
-      <main style={{ flex: 1, padding: '28px', overflowY: 'auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '24px', fontWeight: 900, color: '#F1F5F9', margin: 0 }}>
-              {activeTab === 'VERIFICATIONS' && '🏢 Corporate Verification & Onboarding Queue'}
-              {activeTab === 'USERS' && '👤 User & Recruiter Moderation Bureau'}
-              {activeTab === 'TICKETS' && '🎫 Customer Support Tickets & SLA Desk'}
-            </h1>
-            <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#94A3B8' }}>
-              Service & Moderation Team | Enterprise Customer SLA Level: 15 Minutes
-            </p>
-          </div>
-
-          <button
-            onClick={fetchInitialData}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '8px 14px',
-              background: 'rgba(99, 102, 241, 0.15)',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              borderRadius: '8px',
-              color: '#A5B4FC',
-              fontSize: '12px',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh Queue
-          </button>
-        </div>
-
-        {/* ── TAB 1: CORPORATE VERIFICATIONS ── */}
-        {activeTab === 'VERIFICATIONS' && (
-          <div>
-            {pendingCompanies.length === 0 ? (
-              <div className="service-card" style={{ textAlign: 'center', padding: '48px 20px' }}>
-                <CheckCircle size={48} color="#10B981" style={{ margin: '0 auto 16px' }} />
-                <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#F1F5F9', margin: '0 0 8px' }}>
-                  All Company Registrations Verified!
-                </h3>
-                <p style={{ fontSize: '13px', color: '#94A3B8', maxWidth: '400px', margin: '0 auto' }}>
-                  There are no pending corporate verification requests in the queue. New corporate registrations will appear here for badge approval.
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '20px' }}>
-                {pendingCompanies.map((c) => (
-                  <div key={c.id} className="service-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                      <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#F8FAFC', margin: 0 }}>{c.name}</h3>
-                      <span style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.3)', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700 }}>
-                        PENDING
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <div><strong>Industry:</strong> {c.industry || 'Technology'}</div>
-                      <div><strong>Size:</strong> {c.companySize || '50-200'} employees</div>
-                      <div><strong>Website:</strong> <a href={c.website || '#'} target="_blank" rel="noreferrer" style={{ color: '#818CF8' }}>{c.website || 'N/A'}</a></div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button
-                        onClick={() => handleVerifyCompany(c.id, true)}
-                        style={{ flex: 1, padding: '8px', background: '#10B981', border: 'none', borderRadius: '6px', color: '#060913', fontWeight: 800, fontSize: '12px', cursor: 'pointer' }}
-                      >
-                        ✓ Approve & Issue Badge
-                      </button>
-                      <button
-                        onClick={() => handleVerifyCompany(c.id, false)}
-                        style={{ padding: '8px 14px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid #EF4444', borderRadius: '6px', color: '#F87171', fontWeight: 700, fontSize: '12px', cursor: 'pointer' }}
-                      >
-                        ✕ Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── TAB 2: USER MODERATION ── */}
-        {activeTab === 'USERS' && (
-          <div>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <Search size={16} color="#64748B" style={{ position: 'absolute', top: '12px', left: '14px' }} />
-                <input
-                  type="text"
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  placeholder="Search users by name, email, or candidate ID..."
-                  style={{
-                    width: '100%',
-                    padding: '10px 14px 10px 40px',
-                    background: 'rgba(30, 41, 59, 0.7)',
-                    border: '1px solid rgba(99, 102, 241, 0.25)',
-                    borderRadius: '8px',
-                    color: '#F8FAFC',
-                    fontSize: '13px'
-                  }}
-                />
-              </div>
-              <button
-                onClick={fetchInitialData}
-                style={{ padding: '10px 20px', background: '#6366F1', border: 'none', borderRadius: '8px', color: '#FFF', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-              >
-                Search
-              </button>
+      <main className="eadmin-main">
+        {/* Top Header */}
+        <header className="eadmin-header">
+          <div className="eadmin-header-left">
+            <div className="eadmin-breadcrumb">
+              <span>Operations</span>
+              <ChevronRight size={13} />
+              <span>Service Team</span>
+              <ChevronRight size={13} />
+              <strong>{tabTitle}</strong>
             </div>
-
-            <div className="service-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-                <thead>
-                  <tr style={{ background: 'rgba(15, 23, 42, 0.9)', borderBottom: '1px solid rgba(99, 102, 241, 0.2)', color: '#94A3B8' }}>
-                    <th style={{ padding: '14px 18px' }}>User</th>
-                    <th style={{ padding: '14px 18px' }}>Role</th>
-                    <th style={{ padding: '14px 18px' }}>Status</th>
-                    <th style={{ padding: '14px 18px', textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usersList.map((u) => (
-                    <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ fontWeight: 700, color: '#F8FAFC' }}>{u.firstName} {u.lastName}</div>
-                        <div style={{ fontSize: '11px', color: '#64748B' }}>{u.email}</div>
-                      </td>
-                      <td style={{ padding: '14px 18px', color: '#A5B4FC' }}>
-                        {u.role || 'ROLE_CANDIDATE'}
-                      </td>
-                      <td style={{ padding: '14px 18px' }}>
-                        <span style={{
-                          padding: '2px 8px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          background: u.status === 'ACTIVE' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          color: u.status === 'ACTIVE' ? '#10B981' : '#F87171'
-                        }}>
-                          {u.status || 'ACTIVE'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                          <button
-                            onClick={() => handleViewDetails(u.id)}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              border: '1px solid rgba(99, 102, 241, 0.3)',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              color: '#A5B4FC',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
-                          >
-                            <Eye size={12} /> Inspect
-                          </button>
-                          <button
-                            onClick={() => handleBlockUser(u.id, u.status === 'ACTIVE')}
-                            style={{
-                              padding: '6px 12px',
-                              borderRadius: '6px',
-                              border: 'none',
-                              fontSize: '11px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              background: u.status === 'ACTIVE' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-                              color: u.status === 'ACTIVE' ? '#F87171' : '#10B981'
-                            }}
-                          >
-                            {u.status === 'ACTIVE' ? 'Block' : 'Unblock'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* User Dossier Inspect Modal */}
-            {selectedUserDetails && (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-                <div className="service-card" style={{ maxWidth: '480px', width: '100%', background: '#0F172A' }}>
-                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#F8FAFC', margin: '0 0 16px' }}>User Dossier & Security Record</h3>
-                  <pre style={{ background: 'rgba(0,0,0,0.4)', padding: '14px', borderRadius: '8px', color: '#A5B4FC', fontSize: '12px', maxHeight: '280px', overflowY: 'auto' }}>
-                    {JSON.stringify(selectedUserDetails, null, 2)}
-                  </pre>
-                  <button
-                    onClick={() => setSelectedUserDetails(null)}
-                    style={{ marginTop: '16px', width: '100%', padding: '10px', background: '#6366F1', border: 'none', borderRadius: '8px', color: '#FFF', fontWeight: 800, cursor: 'pointer' }}
-                  >
-                    Close Dossier
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-        )}
 
-        {/* ── TAB 3: SUPPORT TICKETS ── */}
-        {activeTab === 'TICKETS' && (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: selectedTicket ? '1fr 1fr' : '1fr', gap: '20px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {tickets.map((t) => (
-                  <div
-                    key={t.id}
-                    className="service-card"
-                    onClick={() => setSelectedTicket(t)}
-                    style={{
-                      cursor: 'pointer',
-                      borderColor: selectedTicket?.id === t.id ? '#6366F1' : undefined
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#818CF8' }}>{t.id}</span>
-                      <span style={{
-                        fontSize: '10px',
-                        fontWeight: 800,
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        background: t.priority === 'HIGH' ? 'rgba(239,68,68,0.2)' : 'rgba(245,158,11,0.2)',
-                        color: t.priority === 'HIGH' ? '#F87171' : '#F59E0B'
-                      }}>
-                        {t.priority} PRIORITY
-                      </span>
-                    </div>
-                    <div style={{ fontWeight: 700, color: '#F8FAFC', marginBottom: '4px' }}>{t.subject}</div>
-                    <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', justifyContent: 'space-between' }}>
-                      <span>From: {t.customer}</span>
-                      <span>{t.timeAgo}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div className="eadmin-header-right">
+            <span className="eadmin-badge eadmin-badge-teal">
+              <ShieldCheck size={12} /> SLA Level: 15m Active
+            </span>
+            <button
+              onClick={fetchInitialData}
+              className="eadmin-btn eadmin-btn-secondary"
+            >
+              <RefreshCw size={13} className={loading ? 'spin' : ''} /> Refresh
+            </button>
+          </div>
+        </header>
 
-              {selectedTicket && (
-                <div className="service-card">
-                  <h3 style={{ fontSize: '16px', fontWeight: 800, color: '#F8FAFC', margin: '0 0 12px' }}>
-                    Reply to {selectedTicket.id}
+        {/* Content Area */}
+        <div className="eadmin-content">
+          <div className="eadmin-page-title-row">
+            <div className="eadmin-page-title-box">
+              <h1>
+                {activeTab === 'VERIFICATIONS' && 'Corporate Verification Queue'}
+                {activeTab === 'USERS' && 'User & Recruiter Moderation Bureau'}
+                {activeTab === 'TICKETS' && 'Customer Support & SLA Desk'}
+              </h1>
+              <p>
+                {activeTab === 'VERIFICATIONS' && 'Review and verify pending enterprise employer registrations.'}
+                {activeTab === 'USERS' && 'Inspect user dossiers, oversee compliance, and manage account statuses.'}
+                {activeTab === 'TICKETS' && 'Resolve inbound customer tickets and maintain SLA commitments.'}
+              </p>
+            </div>
+          </div>
+
+          {/* ── TAB 1: CORPORATE VERIFICATIONS ── */}
+          {activeTab === 'VERIFICATIONS' && (
+            <div>
+              {pendingCompanies.length === 0 ? (
+                <div className="eadmin-card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+                  <CheckCircle2 size={44} color="#0F766E" style={{ margin: '0 auto 14px' }} />
+                  <h3 style={{ fontSize: '17px', fontWeight: 750, color: '#1E293B', margin: '0 0 6px' }}>
+                    All Company Registrations Verified
                   </h3>
-                  <div style={{ fontSize: '13px', color: '#94A3B8', marginBottom: '16px', padding: '12px', background: 'rgba(0,0,0,0.3)', borderRadius: '8px' }}>
-                    <strong>Subject:</strong> {selectedTicket.subject}<br />
-                    <strong>Customer:</strong> {selectedTicket.customer}
-                  </div>
-                  <form onSubmit={handleSendTicketReply}>
-                    <textarea
-                      rows={5}
-                      value={ticketReply}
-                      onChange={(e) => setTicketReply(e.target.value)}
-                      placeholder="Type official support resolution to customer..."
-                      required
-                      style={{
-                        width: '100%',
-                        background: 'rgba(15, 23, 42, 0.8)',
-                        border: '1px solid rgba(99, 102, 241, 0.3)',
-                        borderRadius: '8px',
-                        color: '#F8FAFC',
-                        padding: '12px',
-                        fontSize: '13px',
-                        marginBottom: '16px'
-                      }}
-                    />
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button
-                        type="submit"
-                        style={{ flex: 1, padding: '10px', background: '#6366F1', border: 'none', borderRadius: '8px', color: '#FFF', fontWeight: 800, fontSize: '13px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                      >
-                        <Send size={14} /> Send Official Resolution
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedTicket(null)}
-                        style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: '8px', color: '#94A3B8', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-                      >
-                        Cancel
-                      </button>
+                  <p style={{ fontSize: '13px', color: '#64748B', maxWidth: '420px', margin: '0 auto' }}>
+                    There are no pending corporate verification requests in the queue. New corporate registrations will appear here for badge approval.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '18px' }}>
+                  {pendingCompanies.map((c) => (
+                    <div key={c.id} className="eadmin-card" style={{ marginBottom: 0 }}>
+                      <div className="eadmin-card-head">
+                        <div>
+                          <h3 className="eadmin-card-title">{c.name}</h3>
+                          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>Company ID #{c.id}</div>
+                        </div>
+                        <span className="eadmin-badge eadmin-badge-amber">PENDING VERIFICATION</span>
+                      </div>
+                      <div style={{ fontSize: '13px', color: '#475569', marginBottom: '18px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div><strong style={{ color: '#1E293B' }}>Industry:</strong> {c.industry || 'Technology'}</div>
+                        <div><strong style={{ color: '#1E293B' }}>Company Size:</strong> {c.companySize || '50-200'} employees</div>
+                        <div>
+                          <strong style={{ color: '#1E293B' }}>Website:</strong>{' '}
+                          {c.website ? (
+                            <a href={c.website} target="_blank" rel="noreferrer" style={{ color: '#2563EB', fontWeight: 600 }}>
+                              {c.website} ↗
+                            </a>
+                          ) : 'Not provided'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                          onClick={() => handleVerifyCompany(c.id, true)}
+                          className="eadmin-btn eadmin-btn-teal"
+                          style={{ flex: 1 }}
+                        >
+                          ✓ Approve & Issue Badge
+                        </button>
+                        <button
+                          onClick={() => handleVerifyCompany(c.id, false)}
+                          className="eadmin-btn eadmin-btn-danger"
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
                     </div>
-                  </form>
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* ── TAB 2: USER MODERATION ── */}
+          {activeTab === 'USERS' && (
+            <div>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '18px', maxWidth: '640px' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <Search size={15} color="#94A3B8" style={{ position: 'absolute', top: '11px', left: '12px' }} />
+                  <input
+                    type="text"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Search users by name, email, or user ID..."
+                    className="eadmin-input"
+                    style={{ paddingLeft: '34px' }}
+                  />
+                </div>
+                <button
+                  onClick={fetchInitialData}
+                  className="eadmin-btn eadmin-btn-primary"
+                >
+                  Search
+                </button>
+              </div>
+
+              <div className="eadmin-table-wrapper">
+                <table className="eadmin-table">
+                  <thead>
+                    <tr>
+                      <th>User Account</th>
+                      <th>System Role</th>
+                      <th>Account Status</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usersList.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '32px', color: '#64748B' }}>
+                          No user records found matching search.
+                        </td>
+                      </tr>
+                    ) : (
+                      usersList.map((u) => (
+                        <tr key={u.id}>
+                          <td>
+                            <div style={{ fontWeight: 700, color: '#0F172A' }}>{u.firstName} {u.lastName}</div>
+                            <div style={{ fontSize: '11.5px', color: '#64748B' }}>{u.email}</div>
+                          </td>
+                          <td>
+                            <span className="eadmin-badge eadmin-badge-blue">
+                              {u.role || 'ROLE_CANDIDATE'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`eadmin-badge ${u.status === 'ACTIVE' ? 'eadmin-badge-teal' : 'eadmin-badge-rose'}`}>
+                              {u.status === 'ACTIVE' ? '● ACTIVE' : '■ BLOCKED'}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={() => handleViewDetails(u.id)}
+                                className="eadmin-btn eadmin-btn-secondary"
+                                style={{ padding: '5px 10px', fontSize: '11.5px', minHeight: '30px' }}
+                              >
+                                <Eye size={12} /> Inspect
+                              </button>
+                              <button
+                                onClick={() => handleBlockUser(u.id, u.status === 'ACTIVE')}
+                                className={`eadmin-btn ${u.status === 'ACTIVE' ? 'eadmin-btn-danger' : 'eadmin-btn-teal'}`}
+                                style={{ padding: '5px 10px', fontSize: '11.5px', minHeight: '30px' }}
+                              >
+                                {u.status === 'ACTIVE' ? 'Block' : 'Unblock'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* User Dossier Inspect Modal */}
+              {selectedUserDetails && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+                  <div className="eadmin-card" style={{ maxWidth: '520px', width: '100%', marginBottom: 0, boxShadow: '0 20px 50px rgba(15, 23, 42, 0.2)' }}>
+                    <div className="eadmin-card-head">
+                      <h3 className="eadmin-card-title">User Dossier & Security Record</h3>
+                    </div>
+                    <pre style={{ background: '#F8FAFC', padding: '14px', borderRadius: '8px', border: '1px solid #E2E8F0', color: '#1E293B', fontSize: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+                      {JSON.stringify(selectedUserDetails, null, 2)}
+                    </pre>
+                    <div style={{ marginTop: '18px', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => setSelectedUserDetails(null)}
+                        className="eadmin-btn eadmin-btn-primary"
+                      >
+                        Close Dossier
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TAB 3: SUPPORT TICKETS ── */}
+          {activeTab === 'TICKETS' && (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: selectedTicket ? 'minmax(0, 1.2fr) minmax(0, 1fr)' : '1fr', gap: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {tickets.map((t) => (
+                    <div
+                      key={t.id}
+                      className="eadmin-card"
+                      onClick={() => setSelectedTicket(t)}
+                      style={{
+                        cursor: 'pointer',
+                        borderColor: selectedTicket?.id === t.id ? '#2563EB' : undefined,
+                        boxShadow: selectedTicket?.id === t.id ? '0 0 0 2px rgba(37, 99, 235, 0.2)' : undefined,
+                        marginBottom: 0
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 750, color: '#2563EB' }}>{t.id}</span>
+                        <span className={`eadmin-badge ${t.priority === 'HIGH' ? 'eadmin-badge-rose' : 'eadmin-badge-amber'}`}>
+                          {t.priority} PRIORITY
+                        </span>
+                      </div>
+                      <div style={{ fontWeight: 700, color: '#0F172A', marginBottom: '6px', fontSize: '14px' }}>{t.subject}</div>
+                      <div style={{ fontSize: '12px', color: '#64748B', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Customer: <strong style={{ color: '#475569' }}>{t.customer}</strong></span>
+                        <span>{t.timeAgo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedTicket && (
+                  <div className="eadmin-card" style={{ marginBottom: 0 }}>
+                    <div className="eadmin-card-head">
+                      <div>
+                        <h3 className="eadmin-card-title">Reply to {selectedTicket.id}</h3>
+                        <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>Official Customer Response</div>
+                      </div>
+                      <span className={`eadmin-badge ${selectedTicket.status === 'RESOLVED' ? 'eadmin-badge-teal' : 'eadmin-badge-blue'}`}>
+                        {selectedTicket.status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: '#475569', marginBottom: '16px', padding: '12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
+                      <div><strong style={{ color: '#0F172A' }}>Subject:</strong> {selectedTicket.subject}</div>
+                      <div style={{ marginTop: '4px' }}><strong style={{ color: '#0F172A' }}>Customer:</strong> {selectedTicket.customer}</div>
+                    </div>
+                    <form onSubmit={handleSendTicketReply}>
+                      <label className="eadmin-label">Resolution Message</label>
+                      <textarea
+                        rows={5}
+                        value={ticketReply}
+                        onChange={(e) => setTicketReply(e.target.value)}
+                        placeholder="Type official support resolution to customer..."
+                        required
+                        className="eadmin-input"
+                        style={{ marginBottom: '16px', resize: 'vertical' }}
+                      />
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                          type="submit"
+                          className="eadmin-btn eadmin-btn-primary"
+                          style={{ flex: 1 }}
+                        >
+                          <Send size={14} /> Send Official Resolution
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTicket(null)}
+                          className="eadmin-btn eadmin-btn-secondary"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
 };
 
 export default ServiceTeamDashboard;
+

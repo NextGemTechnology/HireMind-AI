@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
 /** Native modal semantics for existing HR forms without changing their handlers. */
-export function HrModalFrame({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function HrModalFrame({ title, onClose, children, className = 'hr-legacy-modal' }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -13,7 +13,7 @@ export function HrModalFrame({ title, onClose, children }: { title: string; onCl
       document.body.style.overflow = previousOverflow;
     };
   }, []);
-  return <dialog ref={dialogRef} className="hr-legacy-modal" aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
+  return <dialog ref={dialogRef} className={className} aria-label={title} onCancel={event => { event.preventDefault(); onClose(); }}>
     {children}
   </dialog>;
 }

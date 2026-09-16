@@ -30,6 +30,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 }) => {
   const { user, isAuthenticated, isHr } = useAuth();
   const navigate = useNavigate();
+  const manager = !!user?.roles?.includes('ROLE_COMPANY_ADMIN');
 
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -91,7 +92,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
             if (incoming.receiverId === myId || (incoming.senderId !== myId && !incoming.receiverId)) {
               // Construct ephemeral notification item or refresh
               setUnreadCount(prev => prev + 1);
-              const isHrReceiver = isHr;
+              const isHrReceiver = isHr && !manager;
               const link = isHrReceiver
                 ? `/hr-messages?contactId=${incoming.senderId}`
                 : `/messages?contactId=${incoming.senderId}`;
@@ -147,7 +148,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       eventSource?.close();
       clearInterval(interval);
     };
-  }, [isAuthenticated, user?.id, isHr, fetchNotifications]);
+  }, [isAuthenticated, user?.id, isHr, manager, fetchNotifications]);
 
   // Click outside listener to automatically close dropdown
   useEffect(() => {
@@ -197,10 +198,12 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     setIsHovered(false);
 
     // Route to conversation if linkUrl is present
-    if (notif.linkUrl) {
+    if (manager && (notif.linkUrl?.startsWith('/hr-messages') || notif.linkUrl?.startsWith('/messages'))) {
+      navigate(notif.linkUrl.replace(/^\/hr-messages/, '/messages'));
+    } else if (notif.linkUrl) {
       navigate(notif.linkUrl);
     } else if (notif.type === 'CHAT_MESSAGE') {
-      navigate(isHr ? '/hr-messages' : '/messages');
+      navigate(isHr && !manager ? '/hr-messages' : '/messages');
     }
   };
 

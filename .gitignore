@@ -27,3 +27,9 @@ target/
 /tmp/
 .env
 .env.local
+.env.*
+uploads/
+*.pem
+*.key
+*.p12
+*.crt

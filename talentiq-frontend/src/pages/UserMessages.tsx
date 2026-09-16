@@ -48,7 +48,11 @@ interface UserMessagesProps {
 
 export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) => {
   const { user, isAuthenticated, logout } = useAuth();
-  const { isLight } = useTheme();
+  const { isLight: themeIsLight } = useTheme();
+  const manager = !!user?.roles?.includes('ROLE_COMPANY_ADMIN');
+  const isLight = manager || themeIsLight;
+  const [managerError, setManagerError] = useState('');
+  const [managerSending, setManagerSending] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -113,6 +117,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
   const fetchContacts = useCallback(async () => {
     try {
       setContactsLoading(true);
+      if (manager) setManagerError('');
       const res = await apiClient.get('/chat/contacts');
       const rawList: Contact[] = res.data?.data || [];
       const list: Contact[] = rawList.filter(
@@ -130,7 +135,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
         if (found) {
           setSelectedContact(found);
           sessionStorage.setItem('active_chat_contact_id', String(found.userId));
-        } else {
+        } else if (!manager) {
           const displayName = recruiterNameParam || (companyParam ? `${companyParam} Recruiter` : 'Hiring Team');
           const newRecruiterContact: Contact = {
             userId: targetId,
@@ -176,10 +181,11 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
     } catch (err) {
       console.error('Failed to fetch chat contacts', err);
       setContacts([]);
+      if (manager) setManagerError('Conversations could not be loaded. Please refresh to retry.');
     } finally {
       setContactsLoading(false);
     }
-  }, [contactIdParam, recruiterNameParam, jobTitleParam, companyParam, currentUserId, user]);
+  }, [contactIdParam, recruiterNameParam, jobTitleParam, companyParam, currentUserId, user, manager]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -346,7 +352,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
   /* ─── Send Message ─── */
   const sendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
-    if (!text || !selectedContact) return;
+    if (!text || !selectedContact || managerSending) return;
 
     const myId = getEffectiveUserId();
     const token = localStorage.getItem('accessToken');
@@ -355,6 +361,25 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
       content: text,
       type: 'TEXT',
     };
+
+    if (manager) {
+      setManagerSending(true);
+      setManagerError('');
+      try {
+        const res = await apiClient.post('/chat/messages', payload);
+        const saved = res.data?.data;
+        if (!saved?.id) throw new Error('No delivery confirmation received');
+        setMessages(previous => previous.some(message => message.id === saved.id) ? previous : [...previous, saved]);
+        setInputText(current => current.trim() === text ? '' : current);
+        setContacts(previous => previous.map(contact => contact.userId === payload.receiverId
+          ? { ...contact, lastMessage: saved.content, lastMessageAt: saved.sentAt } : contact));
+      } catch {
+        setManagerError('Message was not sent. Your draft is still available to retry.');
+      } finally {
+        setManagerSending(false);
+      }
+      return;
+    }
 
     const tempId = Date.now();
     const optimistic: Message = {
@@ -435,6 +460,10 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
       }
     } catch (err) {
       console.error('Failed to upload file', err);
+      if (manager) {
+        setMessages(previous => previous.filter(message => message.id !== tempId));
+        setManagerError('Attachment could not be sent. Please try again.');
+      }
     }
 
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -564,7 +593,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
 
       {/* ── Fixed Left Contacts Directory (WhatsApp style chat list) ── */}
       <div className="msg-contacts-panel">
-        <div className="msg-contacts-header">
+        <div className="msg-contacts-header">{manager && <h2 style={{fontSize: 17, margin: '0 0 12px'}}>Direct messages</h2>}{managerError && !selectedContact && <p role="alert">{managerError}</p>}
           <div className="msg-contacts-title-row">
             <div className="msg-contacts-title-wrap">
               <span className="msg-contacts-title-emoji">💬</span>
@@ -578,6 +607,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
             <Search size={15} className="msg-search-icon" />
             <input
               type="text"
+              aria-label="Search conversations"
               placeholder="Search chats or recruiters..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -655,6 +685,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
 
       {/* ── Main Chat Pane ── */}
       <div className="msg-chat-panel">
+        {managerError && selectedContact && <p role="alert" className="cm-notice">{managerError}</p>}
         {selectedContact ? (
           <>
             {/* Top Chat Header (WhatsApp style) */}
@@ -681,15 +712,15 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
                 <div>
                   <div className="msg-chat-header-name">
                     <span className="msg-chat-candidate-title">{selectedContact.name}</span>
-                    {selectedContact.flagged && (
+                    {!manager && selectedContact.flagged && (
                       <span className="msg-flagged-pill candidate-side" title="Shortlisted by Recruiter">
                         🚩 Shortlisted
                       </span>
                     )}
                   </div>
                   <div className="msg-chat-status-line">
-                    <span className="msg-status-dot" />
-                    <span>{otherTyping ? 'typing...' : 'online'}</span>
+                    {!manager && <span className="msg-status-dot" />}
+                    <span>{otherTyping ? 'typing...' : manager ? 'Direct conversation' : 'online'}</span>
                     {selectedContact.companyName && (
                       <span className="msg-company-tag">• {selectedContact.companyName}</span>
                     )}
@@ -720,7 +751,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
             )}
 
             {/* Quick Inquiries Strip */}
-            <div className="msg-quick-inquiries-bar">
+            {!manager && <div className="msg-quick-inquiries-bar">
               <span className="msg-quick-label">⚡ Quick Templates:</span>
               {[
                 "👋 Hello! I'm interested in discussing this opportunity.",
@@ -736,7 +767,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
                   {template}
                 </button>
               ))}
-            </div>
+            </div>}
 
             {/* Message Stream: Strictly Right (Candidate/Me) vs Left (Recruiter) */}
             <div className="msg-messages-scroll-area">
@@ -894,7 +925,8 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
 
               <button
                 onClick={() => sendMessage()}
-                disabled={!inputText.trim()}
+                disabled={!inputText.trim() || managerSending}
+                aria-label={managerSending ? 'Sending message' : 'Send message'}
                 className={`msg-send-btn ${inputText.trim() ? 'active' : ''}`}
                 title="Send Message"
               >
@@ -906,7 +938,7 @@ export const UserMessages: React.FC<UserMessagesProps> = ({ embedded = false }) 
           <div className="msg-no-selected-placeholder">
             <MessageSquare size={52} color="#7C3AED" />
             <h3>Select a Conversation to Start Chatting</h3>
-            <p>Choose a recruiter contact on the left panel or click "Message HR" from any job posting.</p>
+            <p>{manager ? "Choose an existing conversation. Company managers communicate with recruiters; candidate outreach stays with HR." : 'Choose a recruiter contact on the left panel or click "Message HR" from any job posting.'}</p>
           </div>
         )}
       </div>

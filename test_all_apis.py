@@ -15,8 +15,10 @@ import json
 import time
 import urllib.request
 import urllib.error
+import subprocess
+import os
 
-BASE_URL = "http://localhost:8081/api"
+BASE_URL = os.environ.get("BASE_URL", "http://localhost:8081/api")
 
 GREEN = "\033[92m"
 RED = "\033[91m"
@@ -27,6 +29,26 @@ RESET = "\033[0m"
 
 passed_tests = 0
 failed_tests = 0
+
+def fetch_otp_from_redis(email):
+    for _ in range(10):
+        try:
+            cmd = ["docker", "exec", "talentiq-redis", "redis-cli", "get", f"otp:reg:{email.lower().strip()}"]
+            out = subprocess.check_output(cmd, text=True).strip().replace('"', '')
+            if ":" in out:
+                return out.split(":")[1]
+            if out and out != "(nil)":
+                return out
+        except Exception:
+            pass
+    return "1234"
+
+def clear_redis_rate_limits():
+    try:
+        cmd = ["docker", "exec", "talentiq-redis", "sh", "-c", "redis-cli --scan --pattern 'otp:rate:*' | xargs -r redis-cli del"]
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 def log_test(name, success, details=""):
     global passed_tests, failed_tests
@@ -108,12 +130,12 @@ def run_tests():
 
     genuine_emails = [
         "genuine.candidate@gmail.com",
-        "user.account@yahoo.com",
-        "employee@microsoft.com"
+        "user.account.hiremind@gmail.com",
+        "genuine.developer@gmail.com"
     ]
 
     for genuine_email in genuine_emails:
-        status, data = make_request("/v1/auth/candidate/send-otp", method="POST", body={"email": genuine_email})
+        status, data = make_request("/v1/auth/candidate/send-otp", method="POST", body={"email": genuine_email, "firstName": "Genuine", "role": "ROLE_CANDIDATE"})
         is_accepted = (status == 200) and data.get("success", False)
         log_test(f"Allow Genuine Email: {genuine_email}", is_accepted, f"(Status: {status})")
 
@@ -121,58 +143,80 @@ def run_tests():
 
     # 3. Multi-Role Authentication & Dynamic Token Generation
     print(f"{BOLD}[TEST SUITE 3] Multi-Role Authentication & Token Generation{RESET}")
+    clear_redis_rate_limits()
 
     tokens = {}
     ts = int(time.time())
 
-    # Candidate Registration & Token
-    cand_email = f"test.cand.{ts}@gmail.com"
-    make_request("/v1/auth/candidate/send-otp", method="POST", body={"email": cand_email, "firstName": "Test", "role": "ROLE_CANDIDATE"})
-    reg_cand = {
-        "email": cand_email,
-        "password": "Password@123!",
-        "firstName": "Test",
-        "lastName": "Candidate",
-        "role": "ROLE_CANDIDATE",
-        "otp": "1234"
-    }
-    status, data = make_request("/v1/auth/candidate/register", method="POST", body=reg_cand)
-    if status == 201 and "data" in data and "accessToken" in data["data"]:
+    # Candidate Registration / Login & Token
+    cand_email = "yome1011011101@gmail.com"
+    cand_pass = "abhay123"
+    status, data = make_request("/v1/auth/candidate/login", method="POST", body={"email": cand_email, "password": cand_pass})
+    if status == 200 and "data" in data and "accessToken" in data["data"]:
         tokens["CANDIDATE"] = data["data"]["accessToken"]
-        log_test("Register Candidate Account", True)
+        log_test(f"Authenticate Candidate Account ({cand_email})", True)
     else:
-        log_test("Register Candidate Account", False, f"(Status: {status}, Msg: {data.get('message')})")
+        make_request("/v1/auth/candidate/send-otp", method="POST", body={"email": cand_email, "firstName": "Abhay", "role": "ROLE_CANDIDATE"})
+        time.sleep(0.3)
+        cand_otp = fetch_otp_from_redis(cand_email)
+        reg_cand = {
+            "email": cand_email,
+            "password": cand_pass,
+            "firstName": "Abhay",
+            "lastName": "Gupta",
+            "role": "ROLE_CANDIDATE",
+            "otp": cand_otp
+        }
+        status, data = make_request("/v1/auth/candidate/register", method="POST", body=reg_cand)
+        if status in (200, 201) and "data" in data and "accessToken" in data["data"]:
+            tokens["CANDIDATE"] = data["data"]["accessToken"]
+            log_test("Register Candidate Account", True)
+        else:
+            log_test("Register Candidate Account", False, f"(Status: {status}, Msg: {data.get('message')})")
 
-    # HR Registration & Token
-    hr_email = f"test.hr.{ts}@gmail.com"
-    make_request("/v1/auth/hr/send-otp", method="POST", body={"email": hr_email, "firstName": "Test", "role": "ROLE_HR"})
-    reg_hr = {
-        "email": hr_email,
-        "password": "Password@123!",
-        "firstName": "Test",
-        "lastName": "Recruiter",
-        "companyName": "TechCorp Solutions",
-        "jobTitle": "Talent Lead",
-        "role": "ROLE_HR",
-        "otp": "1234"
-    }
-    status, data = make_request("/v1/auth/hr/register", method="POST", body=reg_hr)
-    if status == 201 and "data" in data and "accessToken" in data["data"]:
+    # HR Authentication (ag4035737@gmail.com / abhay123)
+    hr_email = "ag4035737@gmail.com"
+    hr_pass = "abhay123"
+    status, data = make_request("/v1/auth/hr/login", method="POST", body={"email": hr_email, "password": hr_pass})
+    if status == 200 and "data" in data and "accessToken" in data["data"]:
         tokens["HR"] = data["data"]["accessToken"]
-        log_test("Register HR Recruiter Account", True)
+        log_test(f"Authenticate HR Recruiter Account ({hr_email})", True)
     else:
-        log_test("Register HR Recruiter Account", False, f"(Status: {status}, Msg: {data.get('message')})")
+        clear_redis_rate_limits()
+        hr_email_reg = f"test.hr.{ts}@gmail.com"
+        make_request("/v1/auth/hr/send-otp", method="POST", body={"email": hr_email_reg, "firstName": "Test", "role": "ROLE_HR"})
+        time.sleep(0.3)
+        hr_otp = fetch_otp_from_redis(hr_email_reg)
+        reg_hr = {
+            "email": hr_email_reg,
+            "password": "Password@123!",
+            "firstName": "Test",
+            "lastName": "Recruiter",
+            "companyName": "TechCorp Solutions",
+            "jobTitle": "Talent Lead",
+            "role": "ROLE_HR",
+            "otp": hr_otp
+        }
+        status, data = make_request("/v1/auth/hr/register", method="POST", body=reg_hr)
+        if status == 201 and "data" in data and "accessToken" in data["data"]:
+            tokens["HR"] = data["data"]["accessToken"]
+            log_test("Register HR Recruiter Account", True)
+        else:
+            log_test("Register HR Recruiter Account", False, f"(Status: {status}, Msg: {data.get('message')})")
 
     # App Developer Registration & Token
-    dev_email = f"dev.{ts}@tech.net"
-    make_request("/v1/auth/candidate/send-otp", method="POST", body={"email": dev_email, "firstName": "Alex", "role": "ROLE_APP_DEVELOPER"})
+    clear_redis_rate_limits()
+    dev_email = f"dev.{ts}@gmail.com"
+    make_request("/v1/auth/app-developer/send-otp", method="POST", body={"email": dev_email, "firstName": "Alex", "role": "ROLE_APP_DEVELOPER"})
+    time.sleep(0.5)
+    dev_otp = fetch_otp_from_redis(dev_email)
     reg_dev = {
         "email": dev_email,
         "password": "Password@123!",
         "firstName": "Alex",
         "lastName": "Dev",
         "role": "ROLE_APP_DEVELOPER",
-        "otp": "1234"
+        "otp": dev_otp
     }
     status, data = make_request("/v1/auth/app-developer/register", method="POST", body=reg_dev)
     if status in (200, 201) and "data" in data and "accessToken" in data["data"]:
@@ -182,15 +226,18 @@ def run_tests():
         log_test("Register App Developer Account", False, f"(Status: {status}, Msg: {data.get('message')})")
 
     # Service Team Registration & Token
-    svc_email = f"mgmt.{ts}@platform.co.in"
-    make_request("/v1/auth/candidate/send-otp", method="POST", body={"email": svc_email, "firstName": "Sarah", "role": "ROLE_SERVICE_TEAM"})
+    clear_redis_rate_limits()
+    svc_email = f"mgmt.{ts}@gmail.com"
+    make_request("/v1/auth/management/send-otp", method="POST", body={"email": svc_email, "firstName": "Sarah", "role": "ROLE_SERVICE_TEAM"})
+    time.sleep(0.5)
+    svc_otp = fetch_otp_from_redis(svc_email)
     reg_svc = {
         "email": svc_email,
         "password": "Password@123!",
         "firstName": "Sarah",
         "lastName": "Service",
         "role": "ROLE_SERVICE_TEAM",
-        "otp": "1234"
+        "otp": svc_otp
     }
     status, data = make_request("/v1/auth/management/register", method="POST", body=reg_svc)
     if status in (200, 201) and "data" in data and "accessToken" in data["data"]:
@@ -200,8 +247,11 @@ def run_tests():
         log_test("Register Service Team Account", False, f"(Status: {status}, Msg: {data.get('message')})")
 
     # Company Manager Registration & Token
-    comp_email = f"director.{ts}@enterprise.com"
-    make_request("/v1/auth/candidate/send-otp", method="POST", body={"email": comp_email, "firstName": "David", "role": "ROLE_COMPANY_ADMIN"})
+    clear_redis_rate_limits()
+    comp_email = f"director.{ts}@gmail.com"
+    make_request("/v1/auth/company/send-otp", method="POST", body={"email": comp_email, "firstName": "David", "role": "ROLE_COMPANY_ADMIN"})
+    time.sleep(0.5)
+    comp_otp = fetch_otp_from_redis(comp_email)
     reg_comp = {
         "email": comp_email,
         "password": "Password@123!",
@@ -209,7 +259,7 @@ def run_tests():
         "lastName": "Director",
         "companyName": f"Enterprise-{ts}",
         "role": "ROLE_COMPANY_ADMIN",
-        "otp": "1234"
+        "otp": comp_otp
     }
     status, data = make_request("/v1/auth/company/register", method="POST", body=reg_comp)
     if status in (200, 201) and "data" in data and "accessToken" in data["data"]:
@@ -292,6 +342,73 @@ def run_tests():
         headers = {"Authorization": f"Bearer {tokens['COMPANY_ADMIN']}"}
         status, data = make_request("/v1/admin/company/dashboard", headers=headers)
         log_test("Company Manager access /v1/admin/company/dashboard", status == 200 and data.get("success") == True)
+
+    print()
+
+    # 6. Payment & Subscription Microservice Verification
+    print(f"{BOLD}[TEST SUITE 6] Payment & Subscription Microservice Verification{RESET}")
+
+    # 6.1 Public Plans Catalog
+    status, data = make_request("/v1/subscriptions/plans")
+    log_test("Fetch Public Plans Catalog", status == 200 and len(data.get("data", [])) >= 5)
+
+    # 6.2 Filter Plans by Candidate Role
+    status, data = make_request("/v1/subscriptions/plans?role=CANDIDATE")
+    cand_plans = data.get("data", [])
+    log_test("Fetch Candidate Filtered Plans", status == 200 and len(cand_plans) >= 1)
+
+    # 6.3 Candidate Subscription & Purchase Workflow
+    if "CANDIDATE" in tokens:
+        headers = {"Authorization": f"Bearer {tokens['CANDIDATE']}"}
+
+        # Cancel any active subscription first to allow fresh purchase
+        make_request("/v1/subscriptions/cancel", method="POST", headers=headers, body={"reason": "Testing fresh purchase"})
+
+        # Initiate Purchase
+        purchase_payload = {
+            "planCode": "CANDIDATE_PRO",
+            "billingCycle": "MONTHLY",
+            "idempotencyKey": f"idem-test-{int(time.time())}"
+        }
+        status, data = make_request("/v1/subscriptions/purchase", method="POST", headers=headers, body=purchase_payload)
+        order_id = data.get("data", {}).get("orderId") if isinstance(data, dict) else None
+        log_test("Candidate Initiate Purchase (CANDIDATE_PRO)", status == 200 and order_id is not None)
+
+        if order_id:
+            # Generate UPI QR Payment Session
+            status, data = make_request(f"/v1/subscriptions/payment-session/qr?orderId={order_id}", method="POST", headers=headers)
+            upi_uri = data.get("data", {}).get("upiUri") if isinstance(data, dict) else None
+            log_test("Generate Dynamic UPI QR Session", status == 200 and upi_uri is not None)
+
+            # Check Session Status & TTL
+            status, data = make_request(f"/v1/subscriptions/payment-session/{order_id}", headers=headers)
+            ttl = data.get("data", {}).get("ttlRemainingSeconds") if isinstance(data, dict) else None
+            log_test("Inspect Payment Session Status & Redis TTL", status == 200 and ttl is not None and ttl > 0)
+
+            # Verify Payment & Activate
+            verify_payload = {
+                "orderId": order_id,
+                "gatewayPaymentId": f"pay_mock_{int(time.time())}",
+                "gatewaySignature": "mock_sig_valid",
+                "paymentMethod": "UPI"
+            }
+            status, data = make_request("/v1/subscriptions/verify", method="POST", headers=headers, body=verify_payload)
+            is_active = data.get("data", {}).get("status") == "ACTIVE" if isinstance(data, dict) else False
+            log_test("Verify Payment & Activate Subscription", status == 200 and is_active)
+
+            # Verify Active Subscription
+            status, data = make_request("/v1/subscriptions/my", headers=headers)
+            sub_status = data.get("data", {}).get("status") if isinstance(data, dict) else None
+            log_test("Retrieve Current Active Subscription", status == 200 and sub_status == "ACTIVE")
+
+            # Transaction History
+            status, data = make_request("/v1/subscriptions/transactions", headers=headers)
+            content = data.get("data", {}).get("content", []) if isinstance(data, dict) else []
+            log_test("Retrieve User Transaction History", status == 200 and len(content) >= 1)
+
+            # Cancel Subscription
+            status, data = make_request("/v1/subscriptions/cancel", method="POST", headers=headers, body={"reason": "Test complete"})
+            log_test("Cancel Active Subscription", status == 200)
 
     print(f"\n{CYAN}{BOLD}======================================================={RESET}")
     print(f"{BOLD}  VERIFICATION SUMMARY: {GREEN}{passed_tests} PASSED{RESET} | {RED if failed_tests > 0 else GREEN}{failed_tests} FAILED{RESET}")

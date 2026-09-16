@@ -1,0 +1,148 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: api-gateway
+  main:
+    web-application-type: reactive
+  cloud:
+    gateway:
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 30s
+        pool:
+          type: ELASTIC
+          max-idle-time: 15s
+      routes:
+        - id: auth-service
+          uri: ${AUTH_SERVICE_URL:http://auth-service:8082}
+          predicates:
+            - Path=/api/v1/auth/**,/api/v1/auth
+
+        - id: payment-service-subscriptions
+          uri: ${PAYMENT_SERVICE_URL:http://payment-service:8087}
+          predicates:
+            - Path=/api/v1/subscriptions/**,/api/v1/subscriptions
+
+        - id: chat-service
+          uri: ${CHAT_SERVICE_URL:http://chat-service:8086}
+          predicates:
+            - Path=/api/v1/chat/**,/api/v1/chat
+
+        - id: chat-service-ws
+          uri: ${CHAT_SERVICE_WS_URL:http://chat-service:8086}
+          predicates:
+            - Path=/api/ws/**,/api/ws
+
+        - id: job-service-jobs
+          uri: ${JOB_SERVICE_URL:http://job-service:8085}
+          predicates:
+            - Path=/api/v1/jobs/**,/api/v1/jobs
+
+        - id: job-service-applications
+          uri: ${JOB_SERVICE_URL:http://job-service:8085}
+          predicates:
+            - Path=/api/v1/applications/**,/api/v1/applications
+
+        - id: job-service-interviews
+          uri: ${JOB_SERVICE_URL:http://job-service:8085}
+          predicates:
+            - Path=/api/v1/interviews/**,/api/v1/interviews
+
+        - id: job-service-recommendations
+          uri: ${JOB_SERVICE_URL:http://job-service:8085}
+          predicates:
+            - Path=/api/v1/recommendations/**,/api/v1/recommendations
+
+        - id: job-service-copilot
+          uri: ${JOB_SERVICE_URL:http://job-service:8085}
+          predicates:
+            - Path=/api/v1/copilot/**,/api/v1/copilot
+
+        - id: candidate-service-candidates
+          uri: ${CANDIDATE_SERVICE_URL:http://candidate-service:8083}
+          predicates:
+            - Path=/api/v1/candidates/**,/api/v1/candidates
+
+        - id: candidate-service-resumes
+          uri: ${CANDIDATE_SERVICE_URL:http://candidate-service:8083}
+          predicates:
+            - Path=/api/v1/resumes/**,/api/v1/resumes
+
+        - id: candidate-service-portfolios
+          uri: ${CANDIDATE_SERVICE_URL:http://candidate-service:8083}
+          predicates:
+            - Path=/api/v1/portfolios/**,/api/v1/portfolios
+
+        - id: company-service-companies
+          uri: ${COMPANY_SERVICE_URL:http://company-service:8084}
+          predicates:
+            - Path=/api/v1/companies/**,/api/v1/companies
+
+        - id: company-service-hr
+          uri: ${COMPANY_SERVICE_URL:http://company-service:8084}
+          predicates:
+            - Path=/api/v1/hr/**,/api/v1/hr
+
+        - id: company-service-employees
+          uri: ${COMPANY_SERVICE_URL:http://company-service:8084}
+          predicates:
+            - Path=/api/v1/employees/**,/api/v1/employees
+
+        - id: company-service-salaries
+          uri: ${COMPANY_SERVICE_URL:http://company-service:8084}
+          predicates:
+            - Path=/api/v1/salaries/**,/api/v1/salaries
+
+        - id: company-service-verification
+          uri: ${COMPANY_SERVICE_URL:http://company-service:8084}
+          predicates:
+            - Path=/api/v1/company/**,/api/v1/company
+
+        - id: admin-service-admin
+          uri: ${ADMIN_SERVICE_URL:http://admin-service:8089}
+          predicates:
+            - Path=/api/v1/admin/**,/api/v1/admin
+
+        - id: admin-service-public
+          uri: ${ADMIN_SERVICE_URL:http://admin-service:8089}
+          predicates:
+            - Path=/api/v1/public/**,/api/v1/public
+
+        - id: admin-service-analytics
+          uri: ${ADMIN_SERVICE_URL:http://admin-service:8089}
+          predicates:
+            - Path=/api/v1/analytics/**,/api/v1/analytics
+
+        - id: admin-service-notifications
+          uri: ${ADMIN_SERVICE_URL:http://admin-service:8089}
+          predicates:
+            - Path=/api/v1/notifications/**,/api/v1/notifications
+
+        - id: admin-service-developer-workspace
+          uri: ${ADMIN_SERVICE_URL:http://admin-service:8089}
+          predicates:
+            - Path=/api/v1/developer-workspace/**,/api/v1/developer-workspace
+
+management:
+  endpoints:
+    web:
+      base-path: /api/actuator
+      exposure:
+        include: health,info,gateway
+  endpoint:
+    health:
+      show-details: always
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: INFO
+    com.talentiq.gateway: INFO

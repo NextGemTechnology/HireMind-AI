@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -27,6 +27,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { HrCopilot } from './pages/HrCopilot';
 import HrAnalytics from './pages/HrAnalytics';
 import { HrApplications } from './pages/HrApplications';
+import { UserMessages } from './pages/UserMessages';
 import HrMessages from './pages/HrMessages';
 import HrCalendar from './pages/HrCalendar';
 import { HrGlobalNotificationToast } from './components/HrGlobalNotificationToast';
@@ -36,7 +37,11 @@ import { HrWorkspace } from './components/HrWorkspace';
 // 4 Dedicated Admin Dashboards
 import { AppDeveloperDashboard } from './pages/AppDeveloperDashboard';
 import { ServiceTeamDashboard } from './pages/ServiceTeamDashboard';
-import { CompanyManagerDashboard } from './pages/CompanyManagerDashboard';
+const CompanyManagerDashboard = lazy(() => import('./pages/CompanyManagerDashboard'));
+const CompanyWorkspace = lazy(() => import('./components/company/CompanyWorkspace'));
+const CompanyWorkspaceGate = ({ enabled, children }: { enabled: boolean; children: ReactNode }) => enabled
+  ? <Suspense fallback={<div role="status" style={{ padding: 32 }}>Loading company workspace…</div>}><CompanyWorkspace>{children}</CompanyWorkspace></Suspense>
+  : <>{children}</>;
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 
 const BlockedRoute = () => (
@@ -58,7 +63,8 @@ const BlockedRoute = () => (
 
 const CandidateMessagesRoute: React.FC = () => {
   const location = useLocation();
-  const { isHr } = useAuth();
+  const { isHr, user } = useAuth();
+  if (user?.roles.includes('ROLE_COMPANY_ADMIN')) return <UserMessages embedded />;
   if (isHr) {
     return <Navigate to={`/hr-messages${location.search}`} replace />;
   }
@@ -71,7 +77,7 @@ const CandidateMessagesRoute: React.FC = () => {
 
 function AppLayout() {
   const location = useLocation();
-  const { isHr } = useAuth();
+  const { isHr, user } = useAuth();
 
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
@@ -91,14 +97,16 @@ function AppLayout() {
     '/developer-workspace'
   ];
   const isHome = location.pathname === '/';
-  const isHrWorkspace = isHr && (['/hr-analytics', '/hr-messages', '/hr-calendar', '/hr-applications', '/copilot', '/jobs', '/team-chat', '/profile'].includes(location.pathname) || location.pathname.startsWith('/candidate-profile/'));
-  const hideNavbar = isHome || isHrWorkspace || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
+  const isCompanyWorkspace = Boolean(user?.roles.includes('ROLE_COMPANY_ADMIN')) && ['/admin/company', '/team-chat', '/profile', '/messages'].includes(location.pathname);
+  const isHrWorkspace = !isCompanyWorkspace && isHr && (['/hr-analytics', '/hr-messages', '/hr-calendar', '/hr-applications', '/copilot', '/jobs', '/team-chat', '/profile'].includes(location.pathname) || location.pathname.startsWith('/candidate-profile/'));
+  const hideNavbar = isHome || isCompanyWorkspace || isHrWorkspace || HIDE_NAV_ROUTES.some(r => location.pathname.startsWith(r));
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {!hideNavbar && <Navbar />}
       <main style={{ flex: 1 }}>
         <HrWorkspace enabled={isHrWorkspace}>
+        <CompanyWorkspaceGate enabled={isCompanyWorkspace}>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -147,7 +155,7 @@ function AppLayout() {
             </ProtectedRoute>
           } />
           <Route path="/messages" element={
-            <ProtectedRoute roles={['ROLE_CANDIDATE', 'ROLE_HR']}>
+            <ProtectedRoute roles={['ROLE_CANDIDATE', 'ROLE_HR', 'ROLE_COMPANY_ADMIN']}>
               <CandidateMessagesRoute />
             </ProtectedRoute>
           } />
@@ -202,7 +210,7 @@ function AppLayout() {
           {/* Role 3: Company Manager */}
           <Route path="/admin/company" element={
             <ProtectedRoute roles={['ROLE_COMPANY_ADMIN']}>
-              <CompanyManagerDashboard />
+              <Suspense fallback={<div role="status">Loading manager overview…</div>}><CompanyManagerDashboard /></Suspense>
             </ProtectedRoute>
           } />
 
@@ -223,6 +231,7 @@ function AppLayout() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </CompanyWorkspaceGate>
         </HrWorkspace>
       </main>
       <HrGlobalNotificationToast />

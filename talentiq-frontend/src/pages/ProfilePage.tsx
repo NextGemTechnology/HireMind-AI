@@ -22,7 +22,9 @@ interface ParsedResult {
 }
 
 export const ProfilePage: React.FC = () => {
-  const { user, isHr } = useAuth();
+  const { user, isHr: hasHrRole } = useAuth();
+  const isCompanyManager = !!user?.roles?.includes('ROLE_COMPANY_ADMIN');
+  const isHr = hasHrRole && !isCompanyManager;
   const { theme, toggleTheme, isUniverse } = useTheme();
   const navigate = useNavigate();
 
@@ -69,7 +71,7 @@ export const ProfilePage: React.FC = () => {
           } catch {
             // HR profile not yet created
           }
-        } else {
+        } else if (!isCompanyManager) {
           try {
             const candRes = await apiClient.get('/candidates/me');
             const candData = candRes.data?.data || candRes.data;
@@ -90,7 +92,7 @@ export const ProfilePage: React.FC = () => {
     if (user) {
       loadProfileData();
     }
-  }, [user, isHr]);
+  }, [user, isHr, isCompanyManager]);
 
   // Handle Profile Update (Email is strictly immutable/read-only)
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -172,16 +174,16 @@ export const ProfilePage: React.FC = () => {
   };
 
   return (
-    <div className={`profile-container ${isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ position: 'relative', zIndex: 1 }}>
+    <div className={`profile-container ${!isCompanyManager && isUniverse ? 'theme-universe' : 'theme-light'}`} style={{ position: 'relative', zIndex: 1 }}>
       {/* ── Interactive Galaxy Background with Mouse Motion & Attraction ── */}
-      {!isHr && <InteractiveGalaxyBackground theme={theme} />}
+      {!isHr && !isCompanyManager && <InteractiveGalaxyBackground theme={theme} />}
 
       {/* Header Banner */}
       <div className="profile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
             <h2 className="profile-title" style={{ margin: 0 }}>
-              {isHr ? 'HR Recruiter Profile' : 'User Account Profile'}
+              {isCompanyManager ? 'Manager account profile' : isHr ? 'HR Recruiter Profile' : 'User Account Profile'}
             </h2>
             {isHr && (
               <span className="solar-badge-hr">
@@ -190,7 +192,7 @@ export const ProfilePage: React.FC = () => {
             )}
           </div>
           <p className="profile-subtitle" style={{ margin: 0 }}>
-            {isHr
+            {isCompanyManager ? 'Manage your name and contact details. Company settings are managed separately.' : isHr
               ? 'Manage recruitment credentials, talent department, and company administration'
               : 'Manage your personal account details and AI skill matrix'}
           </p>
@@ -198,7 +200,7 @@ export const ProfilePage: React.FC = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           {/* Theme Toggle Button */}
-          <button
+          {!isCompanyManager && <button
             onClick={toggleTheme}
             className="btn btn-secondary"
             style={{
@@ -217,7 +219,7 @@ export const ProfilePage: React.FC = () => {
             title={isUniverse ? 'Switch to Light Mode' : 'Switch to Galaxy / Universe Theme'}
           >
             {isUniverse ? <><Sun size={16} color="#F59E0B" /> Light Mode</> : <><Moon size={16} color="#7C3AED" /> Galaxy Theme</>}
-          </button>
+          </button>}
 
           {/* Edit / Cancel Toggle Button */}
           <button
@@ -262,9 +264,10 @@ export const ProfilePage: React.FC = () => {
             <form onSubmit={handleSaveProfile} className="profile-edit-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
-                  <label className="profile-field-label">First Name</label>
+                  <label htmlFor="profile-first-name" className="profile-field-label">First Name</label>
                   <input
                     type="text"
+                    id="profile-first-name"
                     value={firstName}
                     onChange={e => setFirstName(e.target.value)}
                     required
@@ -273,9 +276,10 @@ export const ProfilePage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="profile-field-label">Last Name</label>
+                  <label htmlFor="profile-last-name" className="profile-field-label">Last Name</label>
                   <input
                     type="text"
+                    id="profile-last-name"
                     value={lastName}
                     onChange={e => setLastName(e.target.value)}
                     required
@@ -288,7 +292,7 @@ export const ProfilePage: React.FC = () => {
               {/* Immutable Email Field with Lock */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label className="profile-field-label">Email Address (Locked)</label>
+                  <label htmlFor="profile-email" className="profile-field-label">Email Address (Locked)</label>
                   <span style={{ fontSize: '11px', color: '#F87171', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Lock size={12} /> Immutable
                   </span>
@@ -296,6 +300,7 @@ export const ProfilePage: React.FC = () => {
                 <div style={{ position: 'relative', marginTop: '6px' }}>
                   <input
                     type="email"
+                    id="profile-email"
                     value={user?.email || ''}
                     disabled
                     readOnly
@@ -308,7 +313,7 @@ export const ProfilePage: React.FC = () => {
                   />
                 </div>
                 <span style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px', display: 'block' }}>
-                  Email is strictly tied to verified HR credentials and cannot be changed.
+                  {isCompanyManager ? 'Your sign-in email is protected and cannot be edited here.' : 'Email is strictly tied to verified HR credentials and cannot be changed.'}
                 </span>
               </div>
 
@@ -363,10 +368,11 @@ export const ProfilePage: React.FC = () => {
               )}
 
               <div>
-                <label className="profile-field-label">Contact Phone</label>
+                <label htmlFor="profile-phone" className="profile-field-label">Contact Phone</label>
                 <input
                   type="text"
                   placeholder="+91 98765 43210"
+                  id="profile-phone"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   className="msg-input-field"
@@ -561,6 +567,8 @@ export const ProfilePage: React.FC = () => {
               </button>
             </div>
           </div>
+        ) : isCompanyManager ? (
+          <div className="glass-panel profile-card"><h3 className="profile-card-heading">Company workspace</h3><p className="profile-subtitle">Manage the company profile, team and account preferences from your workspace.</p><button className="btn btn-secondary" onClick={() => navigate('/admin/company?view=settings&section=account')}>Back to account settings <ArrowRight size={16} /></button></div>
         ) : (
           /* Candidate AI Resume Parser */
           <div className="glass-panel profile-card solar-theme-accent">
